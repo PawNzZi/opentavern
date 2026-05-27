@@ -77,6 +77,96 @@ body {
 .msg-assistant .msg-bubble { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px 20px 20px 4px; }
 .msg-bubble { padding: 14px 18px; line-height: 1.7; font-size: 0.925rem; white-space: pre-wrap; word-break: break-word; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 
+.dialogue-highlight { color: #f59e0b; }
+
+.msg-actions { display: flex; gap: 4px; margin-top: 6px; opacity: 0; transition: opacity 0.2s ease; }
+.msg-wrapper:hover .msg-actions { opacity: 1; }
+.msg-user .msg-actions { justify-content: flex-end; }
+.msg-action-btn {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+    color: #71717a; font-size: 12px; cursor: pointer;
+    transition: all 0.2s ease;
+}
+.msg-action-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.14); color: #d4d4d8; }
+.msg-action-btn.copy-btn:hover { color: #60a5fa; border-color: rgba(96,165,250,0.3); background: rgba(96,165,250,0.08); }
+.msg-action-btn.retry-btn:hover { color: #f59e0b; border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.08); }
+.msg-action-btn.del-btn:hover { color: #f87171; border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.08); }
+
+/* Mobile responsive */
+@media (max-width: 767px) {
+    #sidebar {
+        position: fixed; top: 0; left: 0; bottom: 0; z-index: 60;
+        width: 280px; max-width: 85vw;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: 8px 0 30px rgba(0,0,0,0.5);
+    }
+    #sidebar.open { transform: translateX(0); }
+
+    #sidebarBackdrop {
+        position: fixed; inset: 0; z-index: 55;
+        background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        opacity: 0; visibility: hidden; pointer-events: none;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    #sidebarBackdrop.open { opacity: 1; visibility: visible; pointer-events: auto; }
+
+    .msg-bubble { max-width: 100%; font-size: 0.875rem; padding: 12px 14px; }
+    .msg-wrapper { max-width: 92% !important; }
+
+    .msg-actions { opacity: 1; }
+    .msg-action-btn { width: 30px; height: 30px; border-radius: 8px; font-size: 13px; }
+
+    #messagesContainer { padding: 12px 12px; }
+
+    #chatTopBar { padding: 8px 12px; }
+    #chatTopBar .topbar-actions { gap: 2px; }
+
+    .modal-overlay .glass.rounded-3xl {
+        width: 96%; max-width: 100%; border-radius: 20px; padding: 16px;
+        max-height: 92vh;
+    }
+
+    .hamburger-btn {
+        display: flex !important;
+    }
+    .hamburger-close-btn {
+        display: flex !important;
+    }
+    .mobile-hide-sm { display: none !important; }
+
+    /* Mobile: character editor single column */
+    #charEditorModal .grid.grid-cols-2 { grid-template-columns: 1fr; }
+
+    /* Mobile: lang switcher compact */
+    .lang-btn { padding-left: 8px; padding-right: 8px; padding-top: 6px; padding-bottom: 6px; font-size: 11px; }
+
+    /* Mobile: input area */
+    #messageInput { font-size: 16px; } /* prevent iOS zoom */
+}
+
+@media (min-width: 768px) {
+    #sidebar { transform: translateX(0) !important; }
+    #sidebarBackdrop { display: none !important; }
+    .hamburger-btn { display: none !important; }
+}
+
+.hamburger-btn {
+    display: none;
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    color: #a1a1aa; cursor: pointer;
+    align-items: center; justify-content: center;
+    transition: all 0.2s ease; flex-shrink: 0;
+}
+.hamburger-btn:hover { background: rgba(255,255,255,0.08); color: #d4d4d8; }
+.hamburger-btn svg { width: 18px; height: 18px; }
+
+.hamburger-close-btn { display: none; }
+
 input[type="range"] { -webkit-appearance:none; appearance:none; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; outline:none; }
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background: var(--accent); cursor:pointer; border: 2px solid rgba(255,255,255,0.15); box-shadow: 0 0 10px var(--accent-glow); }
 
@@ -182,6 +272,56 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                 </div>
                 <input type="range" id="summaryThreshold" min="1" max="20" value="10" class="w-full">
             </div>
+
+            <!-- Summarization API Settings -->
+            <hr class="border-white/5">
+            <div>
+                <label class="text-xs font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="settings_summarize_api_title">总结 API 设置（Summarization API）</label>
+
+                <div class="mt-2 space-y-2">
+                    <!-- Use Main API -->
+                    <label class="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" id="summarizeUseMainAPI" class="accent-amber-500" checked>
+                        <span data-i18n="settings_summarize_use_main">使用主 API 进行总结（推荐大多数用户）</span>
+                    </label>
+
+                    <!-- Custom API Section -->
+                    <div id="summarizeCustomApiSection" class="ml-6 space-y-2 border-l border-white/10 pl-3">
+                        <div>
+                            <label class="text-xs font-semibold text-zinc-400" data-i18n="settings_summarize_api_endpoint">API Endpoint</label>
+                            <input id="summarizeApiEndpoint" type="text" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl" placeholder="https://api.deepseek.com/v1/chat/completions">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-zinc-400" data-i18n="settings_summarize_api_key">API Key</label>
+                            <input id="summarizeApiKey" type="password" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl" placeholder="sk-...">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-zinc-400" data-i18n="settings_summarize_model">Model</label>
+                            <input id="summarizeModel" type="text" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl" value="deepseek-chat">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- World Info Budget -->
+            <hr class="border-white/5">
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <label class="text-xs font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="settings_wi_budget">World Info Token Budget</label>
+                        <p class="text-[10px] text-zinc-600 mt-0.5" data-i18n="settings_wi_budget_hint">Limit total tokens injected from World Book entries per generation</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
+                        <input type="checkbox" id="worldInfoBudgetEnabled" class="sr-only peer">
+                        <div class="w-9 h-5 bg-white/10 rounded-full peer-checked:bg-amber-500/60 peer-checked:ring-1 peer-checked:ring-amber-500/40 transition-all after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="text-xs font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="settings_wi_budget_max">Max Tokens from World Info</label>
+                    <span id="worldInfoBudgetVal" class="text-xs text-zinc-500 bg-white/5 px-2 py-0.5 rounded-full">2048</span>
+                </div>
+                <input type="range" id="worldInfoBudget" min="256" max="8192" step="256" value="2048" class="w-full">
+            </div>
         </div>
     </div>
 </div>
@@ -280,6 +420,279 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
     </div>
 </div>
 
+<!-- ===== World Book / World Info Modal ===== -->
+<div id="worldBookModal" class="modal-overlay fixed inset-0 z-[110] flex items-center justify-center hidden">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-md" id="worldBookBackdrop"></div>
+    <div class="relative glass rounded-3xl w-[96%] max-w-[1080px] shadow-2xl animate-fade-in max-h-[94vh] flex flex-col overflow-hidden border border-white/10">
+        <!-- Header -->
+        <div class="px-5 py-3 border-b border-white/10 flex items-center gap-3 flex-shrink-0 bg-black/20">
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+                <span class="text-xl">📖</span>
+                <span class="font-bold text-lg text-zinc-100" data-i18n="world_book_title">世界书 / World Info</span>
+                <input id="wiBookName" class="ml-2 flex-1 max-w-[260px] px-3 py-1.5 text-sm glass rounded-xl text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-amber-500/40" placeholder="Lorebook name (optional)">
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <button id="wiImportBtn" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 transition-all" data-i18n="world_book_import">导入 JSON</button>
+                <button id="wiExportBtn" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 transition-all" data-i18n="world_book_export">导出 JSON</button>
+                <button id="wiDeleteAllBtn" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all" data-i18n="world_book_delete_all">一键删除全部</button>
+                <button id="wiAddEntryBtn" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-white shadow shadow-amber-500/20 transition-all" data-i18n="world_book_add_entry">+ 新建条目</button>
+                <button id="wiCloseBtn" class="w-9 h-9 rounded-full glass flex items-center justify-center text-xl text-zinc-400 hover:text-zinc-200 transition-colors leading-none">&times;</button>
+            </div>
+        </div>
+
+        <!-- Body: list + editor -->
+        <div class="flex-1 flex overflow-hidden min-h-0">
+            <!-- Left: Entry List -->
+            <div class="w-72 border-r border-white/10 flex flex-col bg-black/10">
+                <div class="p-2.5 border-b border-white/5">
+                    <input id="wiSearch" type="text" class="w-full px-3 py-2 text-sm glass rounded-xl placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-amber-500/30" data-i18n-placeholder="world_book_search" placeholder="搜索关键字或备注...">
+                </div>
+                <div id="wiEntryList" class="flex-1 overflow-y-auto p-2 space-y-1.5 text-sm custom-scroll"></div>
+                <div class="p-2 text-[10px] text-center text-zinc-500 border-t border-white/5" id="wiEntryStats"></div>
+            </div>
+
+            <!-- Right: Editor -->
+            <div class="flex-1 flex flex-col overflow-y-auto p-4 bg-zinc-950/30" id="wiEditorContainer">
+                <div id="wiNoSelection" class="flex-1 flex items-center justify-center text-center text-zinc-500 text-sm">
+                    <div>
+                        <div class="text-4xl mb-3 opacity-60">📖</div>
+                        <div data-i18n="world_book_no_selection">选择左侧条目进行编辑，或点击“新建条目”</div>
+                    </div>
+                </div>
+
+                <div id="wiEditorForm" class="hidden space-y-4">
+                    <!-- Quick row -->
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <label class="flex items-center gap-2 text-sm cursor-pointer">
+                                <input type="checkbox" id="wiDisable" class="accent-amber-500">
+                                <span class="text-zinc-400" data-i18n="wi_disable">禁用此条目</span>
+                            </label>
+                            <span id="wiUidBadge" class="text-[10px] text-zinc-500 font-mono"></span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="wiDuplicateBtn" class="px-2.5 py-1 text-xs rounded-lg glass hover:bg-white/10" data-i18n="world_book_duplicate">复制</button>
+                            <button id="wiDeleteEntryBtn" class="px-2.5 py-1 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20" data-i18n="world_book_delete">删除</button>
+                        </div>
+                    </div>
+
+                    <!-- Core fields -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_comment">备注 (Memo)</label>
+                            <input id="wiComment" type="text" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl text-zinc-200 focus:outline-none focus:ring-1 focus:ring-amber-500/40">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_order">插入顺序 (Order)</label>
+                            <input id="wiOrder" type="number" value="100" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl text-zinc-200 focus:outline-none focus:ring-1 focus:ring-amber-500/40">
+                        </div>
+                    </div>
+
+                    <!-- Keys -->
+                    <div>
+                        <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_keys">激活关键字 (Keys)</label>
+                        <div id="wiKeyChips" class="mt-1 min-h-[34px] flex flex-wrap gap-1 p-2 glass rounded-xl bg-black/20"></div>
+                        <div class="flex gap-2 mt-1.5">
+                            <input id="wiKeyInput" type="text" class="flex-1 px-3 py-1.5 text-sm glass rounded-xl" placeholder="输入关键字后回车或点击添加">
+                            <button id="wiAddKeyBtn" class="px-4 text-xs font-semibold rounded-xl glass hover:bg-white/10">添加</button>
+                        </div>
+                        <div class="text-[10px] text-zinc-500 mt-0.5" data-i18n="wi_keys_hint">支持正则表达式：/rainy|storm/i</div>
+                    </div>
+
+                    <!-- Secondary + Logic -->
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                        <div class="md:col-span-3">
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_secondary">可选过滤关键字</label>
+                            <div id="wiSecChips" class="mt-1 min-h-[34px] flex flex-wrap gap-1 p-2 glass rounded-xl bg-black/20"></div>
+                            <div class="flex gap-2 mt-1.5">
+                                <input id="wiSecInput" type="text" class="flex-1 px-3 py-1.5 text-sm glass rounded-xl" placeholder="可选关键字">
+                                <button id="wiAddSecBtn" class="px-4 text-xs font-semibold rounded-xl glass hover:bg-white/10">添加</button>
+                            </div>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_selective_logic">选择逻辑</label>
+                            <select id="wiSelectiveLogic" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl text-zinc-200 focus:outline-none">
+                                <option value="0" data-i18n="logic_and_any">AND ANY (任一)</option>
+                                <option value="1" data-i18n="logic_and_all">AND ALL (全部)</option>
+                                <option value="2" data-i18n="logic_not_any">NOT ANY (无任一)</option>
+                                <option value="3" data-i18n="logic_not_all">NOT ALL (无全部)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Content -->
+                    <div>
+                        <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_content">内容 (插入到提示词)</label>
+                        <textarea id="wiContent" rows="7" class="w-full mt-1 px-3 py-2 text-sm glass rounded-2xl text-zinc-200 font-mono leading-relaxed focus:outline-none focus:ring-1 focus:ring-amber-500/30 resize-y"></textarea>
+                    </div>
+
+                    <!-- Strategy & Probability -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_strategy">策略</label>
+                            <div class="flex mt-1.5 gap-1">
+                                <button id="wiStratConstant" class="flex-1 px-2 py-1.5 text-xs rounded-xl border border-white/10 hover:border-amber-500/50 data-active:bg-amber-500/20 data-active:border-amber-500" data-active="false">🔵 恒常</button>
+                                <button id="wiStratSelective" class="flex-1 px-2 py-1.5 text-xs rounded-xl border border-white/10 hover:border-amber-500/50 data-active:bg-amber-500/20 data-active:border-amber-500" data-active="true">🟢 关键字</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1" data-i18n="wi_probability">触发概率</label>
+                            <div class="flex items-center gap-2 mt-1">
+                                <input id="wiProbability" type="range" min="0" max="100" step="5" value="100" class="flex-1">
+                                <span id="wiProbVal" class="w-9 text-right text-sm tabular-nums">100</span>
+                                <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="wiUseProb" class="accent-amber-500"> <span data-i18n="wi_use_probability">启用</span></label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">包含组 (Group)</label>
+                            <input id="wiGroup" type="text" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl" placeholder="group-name">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">组权重</label>
+                            <div class="flex gap-2 mt-1">
+                                <input id="wiGroupWeight" type="number" value="100" class="flex-1 px-3 py-2 text-sm glass rounded-xl">
+                                <label class="flex items-center gap-1 text-[10px] whitespace-nowrap"><input type="checkbox" id="wiPrioritize" class="accent-amber-500"> <span data-i18n="wi_prioritize">优先</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Position -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div class="md:col-span-1">
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_position">插入位置</label>
+                            <select id="wiPosition" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl">
+                                <option value="0" data-i18n="pos_before_char">Before Char Defs</option>
+                                <option value="1" data-i18n="pos_after_char">After Char Defs</option>
+                                <option value="2" data-i18n="pos_before_ex">Before Example Msgs</option>
+                                <option value="3" data-i18n="pos_after_ex">After Example Msgs</option>
+                                <option value="4" data-i18n="pos_top_an">Top of Author's Note</option>
+                                <option value="5" data-i18n="pos_bottom_an">Bottom of Author's Note</option>
+                                <option value="6" data-i18n="pos_at_depth">@ Depth</option>
+                                <option value="7" data-i18n="pos_outlet">Outlet (named)</option>
+                            </select>
+                        </div>
+                        <div id="wiDepthRow" class="hidden md:col-span-1">
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_depth">深度 (Depth, 0=底部)</label>
+                            <div class="flex gap-2 mt-1">
+                                <input id="wiDepth" type="number" min="0" value="4" class="flex-1 px-3 py-2 text-sm glass rounded-xl">
+                                <select id="wiRole" class="flex-1 px-2 py-2 text-sm glass rounded-xl">
+                                    <option value="0" data-i18n="role_system">System</option>
+                                    <option value="1" data-i18n="role_user">User</option>
+                                    <option value="2" data-i18n="role_assistant">Assistant</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="wiOutletRow" class="hidden md:col-span-1">
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_outlet">Outlet 名称</label>
+                            <input id="wiOutletName" type="text" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl" placeholder="my_outlet">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_use_group_scoring">组评分 / Use Group Scoring</label>
+                            <div class="mt-2 flex gap-4">
+                                <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" id="wiUseGroupScoring" class="accent-amber-500"> <span>启用</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timed Effects + Recursion -->
+                    <details class="glass rounded-2xl p-3">
+                        <summary class="cursor-pointer text-xs font-semibold text-zinc-400 select-none" data-i18n="wi_timed">定时效果 & 递归 (Timed & Recursion)</summary>
+                        <div class="grid grid-cols-3 gap-3 mt-3">
+                            <div>
+                                <label class="text-xs text-zinc-400">Sticky</label>
+                                <input id="wiSticky" type="number" min="0" value="0" class="w-full mt-1 px-3 py-1.5 text-sm glass rounded-xl">
+                            </div>
+                            <div>
+                                <label class="text-xs text-zinc-400">Cooldown</label>
+                                <input id="wiCooldown" type="number" min="0" value="0" class="w-full mt-1 px-3 py-1.5 text-sm glass rounded-xl">
+                            </div>
+                            <div>
+                                <label class="text-xs text-zinc-400">Delay</label>
+                                <input id="wiDelay" type="number" min="0" value="0" class="w-full mt-1 px-3 py-1.5 text-sm glass rounded-xl">
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-x-5 gap-y-2 mt-3 text-sm">
+                            <label class="flex items-center gap-2"><input type="checkbox" id="wiExcludeRec" class="accent-amber-500"> <span class="text-xs" data-i18n="wi_exclude_recursion">排除递归激活</span></label>
+                            <label class="flex items-center gap-2"><input type="checkbox" id="wiPreventRec" class="accent-amber-500"> <span class="text-xs" data-i18n="wi_prevent_recursion">阻止进一步递归</span></label>
+                            <label class="flex items-center gap-2"><input type="checkbox" id="wiDelayRec" class="accent-amber-500"> <span class="text-xs" data-i18n="wi_delay_until_recursion">仅递归时激活</span></label>
+                        </div>
+                    </details>
+
+                    <!-- Filters & Advanced -->
+                    <details class="glass rounded-2xl p-3">
+                        <summary class="cursor-pointer text-xs font-semibold text-zinc-400 select-none" data-i18n="wi_filters">过滤、触发器与高级 (Filters & Advanced)</summary>
+                        <div class="mt-3 space-y-3">
+                            <!-- Character Filter -->
+                            <div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-xs text-zinc-400 font-semibold" data-i18n="wi_char_filter">角色过滤</span>
+                                    <label class="flex items-center gap-1 text-xs ml-auto"><input type="checkbox" id="wiCharExclude" class="accent-amber-500"> <span data-i18n="wi_is_exclude">排除模式</span></label>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input id="wiCharNames" type="text" placeholder="角色名 (逗号分隔)" class="px-3 py-1.5 text-xs glass rounded-xl">
+                                    <input id="wiCharTags" type="text" placeholder="角色标签 (逗号分隔)" class="px-3 py-1.5 text-xs glass rounded-xl">
+                                </div>
+                            </div>
+
+                            <!-- Triggers -->
+                            <div>
+                                <span class="text-xs text-zinc-400 font-semibold" data-i18n="wi_triggers">触发生成类型 (留空=全部)</span>
+                                <div class="grid grid-cols-3 md:grid-cols-6 gap-x-3 gap-y-1 mt-1 text-xs">
+                                    <label><input type="checkbox" value="normal" class="wi-trigger accent-amber-500"> Normal</label>
+                                    <label><input type="checkbox" value="continue" class="wi-trigger accent-amber-500"> Continue</label>
+                                    <label><input type="checkbox" value="impersonate" class="wi-trigger accent-amber-500"> Impersonate</label>
+                                    <label><input type="checkbox" value="swipe" class="wi-trigger accent-amber-500"> Swipe</label>
+                                    <label><input type="checkbox" value="regenerate" class="wi-trigger accent-amber-500"> Regenerate</label>
+                                    <label><input type="checkbox" value="quiet" class="wi-trigger accent-amber-500"> Quiet</label>
+                                </div>
+                            </div>
+
+                            <!-- Additional match sources -->
+                            <div>
+                                <span class="text-xs text-zinc-400 font-semibold" data-i18n="wi_additional_match">额外匹配源</span>
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1 mt-1 text-xs">
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="wiMatchCharDesc" class="accent-amber-500"> 角色描述</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="wiMatchCharPers" class="accent-amber-500"> 角色性格</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="wiMatchScenario" class="accent-amber-500"> 场景</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="wiMatchPersona" class="accent-amber-500"> 人设描述</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="wiMatchCharNote" class="accent-amber-500"> 角色备注</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="wiMatchCreatorNotes" class="accent-amber-500"> 作者备注</label>
+                                </div>
+                            </div>
+
+                            <!-- Advanced overrides -->
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs pt-1 border-t border-white/5">
+                                <div>
+                                    <label class="text-zinc-400">Scan Depth 覆盖</label>
+                                    <input id="wiScanDepth" type="number" min="0" placeholder="全局" class="w-full mt-0.5 px-2 py-1 glass rounded-lg">
+                                </div>
+                                <div class="flex items-end gap-2">
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="wiCaseSens" class="accent-amber-500"> <span data-i18n="wi_case_sensitive">大小写敏感</span></label>
+                                </div>
+                                <div class="flex items-end gap-2">
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="wiMatchWhole" class="accent-amber-500"> <span data-i18n="wi_match_whole">全词匹配</span></label>
+                                </div>
+                                <div class="flex items-end gap-2">
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="wiIgnoreBudget" class="accent-amber-500"> <span data-i18n="wi_ignore_budget">忽略预算</span></label>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="text-zinc-400">Automation ID</label>
+                                    <input id="wiAutomationId" type="text" class="w-full mt-0.5 px-2 py-1 text-xs glass rounded-lg" placeholder="automation_id">
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+        <!-- Tiny footer -->
+        <div class="px-4 py-2 text-[10px] text-zinc-500 border-t border-white/5 flex justify-between flex-shrink-0">
+            <span>基于 SillyTavern World Info 规范实现 · 支持完整字段</span>
+            <span id="wiDirtyIndicator" class="text-amber-400 hidden">未保存</span>
+        </div>
+    </div>
+</div>
+
 <!-- ===== Summarize Dialog ===== -->
 <div id="summarizeModal" class="modal-overlay fixed inset-0 z-[100] flex items-center justify-center hidden">
     <div class="absolute inset-0 bg-black/65 backdrop-blur-sm" id="summarizeBackdrop"></div>
@@ -318,10 +731,11 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
     <aside id="sidebar" class="w-[270px] flex-shrink-0 flex flex-col border-r border-white/5 bg-zinc-950/25 backdrop-blur-xl">
         <div class="px-5 py-4 flex items-center gap-3 border-b border-white/5">
             <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center text-white text-xs font-bold tracking-tighter">OT</div>
-            <div>
+            <div class="flex-1">
                 <p class="text-sm font-bold text-zinc-100 leading-tight">OpenTavern</p>
                 <p class="text-[10px] text-zinc-500 leading-tight" data-i18n="app_subtitle">AI Character Chat</p>
             </div>
+            <button id="sidebarCloseBtn" class="hamburger-close-btn w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-white/10 transition-all" aria-label="Close menu">&times;</button>
         </div>
         <div class="px-3 py-3 space-y-2 border-b border-white/5">
             <button id="newChatBtn" class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-300 glass hover:bg-white/10 active:bg-white/15 transition-all">
@@ -364,6 +778,14 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                     </button>
                 </div>
             </div>
+
+            <!-- World Book quick access (below Character Card) -->
+            <div class="glass rounded-xl px-3 py-2 flex items-center gap-2 text-xs">
+                <span class="text-zinc-400 flex-shrink-0">📖</span>
+                <span class="flex-1 text-zinc-300 truncate" data-i18n="world_book">World Book</span>
+                <span id="wiEntryCount" class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-zinc-400 flex-shrink-0"></span>
+                <button id="worldBookBtn" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-amber-500/20 hover:text-amber-300 text-zinc-300 transition-all text-[11px] font-medium flex-shrink-0" data-i18n="world_book_btn">Edit</button>
+            </div>
         </div>
         <div id="convList" class="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
             <p id="noConvHint" class="text-xs text-zinc-500 text-center py-8 px-2" data-i18n="no_conversations">No saved conversations yet.<br>Start a new chat to begin.</p>
@@ -383,31 +805,44 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
             </div>
         </div>
         <input type="file" id="convImportFile" accept=".json" class="hidden">
+        <input type="file" id="wiImportFile" accept=".json" class="hidden">
     </aside>
+
+    <!-- Sidebar Backdrop (mobile only) -->
+    <div id="sidebarBackdrop"></div>
 
     <!-- Main Chat Area -->
     <div class="flex-1 flex flex-col overflow-hidden">
         <!-- Chat Top Bar -->
         <div id="chatTopBar" class="flex-shrink-0 px-5 py-3 flex items-center justify-between border-b border-white/5 bg-zinc-950/15 backdrop-blur-2xl">
             <div class="flex items-center gap-3 min-w-0">
+                <button id="hamburgerBtn" class="hamburger-btn" aria-label="Menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
                 <div id="charAvatar" class="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-zinc-500 text-sm flex-shrink-0">💬</div>
                 <div class="min-w-0">
                     <h3 id="chatTitle" class="text-sm font-semibold text-zinc-200 truncate" data-i18n="new_chat_title">New Chat</h3>
                     <p id="chatSubtitle" class="text-[10px] text-zinc-500 truncate" data-i18n="no_character">No character loaded</p>
                 </div>
             </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
+            <div class="flex items-center gap-2 flex-shrink-0 topbar-actions">
                 <!-- Language Switcher -->
                 <div class="flex items-center glass rounded-xl p-0.5 border-white/5">
                     <button class="lang-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 active text-zinc-900" data-lang="zh-CN">简</button>
                     <button class="lang-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 text-zinc-400" data-lang="zh-TW">繁</button>
                     <button class="lang-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 text-zinc-400" data-lang="en">EN</button>
                 </div>
-                <button id="summarizeBtn" class="px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-500 glass hover:text-zinc-300 hover:bg-white/10 transition-all" data-i18n="summary_btn" data-i18n-title="summary_manual_title">🧠 Summarize</button>
-                <button id="archiveBtn" class="px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-500 glass hover:text-zinc-300 hover:bg-white/10 transition-all" data-i18n="archive" data-i18n-title="archive_title">📋 Archive</button>
+                <button id="summarizeBtn" class="mobile-hide-sm px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-500 glass hover:text-zinc-300 hover:bg-white/10 transition-all" data-i18n="summary_btn" data-i18n-title="summary_manual_title">🧠 Summarize</button>
+                <button id="archiveBtn" class="mobile-hide-sm px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-500 glass hover:text-zinc-300 hover:bg-white/10 transition-all" data-i18n="archive" data-i18n-title="archive_title">📋 Archive</button>
                 <button id="summaryHistoryBtn" class="w-8 h-8 rounded-xl glass flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors" data-i18n-title="summary_history_title" title="Summary History">🧠</button>
                 <button id="topSettingsBtn" class="w-8 h-8 rounded-xl glass flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors">⚙️</button>
             </div>
+        </div>
+
+        <!-- World Info Budget Warning Banner -->
+        <div id="wiBudgetWarning" class="hidden mx-4 mt-3 px-4 py-2 rounded-2xl glass text-xs flex items-center gap-3 border border-amber-500/20 text-amber-300">
+            <span id="wiBudgetWarningText" class="flex-1"></span>
+            <button id="wiBudgetWarningDismiss" class="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] transition-colors flex-shrink-0"></button>
         </div>
 
         <!-- Messages Area -->
@@ -471,6 +906,8 @@ var i18n = {
         prompt_viewer_title: '完整提示词（发送给 API）',
         copy: '复制',
         copied: '已复制！',
+        delete_msg: '删除消息',
+        regenerate: '重新生成',
         import_title: '导入角色卡',
         import_desc: '支持 SillyTavern',
         import_desc2: '格式的 JSON 文件。',
@@ -558,7 +995,86 @@ var i18n = {
         char_editor_save: '保存',
         char_editor_cancel: '取消',
         char_create_new: '创建新角色',
-        char_empty_name: '未命名角色'
+        char_empty_name: '未命名角色',
+        world_book: '世界书',
+        world_book_btn: '编辑',
+        world_book_title: '世界书 / World Info',
+        world_book_import: '导入 JSON',
+        world_book_export: '导出 JSON',
+        world_book_delete_all: '一键删除全部',
+        world_book_add_entry: '+ 新建条目',
+        world_book_duplicate: '复制',
+        world_book_delete: '删除',
+        world_book_search: '搜索关键字或备注...',
+        world_book_no_entries: '暂无世界书条目',
+        world_book_no_selection: '选择左侧条目进行编辑，或点击“新建条目”',
+        world_book_entry: '条目',
+        world_book_confirm_delete_all: '确定删除此世界书的所有条目？此操作不可撤销。',
+        wi_comment: '备注 (Memo)',
+        wi_keys: '激活关键字 (Keys)',
+        wi_keys_hint: '逗号或换行分隔；支持正则如 /pattern/flags',
+        wi_secondary: '可选过滤关键字 (Secondary)',
+        wi_selective_logic: '选择逻辑',
+        wi_content: '内容 (Content)',
+        wi_strategy: '策略',
+        wi_constant: '恒常 (Always)',
+        wi_vectorized: '向量匹配',
+        wi_probability: '触发概率 %',
+        wi_use_probability: '启用概率',
+        wi_order: '插入顺序 (Order)',
+        wi_position: '插入位置',
+        wi_depth: '深度 (@D)',
+        wi_role: '消息角色',
+        wi_outlet: 'Outlet 名称',
+        wi_group: '包含组 (Inclusion Group)',
+        wi_group_weight: '组权重',
+        wi_prioritize: '优先包含',
+        wi_use_group_scoring: '使用组评分',
+        wi_timed: '定时效果',
+        wi_sticky: 'Sticky (持续消息数)',
+        wi_cooldown: 'Cooldown (冷却消息数)',
+        wi_delay: 'Delay (需消息数)',
+        wi_recursion: '递归',
+        wi_exclude_recursion: '排除递归激活',
+        wi_prevent_recursion: '阻止进一步递归',
+        wi_delay_until_recursion: '仅递归时激活',
+        wi_filters: '过滤与匹配源',
+        wi_char_filter: '角色过滤',
+        wi_is_exclude: '排除模式',
+        wi_triggers: '触发生成类型',
+        wi_additional_match: '额外匹配源',
+        wi_advanced: '高级设置',
+        wi_scan_depth: '扫描深度覆盖',
+        wi_case_sensitive: '大小写敏感',
+        wi_match_whole: '全词匹配',
+        wi_ignore_budget: '忽略预算限制',
+        wi_automation_id: '自动化 ID (STscript)',
+        wi_disable: '禁用此条目',
+        pos_before_char: 'Before Char Defs',
+        pos_after_char: 'After Char Defs',
+        pos_before_ex: 'Before Example Msgs',
+        pos_after_ex: 'After Example Msgs',
+        pos_top_an: 'Top of Author\'s Note',
+        pos_bottom_an: 'Bottom of Author\'s Note',
+        pos_at_depth: '@ Depth',
+        pos_outlet: 'Outlet (named)',
+        role_system: 'System',
+        role_user: 'User',
+        role_assistant: 'Assistant',
+        logic_and_any: 'AND ANY (任一)',
+        logic_and_all: 'AND ALL (全部)',
+        logic_not_any: 'NOT ANY (无任一)',
+        logic_not_all: 'NOT ALL (无全部)',
+        settings_wi_budget: '世界书 Token 预算',
+        settings_wi_budget_hint: '限制每次生成时世界书条目注入的总 Token 数',
+        settings_wi_budget_max: '世界书最大 Token 数',
+        wi_budget_warning: '部分世界书因预算限制未激活',
+        wi_budget_warning_dismiss: '知道了',
+        settings_summarize_api_title: '总结 API 设置（Summarization API）',
+        settings_summarize_use_main: '使用主 API 进行总结（推荐大多数用户）',
+        settings_summarize_api_endpoint: 'API Endpoint',
+        settings_summarize_api_key: 'API Key',
+        settings_summarize_model: 'Model'
     },
     'zh-TW': {
         app_subtitle: 'AI 角色聊天',
@@ -578,6 +1094,8 @@ var i18n = {
         prompt_viewer_title: '完整提示詞（傳送給 API）',
         copy: '複製',
         copied: '已複製！',
+        delete_msg: '刪除訊息',
+        regenerate: '重新生成',
         import_title: '匯入角色卡',
         import_desc: '支援 SillyTavern',
         import_desc2: '格式的 JSON 檔案。',
@@ -665,7 +1183,86 @@ var i18n = {
         char_editor_save: '儲存',
         char_editor_cancel: '取消',
         char_create_new: '创建新角色',
-        char_empty_name: '未命名角色'
+        char_empty_name: '未命名角色',
+        world_book: '世界書',
+        world_book_btn: '編輯',
+        world_book_title: '世界書 / World Info',
+        world_book_import: '匯入 JSON',
+        world_book_export: '匯出 JSON',
+        world_book_delete_all: '一鍵刪除全部',
+        world_book_add_entry: '+ 新建條目',
+        world_book_duplicate: '複製',
+        world_book_delete: '刪除',
+        world_book_search: '搜尋關鍵字或備註...',
+        world_book_no_entries: '暫無世界書條目',
+        world_book_no_selection: '選擇左側條目進行編輯，或點擊「新建條目」',
+        world_book_entry: '條目',
+        world_book_confirm_delete_all: '確定刪除此世界書的所有條目？此操作無法復原。',
+        wi_comment: '備註 (Memo)',
+        wi_keys: '啟動關鍵字 (Keys)',
+        wi_keys_hint: '逗號或換行分隔；支援正則如 /pattern/flags',
+        wi_secondary: '可選過濾關鍵字 (Secondary)',
+        wi_selective_logic: '選擇邏輯',
+        wi_content: '內容 (Content)',
+        wi_strategy: '策略',
+        wi_constant: '恆常 (Always)',
+        wi_vectorized: '向量匹配',
+        wi_probability: '觸發概率 %',
+        wi_use_probability: '啟用概率',
+        wi_order: '插入順序 (Order)',
+        wi_position: '插入位置',
+        wi_depth: '深度 (@D)',
+        wi_role: '訊息角色',
+        wi_outlet: 'Outlet 名稱',
+        wi_group: '包含組 (Inclusion Group)',
+        wi_group_weight: '組權重',
+        wi_prioritize: '優先包含',
+        wi_use_group_scoring: '使用組評分',
+        wi_timed: '定時效果',
+        wi_sticky: 'Sticky (持續訊息數)',
+        wi_cooldown: 'Cooldown (冷卻訊息數)',
+        wi_delay: 'Delay (需訊息數)',
+        wi_recursion: '遞迴',
+        wi_exclude_recursion: '排除遞迴啟動',
+        wi_prevent_recursion: '阻止進一步遞迴',
+        wi_delay_until_recursion: '僅遞迴時啟動',
+        wi_filters: '過濾與匹配源',
+        wi_char_filter: '角色過濾',
+        wi_is_exclude: '排除模式',
+        wi_triggers: '觸發生成類型',
+        wi_additional_match: '額外匹配源',
+        wi_advanced: '進階設定',
+        wi_scan_depth: '掃描深度覆蓋',
+        wi_case_sensitive: '大小寫敏感',
+        wi_match_whole: '全詞匹配',
+        wi_ignore_budget: '忽略預算限制',
+        wi_automation_id: '自動化 ID (STscript)',
+        wi_disable: '停用此條目',
+        pos_before_char: 'Before Char Defs',
+        pos_after_char: 'After Char Defs',
+        pos_before_ex: 'Before Example Msgs',
+        pos_after_ex: 'After Example Msgs',
+        pos_top_an: 'Top of Author\'s Note',
+        pos_bottom_an: 'Bottom of Author\'s Note',
+        pos_at_depth: '@ Depth',
+        pos_outlet: 'Outlet (named)',
+        role_system: 'System',
+        role_user: 'User',
+        role_assistant: 'Assistant',
+        logic_and_any: 'AND ANY (任一)',
+        logic_and_all: 'AND ALL (全部)',
+        logic_not_any: 'NOT ANY (無任一)',
+        logic_not_all: 'NOT ALL (無全部)',
+        settings_wi_budget: '世界書 Token 預算',
+        settings_wi_budget_hint: '限制每次生成時世界書條目注入的總 Token 數',
+        settings_wi_budget_max: '世界書最大 Token 數',
+        wi_budget_warning: '部分世界書因預算限制未啟動',
+        wi_budget_warning_dismiss: '知道了',
+        settings_summarize_api_title: '總結 API 設定（Summarization API）',
+        settings_summarize_use_main: '使用主 API 進行總結（推薦大多數用戶）',
+        settings_summarize_api_endpoint: 'API Endpoint',
+        settings_summarize_api_key: 'API Key',
+        settings_summarize_model: 'Model'
     },
     'en': {
         app_subtitle: 'AI Character Chat',
@@ -685,6 +1282,8 @@ var i18n = {
         prompt_viewer_title: 'Full Prompt (sent to API)',
         copy: 'Copy',
         copied: 'Copied!',
+        delete_msg: 'Delete message',
+        regenerate: 'Regenerate',
         import_title: 'Import Character Card',
         import_desc: 'Supports SillyTavern',
         import_desc2: 'format JSON files.',
@@ -771,7 +1370,86 @@ var i18n = {
         char_editor_creator_notes: 'Creator Notes',
         char_editor_save: 'Save',
         char_editor_cancel: 'Cancel',
-        char_empty_name: 'Unnamed Character'
+        char_empty_name: 'Unnamed Character',
+        world_book: 'World Book',
+        world_book_btn: 'Edit',
+        world_book_title: 'World Book / World Info',
+        world_book_import: 'Import JSON',
+        world_book_export: 'Export JSON',
+        world_book_delete_all: 'Delete All Entries',
+        world_book_add_entry: '+ New Entry',
+        world_book_duplicate: 'Duplicate',
+        world_book_delete: 'Delete',
+        world_book_search: 'Search keys or memo...',
+        world_book_no_entries: 'No World Book entries yet',
+        world_book_no_selection: 'Select an entry on the left to edit, or click "+ New Entry"',
+        world_book_entry: 'entry',
+        world_book_confirm_delete_all: 'Delete ALL entries in this World Book? This cannot be undone.',
+        wi_comment: 'Memo / Title',
+        wi_keys: 'Activation Keys',
+        wi_keys_hint: 'Comma or newline separated. Regex supported: /pattern/flags',
+        wi_secondary: 'Optional Filter Keys (Secondary)',
+        wi_selective_logic: 'Selective Logic',
+        wi_content: 'Entry Content (injected into prompt)',
+        wi_strategy: 'Strategy',
+        wi_constant: 'Constant (Always)',
+        wi_vectorized: 'Vectorized',
+        wi_probability: 'Trigger Probability %',
+        wi_use_probability: 'Use Probability',
+        wi_order: 'Insertion Order',
+        wi_position: 'Insertion Position',
+        wi_depth: 'Depth (@D)',
+        wi_role: 'Message Role',
+        wi_outlet: 'Outlet Name',
+        wi_group: 'Inclusion Group',
+        wi_group_weight: 'Group Weight',
+        wi_prioritize: 'Prioritize Inclusion',
+        wi_use_group_scoring: 'Use Group Scoring',
+        wi_timed: 'Timed Effects',
+        wi_sticky: 'Sticky (messages)',
+        wi_cooldown: 'Cooldown (messages)',
+        wi_delay: 'Delay (min messages)',
+        wi_recursion: 'Recursion',
+        wi_exclude_recursion: 'Exclude from Recursion',
+        wi_prevent_recursion: 'Prevent Further Recursion',
+        wi_delay_until_recursion: 'Delay Until Recursion',
+        wi_filters: 'Filters & Matching Sources',
+        wi_char_filter: 'Character Filter',
+        wi_is_exclude: 'Exclude Mode',
+        wi_triggers: 'Generation Triggers',
+        wi_additional_match: 'Additional Matching Sources',
+        wi_advanced: 'Advanced Settings',
+        wi_scan_depth: 'Scan Depth Override',
+        wi_case_sensitive: 'Case Sensitive',
+        wi_match_whole: 'Match Whole Words',
+        wi_ignore_budget: 'Ignore Budget',
+        wi_automation_id: 'Automation ID (STscript)',
+        wi_disable: 'Disable this entry',
+        pos_before_char: 'Before Char Defs',
+        pos_after_char: 'After Char Defs',
+        pos_before_ex: 'Before Example Messages',
+        pos_after_ex: 'After Example Messages',
+        pos_top_an: 'Top of Author\'s Note',
+        pos_bottom_an: 'Bottom of Author\'s Note',
+        pos_at_depth: '@ Depth',
+        pos_outlet: 'Outlet (named)',
+        role_system: 'System',
+        role_user: 'User',
+        role_assistant: 'Assistant',
+        logic_and_any: 'AND ANY',
+        logic_and_all: 'AND ALL',
+        logic_not_any: 'NOT ANY',
+        logic_not_all: 'NOT ALL',
+        settings_wi_budget: 'World Info Token Budget',
+        settings_wi_budget_hint: 'Limit total tokens injected from World Book entries per generation',
+        settings_wi_budget_max: 'Max Tokens from World Info',
+        wi_budget_warning: 'Some World Book entries were not activated due to budget limits',
+        wi_budget_warning_dismiss: 'Dismiss',
+        settings_summarize_api_title: 'Summarization API Settings',
+        settings_summarize_use_main: 'Use main API for summarization (recommended for most users)',
+        settings_summarize_api_endpoint: 'API Endpoint',
+        settings_summarize_api_key: 'API Key',
+        settings_summarize_model: 'Model'
     }
 };
 
@@ -917,12 +1595,34 @@ if (gl) {
         resizeShader();
 
         var shaderStartTime = performance.now();
+        var shaderAnimationFrame = null;
+
         function renderShader(now) {
+            if (document.hidden) {
+                // 页面不可见时节流，停止绘制
+                shaderAnimationFrame = null;
+                return;
+            }
             if (timeLocation) gl.uniform1f(timeLocation, (now - shaderStartTime) / 1000.0);
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-            requestAnimationFrame(renderShader);
+            shaderAnimationFrame = requestAnimationFrame(renderShader);
         }
-        requestAnimationFrame(renderShader);
+
+        function startShaderAnimation() {
+            if (!shaderAnimationFrame) {
+                shaderAnimationFrame = requestAnimationFrame(renderShader);
+            }
+        }
+
+        // 页面可见性变化时控制动画
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                startShaderAnimation();
+            }
+        });
+
+        // 初始启动
+        startShaderAnimation();
     }
 }
 
@@ -942,6 +1642,94 @@ function makeId() {
     return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 }
 
+// ==================== Lightweight Reactive State (Pub/Sub + Proxy) ====================
+/**
+ * Simple reactive store for OpenTavern.
+ * Supports:
+ * - Proxy-based deep mutation detection (best effort)
+ * - Subscription by key or wildcard
+ * - Automatic partial re-render triggering
+ */
+function createReactiveStore(initialState) {
+    var listeners = {}; // key -> Set of callbacks
+    var allListeners = new Set(); // listeners that want everything
+
+    function notify(changedKeys) {
+        // Notify specific key listeners
+        changedKeys.forEach(function(key) {
+            if (listeners[key]) {
+                listeners[key].forEach(function(fn) {
+                    try { fn(key); } catch(e) { console.error(e); }
+                });
+            }
+        });
+        // Notify global listeners
+        allListeners.forEach(function(fn) {
+            try { fn(changedKeys); } catch(e) { console.error(e); }
+        });
+    }
+
+    var internalState = JSON.parse(JSON.stringify(initialState || {}));
+
+    var handler = {
+        set: function(target, prop, value) {
+            if (target[prop] !== value) {
+                target[prop] = value;
+                notify([prop]);
+            }
+            return true;
+        },
+        deleteProperty: function(target, prop) {
+            delete target[prop];
+            notify([prop]);
+            return true;
+        }
+    };
+
+    var proxy = new Proxy(internalState, handler);
+
+    // For nested objects, we can wrap on access (simplified for this app)
+    function getState() {
+        return proxy;
+    }
+
+    function subscribe(keyOrFn, callback) {
+        if (typeof keyOrFn === 'function') {
+            // global listener
+            allListeners.add(keyOrFn);
+            return function unsubscribe() {
+                allListeners.delete(keyOrFn);
+            };
+        }
+
+        var key = keyOrFn;
+        if (!listeners[key]) listeners[key] = new Set();
+        listeners[key].add(callback);
+
+        return function unsubscribe() {
+            if (listeners[key]) listeners[key].delete(callback);
+        };
+    }
+
+    function set(key, value) {
+        proxy[key] = value;
+    }
+
+    function update(key, updater) {
+        var current = proxy[key];
+        var next = typeof updater === 'function' ? updater(current) : updater;
+        proxy[key] = next;
+    }
+
+    return {
+        get state() { return getState(); },
+        subscribe: subscribe,
+        set: set,
+        update: update,
+        notify: function(keys) { notify(Array.isArray(keys) ? keys : [keys]); }
+    };
+}
+
 // ==================== Default State ====================
 function defaultSettings() {
     return {
@@ -956,7 +1744,16 @@ function defaultSettings() {
         systemPrompt: '',
         lang: 'zh-CN',
         summaryEnabled: true,
-        summaryThreshold: 10
+        summaryThreshold: 10,
+        // World Info (World Book) budget control
+        worldInfoBudgetEnabled: true,
+        worldInfoBudget: 2048,
+
+        // Summarization API (separate from main chat API)
+        summarizeUseMainAPI: true,
+        summarizeApiEndpoint: '',
+        summarizeApiKey: '',
+        summarizeModel: 'deepseek-chat'
     };
 }
 
@@ -967,20 +1764,93 @@ function defaultConversation() {
         character: null,
         messages: [],
         summaries: [],
+        worldInfo: null,   // { name: string, entries: { [uid:string]: WIEntry } }
         created: Date.now(),
         updated: Date.now()
     };
 }
 
-// ==================== App State ====================
-var state = {
+// ==================== App State (now reactive) ====================
+var appStore = createReactiveStore({
     settings: defaultSettings(),
     conversations: {},
     conversationOrder: [],
     activeConvId: null,
     isGenerating: false,
     abortController: null
+});
+
+var state = appStore.state; // keep backward compat for existing code that does state.xxx = yyy
+
+// Map of state keys -> render functions that care about them
+var renderSubscriptions = {
+    'conversations': renderConversationList,
+    'conversationOrder': renderConversationList,
+    'activeConvId': function() {
+        renderConversationListOnly();
+        renderMessagesOnly();
+        renderCharacterUI();
+        renderWorldInfoBudgetWarning();
+    },
+    'isGenerating': function() {
+        updateInputState();
+        renderMessagesOnly(); // for streaming indicator
+    },
+    'settings': function() {
+        updateInputState();
+        renderTopBar();
+    },
+    // World Info related
+    'worldInfo': function() {
+        renderWorldInfoBudgetWarning();
+    }
 };
+
+// Wire the store to trigger partial renders
+appStore.subscribe(function(changedKeys) {
+    changedKeys.forEach(function(key) {
+        if (renderSubscriptions[key]) {
+            try {
+                renderSubscriptions[key]();
+            } catch (e) {
+                console.error('Render error for key:', key, e);
+            }
+        }
+    });
+});
+
+// Helper to force full render when needed
+function requestFullRender() {
+    renderAll();
+}
+
+// ==================== Targeted Render Helpers ====================
+// These are preferred over renderAll() when possible
+function requestRender(key) {
+    if (Array.isArray(key)) {
+        key.forEach(function(k) { appStore.notify([k]); });
+    } else {
+        appStore.notify([key]);
+    }
+}
+
+// Common granular render triggers
+function renderActiveConversation() {
+    requestRender(['activeConvId', 'conversations']);
+}
+
+function renderMessagesOnly() {
+    if (dom.messagesContainer) renderMessages();
+}
+
+function renderConversationListOnly() {
+    if (dom.convList) renderConversationList();
+}
+
+function renderCharacterUI() {
+    renderCharacterCard();
+    renderTopBar();
+}
 
 function initState() {
     var saved = loadAll();
@@ -1003,13 +1873,35 @@ function initState() {
     }
 }
 
-function persistState() {
-    saveAll({
-        settings: state.settings,
-        conversations: state.conversations,
-        conversationOrder: state.conversationOrder,
-        activeConvId: state.activeConvId
-    });
+// ==================== Debounced Persist ====================
+var _persistTimeout = null;
+
+function persistState(immediate) {
+    if (immediate) {
+        if (_persistTimeout) {
+            clearTimeout(_persistTimeout);
+            _persistTimeout = null;
+        }
+        saveAll({
+            settings: state.settings,
+            conversations: state.conversations,
+            conversationOrder: state.conversationOrder,
+            activeConvId: state.activeConvId
+        });
+        return;
+    }
+
+    if (_persistTimeout) clearTimeout(_persistTimeout);
+
+    _persistTimeout = setTimeout(function() {
+        saveAll({
+            settings: state.settings,
+            conversations: state.conversations,
+            conversationOrder: state.conversationOrder,
+            activeConvId: state.activeConvId
+        });
+        _persistTimeout = null;
+    }, 500);
 }
 
 function getActiveConv() {
@@ -1056,7 +1948,7 @@ function setLanguage(lang) {
     });
     persistState();
     applyTranslations();
-    renderAll();
+    requestFullRender(); // language change affects almost everything
 }
 
 // ==================== Character Import ====================
@@ -1090,7 +1982,49 @@ function replacePlaceholders(text, charName, userName) {
         .replace(/\{\{user\}\}/gi, userName || 'User');
 }
 
-function buildSystemPrompt(character) {
+// World Info position constants (must be defined early)
+var WI_POS = {
+    BEFORE_CHAR: 0, AFTER_CHAR: 1,
+    BEFORE_EX: 2, AFTER_EX: 3,
+    TOP_AN: 4, BOTTOM_AN: 5,
+    AT_DEPTH: 6, OUTLET: 7
+};
+var WI_ROLE = { SYSTEM: 0, USER: 1, ASSISTANT: 2 };
+
+function injectWorldInfoIntoSystem(systemParts, wiByPos, charName, userName) {
+    if (!wiByPos) return systemParts;
+
+    function joinEntries(list) {
+        if (!list || !list.length) return '';
+        return list.map(function(e) {
+            return replacePlaceholders(e.content || '', charName, userName);
+        }).join('\n\n');
+    }
+
+    var before = joinEntries(wiByPos[WI_POS.BEFORE_CHAR] || []);
+    var after = joinEntries(wiByPos[WI_POS.AFTER_CHAR] || []);
+    var beforeEx = joinEntries(wiByPos[WI_POS.BEFORE_EX] || []);
+    var afterEx = joinEntries(wiByPos[WI_POS.AFTER_EX] || []);
+    var topAN = joinEntries(wiByPos[WI_POS.TOP_AN] || []);
+    var botAN = joinEntries(wiByPos[WI_POS.BOTTOM_AN] || []);
+
+    if (before) systemParts.unshift(before);
+    if (after) systemParts.push(after);
+
+    if (beforeEx) systemParts.push('Example context (lore):\n' + beforeEx);
+    if (afterEx) systemParts.push('Example context (lore):\n' + afterEx);
+
+    if (topAN || botAN) {
+        var an = [];
+        if (topAN) an.push(topAN);
+        if (botAN) an.push(botAN);
+        systemParts.push("[Author's Note / World Lore]\n" + an.join('\n'));
+    }
+
+    return systemParts;
+}
+
+function buildSystemPrompt(character, worldInfoByPos) {
     var parts = [];
     var charName = character ? character.name : 'Assistant';
     var userName = state.settings.userName || 'User';
@@ -1115,6 +2049,11 @@ function buildSystemPrompt(character) {
         if (charInfo.length > 0) parts.push(charInfo.join('\n\n'));
     }
 
+    // World Info injection (before/after char + example/AN positions)
+    if (worldInfoByPos) {
+        parts = injectWorldInfoIntoSystem(parts, worldInfoByPos, charName, userName);
+    }
+
     if (character && character.mes_example) {
         parts.push('Example dialogues:\n' + replacePlaceholders(character.mes_example, charName, userName));
     }
@@ -1128,7 +2067,11 @@ function buildMessagesForAPI() {
     var userName = state.settings.userName || 'User';
     var maxMsgs = state.settings.contextLength * 2;
 
-    var systemContent = buildSystemPrompt(conv.character);
+    // Activate World Info for this conversation
+    var wiResult = getActivatedWorldInfo(conv);
+    var wiByPos = wiResult.byPosition || {};
+
+    var systemContent = buildSystemPrompt(conv.character, wiByPos);
     var apiMessages = [];
     if (systemContent) apiMessages.push({ role: 'system', content: systemContent });
 
@@ -1150,9 +2093,1292 @@ function buildMessagesForAPI() {
     }
     apiMessages = apiMessages.concat(regularMsgs);
 
+    // @D (Depth) insertions: support positive and negative depth + correct roles
+    var depthEntries = wiByPos[WI_POS.AT_DEPTH] || [];
+    if (depthEntries.length > 0) {
+        depthEntries.forEach(function(e) {
+            var d = (e.depth != null) ? e.depth : 4;
+            var role = (e.role === 0) ? 'system' : (e.role === 1 ? 'user' : 'assistant');
+            var content = replacePlaceholders(e.content || '', charName, userName);
+
+            var insertIdx;
+            if (d < 0) {
+                // Negative depth: -1 = after the last message, -2 = before the last message, etc.
+                insertIdx = apiMessages.length + (d + 1);
+            } else {
+                // Positive depth: 0 = after last, 1 = before last, etc. (from the end)
+                insertIdx = apiMessages.length - d;
+            }
+
+            if (insertIdx < 1) insertIdx = 1;
+            if (insertIdx > apiMessages.length) insertIdx = apiMessages.length;
+
+            apiMessages.splice(insertIdx, 0, { role: role, content: content });
+        });
+    }
+
+    // === Outlet Support ===
+    // Resolve {{outlet::Name}} in all messages
+    var wiOutlets = wiResult.outlets || {};
+    if (Object.keys(wiOutlets).length > 0) {
+        apiMessages.forEach(function(msg) {
+            msg.content = msg.content.replace(/\{\{outlet::([^}]+)\}\}/gi, function(match, outletName) {
+                var name = outletName.trim();
+                var entries = wiOutlets[name];
+                if (!entries || entries.length === 0) return '';
+                var combined = entries.map(function(e) {
+                    return replacePlaceholders(e.content || '', charName, userName);
+                }).join('\n\n');
+                return combined;
+            });
+        });
+    }
+
     return apiMessages.map(function(m) {
         return { role: m.role, content: replacePlaceholders(m.content, charName, userName) };
     });
+}
+
+// ==================== World Info (World Book) Support ====================
+// Full SillyTavern-compatible implementation (all documented fields supported in UI + core activation)
+
+function createDefaultWIEntry(uid) {
+    uid = uid != null ? uid : Date.now();
+    return {
+        uid: uid,
+        key: [],
+        keysecondary: [],
+        comment: 'New Entry ' + uid,
+        content: '',
+        constant: false,
+        vectorized: false,
+        selective: true,
+        selectiveLogic: 0,           // 0=AND ANY, 1=AND ALL, 2=NOT ANY, 3=NOT ALL
+        order: 100,
+        position: WI_POS.AFTER_CHAR,
+        disable: false,
+        ignoreBudget: false,
+        excludeRecursion: false,
+        preventRecursion: false,
+        delayUntilRecursion: false,
+        probability: 100,
+        useProbability: true,
+        depth: 4,
+        outletName: '',
+        group: '',
+        groupOverride: false,        // prioritize inclusion
+        groupWeight: 100,
+        scanDepth: null,
+        caseSensitive: null,
+        matchWholeWords: null,
+        useGroupScoring: false,
+        automationId: '',
+        role: WI_ROLE.SYSTEM,
+        sticky: 0,
+        cooldown: 0,
+        delay: 0,
+        triggers: [],
+        // additional matching sources
+        matchPersonaDescription: false,
+        matchCharacterDescription: false,
+        matchCharacterPersonality: false,
+        matchCharacterDepthPrompt: false,
+        matchScenario: false,
+        matchCreatorNotes: false,
+        // character filter
+        characterFilter: { isExclude: false, names: [], tags: [] },
+        // extensions mirror for ST compatibility
+        extensions: {
+            position: WI_POS.AFTER_CHAR,
+            depth: 4,
+            role: WI_ROLE.SYSTEM,
+            probability: 100,
+            useProbability: true,
+            outlet_name: '',
+            group: '',
+            group_override: false,
+            group_weight: 100,
+            scan_depth: null,
+            case_sensitive: null,
+            match_whole_words: null,
+            use_group_scoring: false,
+            automation_id: '',
+            vectorized: false,
+            sticky: 0, cooldown: 0, delay: 0,
+            exclude_recursion: false,
+            prevent_recursion: false,
+            delay_until_recursion: false,
+            match_persona_description: false,
+            match_character_description: false,
+            match_character_personality: false,
+            match_character_depth_prompt: false,
+            match_scenario: false,
+            match_creator_notes: false,
+            triggers: [],
+            ignore_budget: false
+        }
+    };
+}
+
+function getWorldInfo(conv) {
+    if (!conv) return null;
+    if (!conv.worldInfo) {
+        conv.worldInfo = { name: '', entries: {} };
+    }
+    if (!conv.worldInfo.entries) conv.worldInfo.entries = {};
+    return conv.worldInfo;
+}
+
+function normalizeImportedWorldInfo(raw) {
+    // Accept SillyTavern format { entries: { "0": {...}, ... } } or { worldInfo: ... } or array fallback
+    var wi = { name: '', entries: {} };
+    if (!raw) return wi;
+
+    var src = raw.entries || (raw.worldInfo && raw.worldInfo.entries) || raw;
+    if (Array.isArray(src)) {
+        src.forEach(function(e, idx) {
+            var entry = JSON.parse(JSON.stringify(e));
+            var uid = (entry.uid != null) ? entry.uid : idx;
+            var parsed = parseInt(uid, 10);
+            entry.uid = (parsed === 0 || !isNaN(parsed)) ? parsed : Date.now();
+            wi.entries[String(entry.uid)] = entry;
+        });
+    } else if (src && typeof src === 'object') {
+        Object.keys(src).forEach(function(k) {
+            var entry = JSON.parse(JSON.stringify(src[k]));
+            // Preserve uid 0 correctly (common in SillyTavern exports)
+            var uid = (entry.uid != null) ? entry.uid : k;
+            var parsed = parseInt(uid, 10);
+            entry.uid = (parsed === 0 || !isNaN(parsed)) ? parsed : Date.now();
+            wi.entries[String(entry.uid)] = entry;
+        });
+    }
+    if (raw.name) wi.name = raw.name;
+    return wi;
+}
+
+function entriesToSTFormat(worldInfo) {
+    // Export in SillyTavern compatible shape
+    var out = { entries: {} };
+    if (worldInfo && worldInfo.name) out.name = worldInfo.name;
+    if (worldInfo && worldInfo.entries) {
+        Object.keys(worldInfo.entries).forEach(function(uid) {
+            var e = JSON.parse(JSON.stringify(worldInfo.entries[uid]));
+            // keep both top-level and extensions in sync (best effort)
+            if (!e.extensions) e.extensions = {};
+            e.extensions.position = e.position;
+            e.extensions.depth = e.depth;
+            e.extensions.role = e.role;
+            e.extensions.outlet_name = e.outletName;
+            e.extensions.group = e.group;
+            e.extensions.group_override = e.groupOverride;
+            e.extensions.group_weight = e.groupWeight;
+            e.extensions.scan_depth = e.scanDepth;
+            e.extensions.case_sensitive = e.caseSensitive;
+            e.extensions.match_whole_words = e.matchWholeWords;
+            e.extensions.use_group_scoring = e.useGroupScoring;
+            e.extensions.automation_id = e.automationId;
+            e.extensions.sticky = e.sticky;
+            e.extensions.cooldown = e.cooldown;
+            e.extensions.delay = e.delay;
+            e.extensions.exclude_recursion = e.excludeRecursion;
+            e.extensions.prevent_recursion = e.preventRecursion;
+            e.extensions.delay_until_recursion = e.delayUntilRecursion;
+            e.extensions.triggers = e.triggers || [];
+            out.entries[String(uid)] = e;
+        });
+    }
+    return out;
+}
+
+// In-memory editor state
+var wiState = {
+    modalOpen: false,
+    currentConvId: null,
+    selectedUid: null,
+    dirty: false,
+    primaryKeys: [],      // working array for chips
+    secondaryKeys: []
+};
+
+function getActiveWI() {
+    var conv = getActiveConv();
+    return getWorldInfo(conv);
+}
+
+function openWorldBookModal() {
+    var conv = getActiveConv();
+    if (!conv) { newConversation(); conv = getActiveConv(); }
+
+    wiState.currentConvId = conv.id;
+    wiState.selectedUid = null;
+    wiState.dirty = false;
+    wiState.primaryKeys = [];
+    wiState.secondaryKeys = [];
+
+    var wi = getWorldInfo(conv);
+    dom.wiBookName.value = wi.name || '';
+
+    dom.worldBookModal.classList.remove('hidden');
+    wiState.modalOpen = true;
+
+    renderWIEntryList('');
+    showNoSelection();
+
+    // wire dynamic listeners once
+    if (!dom.wiBookName._wired) {
+        wireWorldBookListeners();
+        dom.wiBookName._wired = true;
+    }
+}
+
+function closeWorldBookModal() {
+    if (wiState.dirty) {
+        persistState();
+        // 世界书条目有变更，清除激活缓存
+        var conv = getActiveConv();
+        if (conv) conv._wiCache = null;
+    }
+    dom.worldBookModal.classList.add('hidden');
+    wiState.modalOpen = false;
+    wiState.selectedUid = null;
+    renderConversationListOnly(); // for count badge
+    renderWorldInfoBudgetWarning();
+}
+
+function wireWorldBookListeners() {
+    // Search
+    dom.wiSearch.addEventListener('input', function() { renderWIEntryList(this.value.trim()); });
+
+    // Book name
+    dom.wiBookName.addEventListener('input', function() {
+        var wi = getActiveWI();
+        wi.name = this.value;
+        wiState.dirty = true;
+    });
+
+    // Buttons
+    dom.wiCloseBtn.addEventListener('click', closeWorldBookModal);
+    dom.worldBookBackdrop.addEventListener('click', closeWorldBookModal);
+
+    dom.wiAddEntryBtn.addEventListener('click', addNewWIEntry);
+    dom.wiImportBtn.addEventListener('click', function() {
+        if (dom.wiImportFile) {
+            dom.wiImportFile.click();
+        } else {
+            console.error('wiImportFile element not found in DOM cache');
+        }
+    });
+    dom.wiExportBtn.addEventListener('click', exportCurrentWorldInfo);
+    dom.wiDeleteAllBtn.addEventListener('click', deleteAllWIEntries);
+
+    if (dom.wiImportFile) {
+        dom.wiImportFile.addEventListener('change', handleWIFileImport);
+    } else {
+        console.warn('wiImportFile not cached, import will not work');
+    }
+
+    // Editor fields - live sync
+    function bindLive(id, prop, isNum) {
+        var el = dom[id];
+        if (!el) return;
+        el.addEventListener('input', function() {
+            if (!wiState.selectedUid) return;
+            var entry = getActiveWI().entries[wiState.selectedUid];
+            if (!entry) return;
+            var val = isNum ? (parseInt(this.value, 10) || 0) : this.value;
+            entry[prop] = val;
+            // sync extensions for common fields
+            if (prop === 'position' && entry.extensions) entry.extensions.position = val;
+            if (prop === 'depth' && entry.extensions) entry.extensions.depth = val;
+            wiState.dirty = true;
+            renderWIEntryList(dom.wiSearch.value.trim());
+        });
+    }
+
+    bindLive('wiComment', 'comment');
+    bindLive('wiOrder', 'order', true);
+    bindLive('wiAutomationId', 'automationId');
+    bindLive('wiGroup', 'group');
+    bindLive('wiGroupWeight', 'groupWeight', true);
+    bindLive('wiOutletName', 'outletName');
+    bindLive('wiDepth', 'depth', true);
+    bindLive('wiSticky', 'sticky', true);
+    bindLive('wiCooldown', 'cooldown', true);
+    bindLive('wiDelay', 'delay', true);
+    bindLive('wiScanDepth', 'scanDepth', true);
+
+    // Checkboxes
+    var checkboxes = [
+        ['wiDisable', 'disable'],
+        ['wiUseProb', 'useProbability'],
+        ['wiPrioritize', 'groupOverride'],
+        ['wiUseGroupScoring', 'useGroupScoring'],
+        ['wiExcludeRec', 'excludeRecursion'],
+        ['wiPreventRec', 'preventRecursion'],
+        ['wiDelayRec', 'delayUntilRecursion'],
+        ['wiCharExclude', 'characterFilter.isExclude'],
+        ['wiIgnoreBudget', 'ignoreBudget'],
+        ['wiCaseSens', 'caseSensitive'],
+        ['wiMatchWhole', 'matchWholeWords']
+    ];
+    checkboxes.forEach(function(pair) {
+        var el = dom[pair[0]];
+        if (!el) return;
+        el.addEventListener('change', function() {
+            if (!wiState.selectedUid) return;
+            var entry = getActiveWI().entries[wiState.selectedUid];
+            if (!entry) return;
+            var path = pair[1];
+            if (path.indexOf('.') > -1) {
+                var parts = path.split('.');
+                if (!entry[parts[0]]) entry[parts[0]] = {};
+                entry[parts[0]][parts[1]] = this.checked;
+            } else {
+                entry[path] = this.checked;
+            }
+            wiState.dirty = true;
+            renderWIEntryList(dom.wiSearch.value.trim());
+        });
+    });
+
+    // Strategy buttons
+    dom.wiStratConstant.addEventListener('click', function() {
+        if (!wiState.selectedUid) return;
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        entry.constant = true;
+        entry.selective = false;
+        wiState.dirty = true;
+        updateStrategyButtons(entry);
+        renderWIEntryList(dom.wiSearch.value.trim());
+    });
+    dom.wiStratSelective.addEventListener('click', function() {
+        if (!wiState.selectedUid) return;
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        entry.constant = false;
+        entry.selective = true;
+        wiState.dirty = true;
+        updateStrategyButtons(entry);
+        renderWIEntryList(dom.wiSearch.value.trim());
+    });
+
+    // Position select (shows/hides conditional rows)
+    dom.wiPosition.addEventListener('change', function() {
+        if (!wiState.selectedUid) return;
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        entry.position = parseInt(this.value, 10) || 0;
+        if (entry.extensions) entry.extensions.position = entry.position;
+        wiState.dirty = true;
+        updatePositionConditionalRows(entry.position);
+        renderWIEntryList(dom.wiSearch.value.trim());
+    });
+
+    // Role
+    dom.wiRole.addEventListener('change', function() {
+        if (!wiState.selectedUid) return;
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        entry.role = parseInt(this.value, 10) || 0;
+        if (entry.extensions) entry.extensions.role = entry.role;
+        wiState.dirty = true;
+    });
+
+    // Probability slider
+    dom.wiProbability.addEventListener('input', function() {
+        if (!wiState.selectedUid) return;
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        entry.probability = parseInt(this.value, 10) || 100;
+        if (entry.extensions) entry.extensions.probability = entry.probability;
+        dom.wiProbVal.textContent = entry.probability;
+        wiState.dirty = true;
+    });
+
+    // Selective logic
+    dom.wiSelectiveLogic.addEventListener('change', function() {
+        if (!wiState.selectedUid) return;
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        entry.selectiveLogic = parseInt(this.value, 10) || 0;
+        wiState.dirty = true;
+    });
+
+    // Additional match checkboxes (direct ids)
+    var matchCbs = ['wiMatchCharDesc','wiMatchCharPers','wiMatchScenario','wiMatchPersona','wiMatchCharNote','wiMatchCreatorNotes'];
+    var matchProps = ['matchCharacterDescription','matchCharacterPersonality','matchScenario','matchPersonaDescription','matchCharacterDepthPrompt','matchCreatorNotes'];
+    matchCbs.forEach(function(id, i) {
+        var el = dom[id];
+        if (!el) return;
+        el.addEventListener('change', function() {
+            if (!wiState.selectedUid) return;
+            var entry = getActiveWI().entries[wiState.selectedUid];
+            entry[matchProps[i]] = this.checked;
+            if (entry.extensions) entry.extensions[matchProps[i].replace(/([A-Z])/g, '_$1').toLowerCase()] = this.checked;
+            wiState.dirty = true;
+        });
+    });
+
+    // Key chips buttons
+    dom.wiAddKeyBtn.addEventListener('click', function() { addWIKeyFromInput(true); });
+    dom.wiKeyInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); addWIKeyFromInput(true); }
+    });
+    dom.wiAddSecBtn.addEventListener('click', function() { addWIKeyFromInput(false); });
+    dom.wiSecInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); addWIKeyFromInput(false); }
+    });
+
+    // Duplicate / Delete current entry
+    dom.wiDuplicateBtn.addEventListener('click', duplicateCurrentEntry);
+    dom.wiDeleteEntryBtn.addEventListener('click', deleteCurrentEntry);
+
+    // Trigger checkboxes (delegated via class)
+    document.getElementById('wiEditorForm').addEventListener('change', function(e) {
+        if (!e.target.classList.contains('wi-trigger') || !wiState.selectedUid) return;
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        if (!entry.triggers) entry.triggers = [];
+        var val = e.target.value;
+        if (e.target.checked) {
+            if (entry.triggers.indexOf(val) === -1) entry.triggers.push(val);
+        } else {
+            entry.triggers = entry.triggers.filter(function(v) { return v !== val; });
+        }
+        wiState.dirty = true;
+    });
+
+    // Live sync for char filter text inputs
+    if (dom.wiCharNames) dom.wiCharNames.addEventListener('input', function() {
+        if (!wiState.selectedUid) return;
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        var cf = entry.characterFilter || (entry.characterFilter = { isExclude: false, names: [], tags: [] });
+        cf.names = (this.value || '').split(',').map(function(s){return s.trim();}).filter(Boolean);
+        wiState.dirty = true;
+    });
+    if (dom.wiCharTags) dom.wiCharTags.addEventListener('input', function() {
+        if (!wiState.selectedUid) return;
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        var cf = entry.characterFilter || (entry.characterFilter = { isExclude: false, names: [], tags: [] });
+        cf.tags = (this.value || '').split(',').map(function(s){return s.trim();}).filter(Boolean);
+        wiState.dirty = true;
+    });
+}
+
+function addWIKeyFromInput(isPrimary) {
+    var input = isPrimary ? dom.wiKeyInput : dom.wiSecInput;
+    var val = input.value.trim();
+    if (!val || !wiState.selectedUid) return;
+    var entry = getActiveWI().entries[wiState.selectedUid];
+    var arr = isPrimary ? (entry.key = entry.key || []) : (entry.keysecondary = entry.keysecondary || []);
+    // split on comma or just push
+    val.split(',').map(function(s){return s.trim();}).filter(Boolean).forEach(function(k) {
+        if (arr.indexOf(k) === -1) arr.push(k);
+    });
+    input.value = '';
+    if (isPrimary) wiState.primaryKeys = entry.key.slice();
+    else wiState.secondaryKeys = entry.keysecondary.slice();
+    wiState.dirty = true;
+    renderChips(isPrimary);
+    renderWIEntryList(dom.wiSearch.value.trim());
+}
+
+function removeWIKey(key, isPrimary) {
+    if (!wiState.selectedUid) return;
+    var entry = getActiveWI().entries[wiState.selectedUid];
+    var arr = isPrimary ? entry.key : entry.keysecondary;
+    if (!arr) return;
+    var idx = arr.indexOf(key);
+    if (idx > -1) arr.splice(idx, 1);
+    if (isPrimary) wiState.primaryKeys = entry.key.slice();
+    else wiState.secondaryKeys = entry.keysecondary.slice();
+    wiState.dirty = true;
+    renderChips(isPrimary);
+    renderWIEntryList(dom.wiSearch.value.trim());
+}
+
+function renderChips(isPrimary) {
+    var container = isPrimary ? dom.wiKeyChips : dom.wiSecChips;
+    if (!container) return;
+    container.innerHTML = '';
+    var keys = isPrimary ? wiState.primaryKeys : wiState.secondaryKeys;
+    keys.forEach(function(k) {
+        var pill = document.createElement('span');
+        pill.className = 'inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-white/10 text-zinc-200 border border-white/10';
+        var isRegex = k[0] === '/' && k.lastIndexOf('/') > 0;
+        pill.innerHTML = (isRegex ? '<span class="text-emerald-400">⚡</span>' : '') + '<span>' + escapeHtml(k) + '</span><span class="cursor-pointer text-zinc-400 hover:text-red-400 ml-0.5" data-key="' + escapeHtml(k) + '">✕</span>';
+        pill.querySelector('span:last-child').addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            removeWIKey(k, isPrimary);
+        });
+        container.appendChild(pill);
+    });
+    if (keys.length === 0) {
+        var empty = document.createElement('span');
+        empty.className = 'text-xs text-zinc-500 px-1';
+        empty.textContent = isPrimary ? '（无关键字 = 仅恒常条目）' : '（无）';
+        container.appendChild(empty);
+    }
+}
+
+function updateStrategyButtons(entry) {
+    if (!entry) return;
+    var c = dom.wiStratConstant;
+    var s = dom.wiStratSelective;
+    if (!c || !s) return;
+    var isConst = !!entry.constant;
+    c.setAttribute('data-active', isConst ? 'true' : 'false');
+    s.setAttribute('data-active', isConst ? 'false' : 'true');
+    if (isConst) {
+        c.style.borderColor = 'rgba(245,158,11,0.6)';
+        s.style.borderColor = '';
+    } else {
+        s.style.borderColor = 'rgba(245,158,11,0.6)';
+        c.style.borderColor = '';
+    }
+}
+
+function updatePositionConditionalRows(pos) {
+    pos = parseInt(pos, 10);
+    var depthRow = dom.wiDepthRow;
+    var outletRow = dom.wiOutletRow;
+    if (!depthRow || !outletRow) return;
+    depthRow.classList.toggle('hidden', pos !== WI_POS.AT_DEPTH);
+    outletRow.classList.toggle('hidden', pos !== WI_POS.OUTLET);
+}
+
+function fillEditorFromEntry(entry) {
+    if (!entry) return showNoSelection();
+
+    dom.wiNoSelection.classList.add('hidden');
+    dom.wiEditorForm.classList.remove('hidden');
+
+    wiState.primaryKeys = (entry.key || []).slice();
+    wiState.secondaryKeys = (entry.keysecondary || []).slice();
+
+    dom.wiComment.value = entry.comment || '';
+    dom.wiOrder.value = entry.order != null ? entry.order : 100;
+    dom.wiUidBadge.textContent = 'uid:' + entry.uid;
+
+    dom.wiDisable.checked = !!entry.disable;
+    dom.wiUseProb.checked = entry.useProbability !== false;
+    dom.wiProbability.value = entry.probability != null ? entry.probability : 100;
+    dom.wiProbVal.textContent = dom.wiProbability.value;
+
+    dom.wiGroup.value = entry.group || '';
+    dom.wiGroupWeight.value = entry.groupWeight != null ? entry.groupWeight : 100;
+    dom.wiPrioritize.checked = !!entry.groupOverride;
+    dom.wiUseGroupScoring.checked = !!entry.useGroupScoring;
+
+    dom.wiSelectiveLogic.value = entry.selectiveLogic != null ? entry.selectiveLogic : 0;
+
+    dom.wiContent.value = entry.content || '';
+
+    dom.wiPosition.value = entry.position != null ? entry.position : WI_POS.AFTER_CHAR;
+    dom.wiDepth.value = entry.depth != null ? entry.depth : 4;
+    dom.wiRole.value = entry.role != null ? entry.role : WI_ROLE.SYSTEM;
+    dom.wiOutletName.value = entry.outletName || '';
+
+    dom.wiSticky.value = entry.sticky || 0;
+    dom.wiCooldown.value = entry.cooldown || 0;
+    dom.wiDelay.value = entry.delay || 0;
+
+    dom.wiExcludeRec.checked = !!entry.excludeRecursion;
+    dom.wiPreventRec.checked = !!entry.preventRecursion;
+    dom.wiDelayRec.checked = !!entry.delayUntilRecursion;
+
+    // character filter
+    var cf = entry.characterFilter || { isExclude: false, names: [], tags: [] };
+    dom.wiCharExclude.checked = !!cf.isExclude;
+    dom.wiCharNames.value = (cf.names || []).join(', ');
+    dom.wiCharTags.value = (cf.tags || []).join(', ');
+
+    // triggers
+    var triggers = entry.triggers || [];
+    document.querySelectorAll('#wiEditorForm .wi-trigger').forEach(function(cb) {
+        cb.checked = triggers.indexOf(cb.value) !== -1;
+    });
+
+    // match sources
+    dom.wiMatchCharDesc.checked = !!entry.matchCharacterDescription;
+    dom.wiMatchCharPers.checked = !!entry.matchCharacterPersonality;
+    dom.wiMatchScenario.checked = !!entry.matchScenario;
+    dom.wiMatchPersona.checked = !!entry.matchPersonaDescription;
+    dom.wiMatchCharNote.checked = !!entry.matchCharacterDepthPrompt;
+    dom.wiMatchCreatorNotes.checked = !!entry.matchCreatorNotes;
+
+    // advanced
+    dom.wiScanDepth.value = entry.scanDepth != null ? entry.scanDepth : '';
+    dom.wiCaseSens.checked = entry.caseSensitive === true;
+    dom.wiMatchWhole.checked = entry.matchWholeWords === true;
+    dom.wiIgnoreBudget.checked = !!entry.ignoreBudget;
+    dom.wiAutomationId.value = entry.automationId || '';
+
+    updateStrategyButtons(entry);
+    updatePositionConditionalRows(entry.position);
+    renderChips(true);
+    renderChips(false);
+}
+
+function showNoSelection() {
+    dom.wiNoSelection.classList.remove('hidden');
+    dom.wiEditorForm.classList.add('hidden');
+    wiState.selectedUid = null;
+    wiState.primaryKeys = [];
+    wiState.secondaryKeys = [];
+}
+
+function updateEntryFromForm() {
+    // called on save/close if needed; most fields are live-bound
+    if (!wiState.selectedUid) return;
+    var entry = getActiveWI().entries[wiState.selectedUid];
+    if (!entry) return;
+
+    // sync characterFilter names/tags from inputs
+    var cf = entry.characterFilter || (entry.characterFilter = { isExclude: false, names: [], tags: [] });
+    cf.names = (dom.wiCharNames.value || '').split(',').map(function(s){return s.trim();}).filter(Boolean);
+    cf.tags = (dom.wiCharTags.value || '').split(',').map(function(s){return s.trim();}).filter(Boolean);
+
+    wiState.dirty = true;
+}
+
+function addNewWIEntry() {
+    var wi = getActiveWI();
+    var uid = Date.now();
+    var entry = createDefaultWIEntry(uid);
+    wi.entries[String(uid)] = entry;
+    wiState.dirty = true;
+    renderWIEntryList(dom.wiSearch.value.trim());
+    selectWIEntry(uid);
+}
+
+function duplicateCurrentEntry() {
+    if (!wiState.selectedUid) return;
+    var wi = getActiveWI();
+    var src = wi.entries[wiState.selectedUid];
+    if (!src) return;
+    var copy = JSON.parse(JSON.stringify(src));
+    copy.uid = Date.now();
+    copy.comment = (src.comment || 'Entry') + ' (copy)';
+    wi.entries[String(copy.uid)] = copy;
+    wiState.dirty = true;
+    renderWIEntryList(dom.wiSearch.value.trim());
+    selectWIEntry(copy.uid);
+}
+
+function deleteCurrentEntry() {
+    if (!wiState.selectedUid) return;
+    if (!confirm('删除当前条目？')) return;
+    var wi = getActiveWI();
+    delete wi.entries[wiState.selectedUid];
+    wiState.dirty = true;
+    wiState.selectedUid = null;
+    renderWIEntryList(dom.wiSearch.value.trim());
+    showNoSelection();
+}
+
+function deleteAllWIEntries() {
+    if (!confirm(t('world_book_confirm_delete_all'))) return;
+    var wi = getActiveWI();
+    wi.entries = {};
+    wiState.selectedUid = null;
+    wiState.dirty = true;
+    renderWIEntryList('');
+    showNoSelection();
+}
+
+function selectWIEntry(uid) {
+    wiState.selectedUid = String(uid);
+    var entry = getActiveWI().entries[wiState.selectedUid];
+    fillEditorFromEntry(entry);
+}
+
+function renderWIEntryList(filter) {
+    var container = dom.wiEntryList;
+    if (!container) return;
+    container.innerHTML = '';
+
+    var wi = getActiveWI();
+    var entries = Object.keys(wi.entries).map(function(k){ return wi.entries[k]; });
+
+    if (filter) {
+        var f = filter.toLowerCase();
+        entries = entries.filter(function(e) {
+            var keys = (e.key || []).join(' ').toLowerCase();
+            var sec = (e.keysecondary || []).join(' ').toLowerCase();
+            var cmt = (e.comment || '').toLowerCase();
+            return keys.indexOf(f) !== -1 || sec.indexOf(f) !== -1 || cmt.indexOf(f) !== -1;
+        });
+    }
+
+    // sort by order desc (higher order = later insertion per ST convention)
+    entries.sort(function(a, b) { return (b.order || 0) - (a.order || 0); });
+
+    if (entries.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'text-xs text-zinc-500 px-2 py-6 text-center';
+        empty.textContent = t('world_book_no_entries');
+        container.appendChild(empty);
+        dom.wiEntryStats.textContent = '0 ' + t('world_book_entry');
+        return;
+    }
+
+    entries.forEach(function(entry) {
+        var uidStr = String(entry.uid);
+        var row = document.createElement('div');
+        row.className = 'group px-2.5 py-2 rounded-xl border border-white/5 hover:border-white/10 cursor-pointer flex flex-col gap-1 ' + (wiState.selectedUid === uidStr ? 'bg-amber-500/10 border-amber-500/30' : 'bg-black/20');
+        row.innerHTML = 
+            '<div class="flex items-start justify-between gap-2">' +
+                '<div class="flex items-center gap-2 min-w-0">' +
+                    '<input type="checkbox" class="wi-list-toggle accent-amber-500 mt-0.5" data-uid="' + uidStr + '" ' + (entry.disable ? '' : 'checked') + '>' +
+                    '<div class="min-w-0">' +
+                        '<div class="text-xs font-medium text-zinc-200 truncate">' + escapeHtml(entry.comment || '(no memo)') + '</div>' +
+                        '<div class="text-[10px] text-emerald-400/70 truncate">' + escapeHtml((entry.key || []).slice(0,3).join(', ') || (entry.constant ? '恒常' : '—')) + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="flex items-center gap-1 text-[10px] text-right flex-shrink-0">' +
+                    '<span class="tabular-nums text-zinc-400">' + (entry.order != null ? entry.order : 100) + '</span>' +
+                    '<button class="wi-list-del opacity-40 hover:opacity-100 text-red-400 px-1" data-uid="' + uidStr + '">✕</button>' +
+                '</div>' +
+            '</div>';
+
+        row.addEventListener('click', function(e) {
+            if (e.target.classList.contains('wi-list-toggle') || e.target.classList.contains('wi-list-del')) return;
+            selectWIEntry(uidStr);
+        });
+
+        // toggle enable/disable
+        row.querySelector('.wi-list-toggle').addEventListener('change', function(ev) {
+            ev.stopPropagation();
+            var e = wi.entries[uidStr];
+            e.disable = !this.checked;
+            wiState.dirty = true;
+            renderWIEntryList(dom.wiSearch.value.trim());
+        });
+
+        // delete from list
+        row.querySelector('.wi-list-del').addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            if (!confirm('删除此条目？')) return;
+            delete wi.entries[uidStr];
+            wiState.dirty = true;
+            if (wiState.selectedUid === uidStr) {
+                wiState.selectedUid = null;
+                showNoSelection();
+            }
+            renderWIEntryList(dom.wiSearch.value.trim());
+        });
+
+        container.appendChild(row);
+    });
+
+    dom.wiEntryStats.textContent = entries.length + ' ' + t('world_book_entry');
+}
+
+function handleWIFileImport(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        try {
+            var json = JSON.parse(ev.target.result);
+            var normalized = normalizeImportedWorldInfo(json);
+            var wi = getActiveWI();
+            // merge strategy: replace entries (user can re-import different books)
+            wi.entries = normalized.entries;
+            if (normalized.name) {
+                wi.name = normalized.name;
+                if (dom.wiBookName) dom.wiBookName.value = normalized.name;
+            }
+            wiState.dirty = true;
+            // Clear any active search so user immediately sees the imported entries
+            if (dom.wiSearch) dom.wiSearch.value = '';
+            renderWIEntryList('');
+            showNoSelection();
+            alert('世界书导入成功（' + Object.keys(wi.entries).length + ' 条目）');
+        } catch (err) {
+            alert('导入失败: ' + err.message);
+        }
+        if (dom.wiImportFile) dom.wiImportFile.value = '';
+    };
+    reader.readAsText(file);
+}
+
+function exportCurrentWorldInfo() {
+    var wi = getActiveWI();
+    var data = entriesToSTFormat(wi);
+    var name = (wi.name || 'world_info').replace(/[^a-zA-Z0-9一-鿿]/g, '_');
+    downloadJsonFile(data, name + '.json');
+}
+
+// Simple render hook for count badge (called from renderAll / renderCharacterCard)
+function renderWorldInfoBadge() {
+    var el = dom.wiEntryCount;
+    if (!el) return;
+    var conv = getActiveConv();
+    var wi = conv && conv.worldInfo;
+    var count = wi && wi.entries ? Object.keys(wi.entries).length : 0;
+    el.textContent = count > 0 ? count : '';
+    el.title = count + ' ' + t('world_book_entry');
+}
+
+function renderWorldInfoBudgetWarning() {
+    var el = dom.wiBudgetWarning;
+    var textEl = dom.wiBudgetWarningText;
+    var dismissBtn = dom.wiBudgetWarningDismiss;
+    if (!el || !textEl || !dismissBtn) return;
+
+    var conv = getActiveConv();
+    if (!conv || !conv._wiBudgetWarning) {
+        el.classList.add('hidden');
+        return;
+    }
+
+    textEl.textContent = t('wi_budget_warning');
+    dismissBtn.textContent = t('wi_budget_warning_dismiss');
+
+    el.classList.remove('hidden');
+
+    // Wire dismiss once
+    if (!dismissBtn._wired) {
+        dismissBtn.addEventListener('click', function() {
+            if (conv) conv._wiBudgetWarning = false;
+            el.classList.add('hidden');
+        });
+        dismissBtn._wired = true;
+    }
+}
+
+// ---------- World Info Activation Engine (core features) ----------
+
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function entryMatchesKeys(entry, text, caseSensitive, wholeWord) {
+    if (!entry || !entry.key || entry.key.length === 0) return false;
+    var flags = caseSensitive ? 'g' : 'gi';
+    for (var i = 0; i < entry.key.length; i++) {
+        var k = entry.key[i];
+        if (!k) continue;
+        var isRegex = k[0] === '/' && k.lastIndexOf('/') > 1;
+        var re;
+        if (isRegex) {
+            try {
+                var lastSlash = k.lastIndexOf('/');
+                var pattern = k.slice(1, lastSlash);
+                var f = k.slice(lastSlash + 1) || flags;
+                re = new RegExp(pattern, f);
+            } catch (e) { re = null; }
+        } else {
+            var pat = wholeWord ? '\\b' + escapeRegex(k) + '\\b' : escapeRegex(k);
+            re = new RegExp(pat, flags);
+        }
+        if (re && re.test(text)) return true;
+    }
+    return false;
+}
+
+function entryMatchesSecondary(entry, text, caseSensitive) {
+    if (!entry.keysecondary || entry.keysecondary.length === 0) return true;
+    var flags = caseSensitive ? 'g' : 'gi';
+    var matches = 0;
+    for (var i = 0; i < entry.keysecondary.length; i++) {
+        var k = entry.keysecondary[i];
+        if (!k) continue;
+        var isRegex = k[0] === '/' && k.lastIndexOf('/') > 1;
+        var re;
+        if (isRegex) {
+            try {
+                var last = k.lastIndexOf('/');
+                re = new RegExp(k.slice(1, last), k.slice(last + 1) || flags);
+            } catch (e) { re = null; }
+        } else {
+            re = new RegExp(escapeRegex(k), flags);
+        }
+        if (re && re.test(text)) matches++;
+    }
+    var logic = entry.selectiveLogic || 0;
+    if (logic === 0) return matches > 0;
+    if (logic === 1) return matches === entry.keysecondary.length;
+    if (logic === 2) return matches === 0;
+    if (logic === 3) return matches < entry.keysecondary.length;
+    return matches > 0;
+}
+
+function passesCharacterFilter(entry, charName, charTags) {
+    var cf = entry.characterFilter || { isExclude: false, names: [], tags: [] };
+    var names = cf.names || [];
+    var tags = cf.tags || [];
+    if (names.length === 0 && tags.length === 0) return true;
+    var nameMatch = names.length > 0 && names.some(function(n) { return (charName || '').toLowerCase() === n.toLowerCase(); });
+    var tagMatch = tags.length > 0 && charTags && charTags.some(function(t) {
+        return tags.some(function(tt) { return (t || '').toLowerCase() === tt.toLowerCase(); });
+    });
+    var match = nameMatch || tagMatch;
+    return cf.isExclude ? !match : match;
+}
+
+function passesProbability(entry) {
+    if (!entry.useProbability) return true;
+    var p = entry.probability != null ? entry.probability : 100;
+    if (p >= 100) return true;
+    if (p <= 0) return false;
+    return Math.random() * 100 < p;
+}
+
+function buildScanText(conv, depth, entry) {
+    if (!conv) return '';
+    var msgs = conv.messages.filter(function(m) { return m.role !== 'system'; });
+    depth = depth || 4;
+    if (depth > 0) msgs = msgs.slice(-depth);
+    var charName = conv.character ? conv.character.name : '';
+    var userName = state.settings.userName || 'User';
+    var out = [];
+
+    for (var i = 0; i < msgs.length; i++) {
+        var m = msgs[i];
+        var prefix = m.role === 'user' ? (userName + ': ') : (charName ? (charName + ': ') : '');
+        out.push(prefix + (m.content || ''));
+    }
+
+    // === Selective Additional Matching Sources ===
+    // Only include fields that this specific entry has enabled
+    if (conv.character && entry) {
+        var c = conv.character;
+        if (entry.matchCharacterDescription) {
+            out.push('CharacterDescription: ' + (c.description || ''));
+        }
+        if (entry.matchCharacterPersonality) {
+            out.push('CharacterPersonality: ' + (c.personality || ''));
+        }
+        if (entry.matchScenario) {
+            out.push('Scenario: ' + (c.scenario || ''));
+        }
+        if (entry.matchPersonaDescription) {
+            // For now we don't have a separate persona system, skip or use settings
+        }
+        if (entry.matchCharacterDepthPrompt) {
+            out.push("Character's Note: " + (c.post_history_instructions || ''));
+        }
+        if (entry.matchCreatorNotes) {
+            out.push('Creator Notes: ' + (c.creator_notes || ''));
+        }
+    } else if (conv.character) {
+        // Fallback: if no entry provided, include everything (legacy behavior)
+        var c = conv.character;
+        out.push('CharacterDescription: ' + (c.description || ''));
+        out.push('CharacterPersonality: ' + (c.personality || ''));
+        out.push('Scenario: ' + (c.scenario || ''));
+    }
+
+    return out.join('\n');
+}
+
+function estimateTokens(text) {
+    if (!text) return 0;
+    // Simple but effective heuristic used by many lightweight frontends
+    return Math.max(1, Math.ceil(text.length / 3.6));
+}
+
+function applyWorldInfoBudget(entries, settings) {
+    if (!entries || entries.length === 0) {
+        return { entries: entries || [], trimmed: false };
+    }
+
+    var budgetEnabled = settings.worldInfoBudgetEnabled !== false;
+    var maxBudget = parseInt(settings.worldInfoBudget) || 2048;
+
+    if (!budgetEnabled) {
+        return { entries: entries, trimmed: false };
+    }
+
+    var originalCount = entries.length;
+
+    // Always keep ignoreBudget entries
+    var mustKeep = entries.filter(function(e) { return e.ignoreBudget; });
+    var rest = entries.filter(function(e) { return !e.ignoreBudget; });
+
+    // Priority:
+    // 1. Direct (non-recursive) entries before recursive ones
+    // 2. Constants before non-constants
+    // 3. Higher order first
+    rest.sort(function(a, b) {
+        var aRec = a.isRecursive ? 1 : 0;
+        var bRec = b.isRecursive ? 1 : 0;
+        if (aRec !== bRec) return aRec - bRec;     // direct (0) before recursive (1)
+
+        var aConst = a.constant ? 1 : 0;
+        var bConst = b.constant ? 1 : 0;
+        if (aConst !== bConst) return bConst - aConst;
+
+        return (b.order || 0) - (a.order || 0);
+    });
+
+    var used = 0;
+    mustKeep.forEach(function(e) {
+        used += estimateTokens(e.content);
+    });
+
+    var accepted = [];
+
+    for (var i = 0; i < rest.length; i++) {
+        var e = rest[i];
+        var cost = estimateTokens(e.content);
+        if (used + cost <= maxBudget) {
+            accepted.push(e);
+            used += cost;
+        } else {
+            break;
+        }
+    }
+
+    // Combine and re-sort by original order for correct injection sequence
+    var final = mustKeep.concat(accepted);
+    final.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+
+    var trimmed = final.length < originalCount;
+
+    return { entries: final, trimmed: trimmed };
+}
+
+function getActivatedWorldInfo(conv) {
+    var wi = conv ? conv.worldInfo : null;
+    if (!wi || !wi.entries) return { entries: [], byPosition: {} };
+
+    // ==================== World Info Activation Cache ====================
+    // 计算一个轻量 hash：消息数量 + 最后一条消息内容前 64 字符 + 世界书条目数量
+    var messages = conv.messages || [];
+    var lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+    var lastContentHash = lastMsg ? (lastMsg.content || '').slice(0, 64) : '';
+    var wiEntryCount = Object.keys(wi.entries).length;
+
+    var cacheKey = messages.length + '|' + lastContentHash + '|' + wiEntryCount;
+
+    if (conv._wiCache && conv._wiCache.key === cacheKey) {
+        return conv._wiCache.result;
+    }
+    // 缓存失效，继续正常计算...
+
+    var all = Object.keys(wi.entries).map(function(k) { return wi.entries[k]; })
+        .filter(function(e) { return e && !e.disable; });
+
+    if (all.length === 0) return { entries: [], byPosition: {} };
+
+    var charName = conv.character ? conv.character.name : '';
+    var charTags = conv.character ? (conv.character.tags || []) : [];
+    // Base chat history (depth is global default here; per-entry scanDepth override handled later if needed)
+    var baseScanText = buildScanText(conv, 4, null);
+
+    var activated = [];
+
+    for (var i = 0; i < all.length; i++) {
+        var e = all[i];
+        var cs = e.caseSensitive === true;
+        var ww = e.matchWholeWords === true;
+
+        // Build scan text tailored to this entry's additional matching sources
+        var scanText = buildScanText(conv, (e.scanDepth != null ? e.scanDepth : 4), e);
+
+        var keyHit = entryMatchesKeys(e, scanText, cs, ww);
+        var secHit = entryMatchesSecondary(e, scanText, cs);
+        var should = false;
+        if (e.constant) should = true;
+        else if (keyHit && secHit) should = true;
+
+        if (should && passesCharacterFilter(e, charName, charTags) && passesProbability(e)) {
+            activated.push(e);
+        }
+    }
+
+    // One level recursion via content mention
+    // Mark recursive entries so they have lower priority in budget allocation
+    var rec = [];
+    activated.forEach(function(act) {
+        if (act.preventRecursion) return;
+        all.forEach(function(cand) {
+            if (cand.disable || activated.indexOf(cand) > -1 || rec.indexOf(cand) > -1) return;
+            if (cand.excludeRecursion) return;
+            var keysJoined = (cand.key || []).join(' ').toLowerCase();
+            if (act.content && act.content.toLowerCase().indexOf(keysJoined) !== -1) {
+                if (passesCharacterFilter(cand, charName, charTags) && passesProbability(cand)) {
+                    cand.isRecursive = true;   // mark for budget priority
+                    rec.push(cand);
+                }
+            }
+        });
+    });
+    activated = activated.concat(rec);
+
+    // dedupe
+    var seen = {};
+    activated = activated.filter(function(e) { if (seen[e.uid]) return false; seen[e.uid] = true; return true; });
+
+    // inclusion groups (with Group Scoring support)
+    var groups = {};
+    activated.forEach(function(e) {
+        if (e.group) { (groups[e.group] = groups[e.group] || []).push(e); }
+    });
+    Object.keys(groups).forEach(function(g) {
+        var gents = groups[g];
+        if (gents.length < 2) return;
+
+        activated = activated.filter(function(e) { return !e.group || e.group !== g; });
+
+        var useScoring = gents.some(function(e) { return e.useGroupScoring; });
+
+        var winner;
+        if (useScoring) {
+            // Calculate score for each entry
+            gents.forEach(function(e) {
+                var score = 0;
+                // Primary keys
+                if (e.key && e.key.length > 0) {
+                    // Simple heuristic: count how many primary keys exist (real matching already happened)
+                    score += e.key.length;
+                }
+                // Secondary keys contribution depends on selective logic (simplified)
+                if (e.keysecondary && e.keysecondary.length > 0) {
+                    var logic = e.selectiveLogic || 0;
+                    if (logic === 0 || logic === 1) score += e.keysecondary.length; // AND ANY / AND ALL
+                }
+                e._groupScore = score;
+            });
+            winner = gents.sort(function(a, b) { return (b._groupScore || 0) - (a._groupScore || 0); })[0];
+            gents.forEach(function(e) { delete e._groupScore; });
+        } else {
+            // Original behavior: highest order wins (or random weight later)
+            winner = gents.sort(function(a, b) { return (b.order || 0) - (a.order || 0); })[0];
+        }
+
+        activated.push(winner);
+    });
+
+    activated.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+
+    // === Timed Effects (Sticky / Cooldown / Delay) ===
+    activated = processTimedEffects(conv, activated);
+
+    // === Apply global World Info token budget ===
+    // This now also considers recursive entries (they have lower priority)
+    var settings = state.settings || {};
+    var budgetResult = applyWorldInfoBudget(activated, settings);
+    activated = budgetResult.entries;
+
+    // Record budget warning for UI
+    if (budgetResult.trimmed) {
+        var activeConv = getActiveConv();
+        if (activeConv) {
+            activeConv._wiBudgetWarning = true;
+        }
+    }
+
+    // Clean up temporary recursion marker
+    activated.forEach(function(e) { delete e.isRecursive; });
+
+    var byPos = {};
+    var outlets = {}; // name -> array of entries
+
+    activated.forEach(function(e) {
+        var p = e.position != null ? e.position : WI_POS.AFTER_CHAR;
+        (byPos[p] = byPos[p] || []).push(e);
+
+        // Collect Outlet entries
+        if (p === WI_POS.OUTLET && e.outletName) {
+            var name = e.outletName.trim();
+            if (name) {
+                if (!outlets[name]) outlets[name] = [];
+                outlets[name].push(e);
+            }
+        }
+    });
+
+    // Sort outlets by order
+    Object.keys(outlets).forEach(function(name) {
+        outlets[name].sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+    });
+
+    var result = { entries: activated, byPosition: byPos, outlets: outlets };
+
+    // 写入缓存
+    if (conv) {
+        conv._wiCache = {
+            key: cacheKey,
+            result: result
+        };
+    }
+
+    return result;
+}
+
+function joinWIContent(list, charName, userName) {
+    if (!list || !list.length) return '';
+    return list.map(function(e) {
+        return replacePlaceholders(e.content || '', charName, userName);
+    }).join('\n\n');
+}
+
+// ==================== Timed Effects Helpers (Sticky / Cooldown / Delay) ====================
+function getConversationMessageCount(conv) {
+    if (!conv || !conv.messages) return 0;
+    return conv.messages.filter(function(m) { return m.role !== 'system'; }).length;
+}
+
+function processTimedEffects(conv, activatedEntries) {
+    if (!conv || !activatedEntries || activatedEntries.length === 0) return activatedEntries;
+
+    if (!conv._wiTimedEffects) conv._wiTimedEffects = {};
+
+    var currentCount = getConversationMessageCount(conv);
+    var finalEntries = [];
+    var timed = conv._wiTimedEffects;
+
+    for (var i = 0; i < activatedEntries.length; i++) {
+        var e = activatedEntries[i];
+        var uid = String(e.uid);
+        var state = timed[uid] || { sticky: 0, cooldown: 0, delay: 0, lastActivated: 0 };
+
+        var delay = e.delay || 0;
+        var sticky = e.sticky || 0;
+        var cooldown = e.cooldown || 0;
+
+        var canActivate = true;
+
+        // Delay check
+        if (delay > 0 && currentCount < delay) {
+            canActivate = false;
+        }
+
+        // Cooldown check
+        if (state.cooldown > currentCount) {
+            canActivate = false;
+        }
+
+        // Sticky: if still active, force include (ignore probability later in activation)
+        if (state.sticky > currentCount) {
+            canActivate = true; // force
+        }
+
+        if (canActivate) {
+            finalEntries.push(e);
+
+            // Update state after successful activation consideration
+            if (sticky > 0) {
+                state.sticky = currentCount + sticky;
+            }
+            if (cooldown > 0) {
+                state.cooldown = (state.sticky > currentCount ? state.sticky : currentCount) + cooldown;
+            }
+            state.lastActivated = currentCount;
+
+            timed[uid] = state;
+        }
+    }
+
+    // Clean up expired effects
+    Object.keys(timed).forEach(function(uid) {
+        var s = timed[uid];
+        if (s.sticky <= currentCount && s.cooldown <= currentCount) {
+            delete timed[uid];
+        }
+    });
+
+    return finalEntries;
 }
 
 // ==================== API Client ====================
@@ -1163,7 +3389,16 @@ function streamChat(onToken, onComplete, onError) {
         return;
     }
 
-    var messages = buildMessagesForAPI();
+    var messages;
+    try {
+        messages = buildMessagesForAPI();
+    } catch (err) {
+        console.error('buildMessagesForAPI failed:', err);
+        state.isGenerating = false;
+        onError(new Error('构建提示词时出错：' + (err.message || err)));
+        return;
+    }
+
     var controller = new AbortController();
     state.abortController = controller;
     state.isGenerating = true;
@@ -1285,11 +3520,20 @@ function saveCurrentConversation() {
 // ==================== Summarization ====================
 function generateSummary(messages, callback) {
     var settings = state.settings;
-    if (!settings.apiKey || !settings.apiEndpoint) {
+
+    // Decide which API credentials to use for summarization
+    var useMainAPI = settings.summarizeUseMainAPI !== false;
+    var apiEndpoint = useMainAPI ? settings.apiEndpoint : (settings.summarizeApiEndpoint || settings.apiEndpoint);
+    var apiKey      = useMainAPI ? settings.apiKey      : (settings.summarizeApiKey      || settings.apiKey);
+    var model       = useMainAPI ? settings.model       : (settings.summarizeModel       || settings.model || 'deepseek-chat');
+
+    if (!apiKey || !apiEndpoint) {
         callback(new Error(t('no_api_error')));
         return;
     }
+
     var lang = settings.lang || 'zh-CN';
+    // 推荐替换为更宽松的提示词
     var summaryPrompt = lang === 'zh-TW'
         ? '你是一位专业的故事复述助手。请以繁體中文將以下對話內容濃縮成簡潔的敘事摘要，重點記錄事件發展、人物關係變化和重要情節轉折。只輸出摘要文字，不要添加任何評論或解釋。'
         : lang === 'en'
@@ -1303,7 +3547,7 @@ function generateSummary(messages, callback) {
         }).join('\n\n') }
     ];
 
-    var endpoint = settings.apiEndpoint;
+    var endpoint = apiEndpoint;
     if (!endpoint.includes('/chat/completions')) {
         if (endpoint.endsWith('/v1')) endpoint += '/chat/completions';
         else if (endpoint.endsWith('/')) endpoint += 'chat/completions';
@@ -1312,8 +3556,8 @@ function generateSummary(messages, callback) {
 
     fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + settings.apiKey },
-        body: JSON.stringify({ model: settings.model, messages: summaryMessages, max_tokens: 512, temperature: 0.3, stream: false })
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+        body: JSON.stringify({ model: model, messages: summaryMessages, max_tokens: 512, temperature: 0.3, stream: false })
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.choices && data.choices[0] && data.choices[0].message) {
             callback(null, data.choices[0].message.content.trim());
@@ -1518,8 +3762,11 @@ function newConversation() {
     state.conversations[conv.id] = conv;
     state.conversationOrder.unshift(conv.id);
     state.activeConvId = conv.id;
+    if (conv._wiBudgetWarning) conv._wiBudgetWarning = false;
     persistState();
-    renderAll();
+    // activeConvId change will handle most renders
+    renderWorldInfoBudgetWarning();
+    if (isMobile()) closeSidebar();
 }
 
 function loadConversation(id) {
@@ -1528,9 +3775,9 @@ function loadConversation(id) {
         stopGeneration();
     }
     saveCurrentConversation();
-    state.activeConvId = id;
+    state.activeConvId = id;           // triggers granular renders via subscription
     persistState();
-    renderAll();
+    if (isMobile()) closeSidebar();
 }
 
 function deleteConversation(id) {
@@ -1548,7 +3795,7 @@ function deleteConversation(id) {
         }
     }
     persistState();
-    renderAll();
+    requestRender(['conversations', 'conversationOrder', 'activeConvId']);
 }
 
 // ==================== UI Rendering ====================
@@ -1575,7 +3822,30 @@ function cacheDom() {
         'summarizeBtn','summaryHistoryBtn','summarizeModal','summarizeBackdrop','summarizeTurns',
         'summarizeStatus','summarizeCancelBtn','summarizeConfirmBtn',
         'summaryHistoryModal','summaryHistoryBackdrop','summaryHistoryCloseBtn','summaryHistoryList',
-        'summaryNoHistory','summaryEnabled','summaryThreshold','summaryThresholdVal'
+        'summaryNoHistory','summaryEnabled','summaryThreshold','summaryThresholdVal',
+        'hamburgerBtn','sidebarCloseBtn','sidebarBackdrop',
+        'worldBookModal','worldBookBackdrop','worldBookBtn','wiEntryCount',
+        'wiImportBtn','wiExportBtn','wiDeleteAllBtn','wiAddEntryBtn','wiCloseBtn',
+        'wiBookName','wiSearch','wiEntryList','wiEntryStats',
+        'wiNoSelection','wiEditorForm','wiEditorContainer',
+        'wiDisable','wiUidBadge','wiDuplicateBtn','wiDeleteEntryBtn',
+        'wiComment','wiOrder','wiKeyChips','wiKeyInput','wiAddKeyBtn',
+        'wiSecChips','wiSecInput','wiAddSecBtn','wiSelectiveLogic',
+        'wiContent','wiStratConstant','wiStratSelective',
+        'wiProbability','wiProbVal','wiUseProb',
+        'wiGroup','wiGroupWeight','wiPrioritize','wiUseGroupScoring',
+        'wiPosition','wiDepthRow','wiDepth','wiRole','wiOutletRow','wiOutletName',
+        'wiSticky','wiCooldown','wiDelay',
+        'wiExcludeRec','wiPreventRec','wiDelayRec',
+        'wiCharNames','wiCharTags','wiCharExclude',
+        'wiMatchCharDesc','wiMatchCharPers','wiMatchScenario','wiMatchPersona','wiMatchCharNote','wiMatchCreatorNotes',
+        'wiScanDepth','wiCaseSens','wiMatchWhole','wiIgnoreBudget','wiAutomationId',
+        'wiDirtyIndicator',
+        'wiImportFile',
+        'worldInfoBudgetEnabled','worldInfoBudget','worldInfoBudgetVal',
+        'wiBudgetWarning','wiBudgetWarningText','wiBudgetWarningDismiss',
+        'summarizeUseMainAPI','summarizeApiEndpoint','summarizeApiKey','summarizeModel',
+        'summarizeCustomApiSection'
     ];
     ids.forEach(function(id) { dom[id] = document.getElementById(id); });
 }
@@ -1646,7 +3916,7 @@ function importConversations(file) {
                 }
                 state.activeConvId = state.conversationOrder[0];
                 persistState();
-                renderAll();
+                // activeConvId change handles rendering
             }
             var msg = t('import_conv_success') + imported + t('import_conv_success_suffix');
             if (skipped > 0) msg += ' ' + skipped + t('import_conv_duplicate');
@@ -1709,9 +3979,9 @@ function renderMessages() {
     var conv = getActiveConv();
     if (!conv) return;
     var container = dom.messagesContainer;
-    var messages = conv.messages.filter(function(m) { return m.role !== 'system'; });
+    var allMessages = conv.messages.filter(function(m) { return m.role !== 'system'; });
 
-    if (messages.length === 0) {
+    if (allMessages.length === 0) {
         container.innerHTML = '';
         dom.emptyState.style.display = '';
         dom.tokenInfo.classList.add('hidden');
@@ -1721,15 +3991,85 @@ function renderMessages() {
     dom.emptyState.style.display = 'none';
     dom.tokenInfo.classList.remove('hidden');
 
+    // === 增量 DOM 更新 + Windowed Rendering ===
+    var MAX_VISIBLE = 80;
+    var startIdx = Math.max(0, allMessages.length - MAX_VISIBLE);
+    var visibleMessages = allMessages.slice(startIdx);
+
+    // 尝试增量追加（最常见场景：只收到新消息）
+    var lastRenderedCount = conv._lastRenderedVisibleCount || 0;
+    var currentVisibleCount = visibleMessages.length;
+
+    // 只有在“纯追加”且没有删除/重试时才做增量更新
+    if (currentVisibleCount > lastRenderedCount &&
+        !state.isGenerating && // 流式中不走增量
+        container.querySelectorAll('.msg-wrapper').length === lastRenderedCount) {
+
+        // 增量追加新消息
+        var fragment = document.createDocumentFragment();
+        for (var i = lastRenderedCount; i < currentVisibleCount; i++) {
+            var msg = visibleMessages[i];
+            var isUser = msg.role === 'user';
+            var senderName = isUser ? (state.settings.userName || t('sender_you')) : (conv.character ? conv.character.name : t('sender_assistant'));
+            var actualIdx = conv.messages.indexOf(msg);
+
+            var msgDiv = document.createElement('div');
+            msgDiv.className = 'msg-enter ' + (isUser ? 'msg-user flex justify-end' : 'msg-assistant flex justify-start');
+            msgDiv.innerHTML = `
+                <div class="max-w-[80%] msg-wrapper">
+                    ${!isUser ? `<p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">${escapeHtml(senderName)}</p>` : ''}
+                    <div class="msg-bubble">${isUser ? escapeHtml(msg.content) : highlightDialogue(msg.content)}</div>
+                    <div class="msg-actions">
+                        <button class="msg-action-btn copy-btn" data-action="copy" data-msg-idx="${actualIdx}" title="${t('copy')}">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        </button>
+                        ${!isUser ? `
+                        <button class="msg-action-btn retry-btn" data-action="retry" data-msg-idx="${actualIdx}" title="${t('regenerate')}">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                        </button>` : ''}
+                        <button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="${actualIdx}" title="${t('delete_msg')}">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                    </div>
+                </div>`;
+
+            fragment.appendChild(msgDiv);
+        }
+        container.appendChild(fragment);
+        container.scrollTop = container.scrollHeight;
+
+        conv._lastRenderedVisibleCount = currentVisibleCount;
+        return;
+    }
+
+    // 否则走全量渲染（删除、重试、第一次渲染、流式等）
     var html = '';
-    for (var i = 0; i < messages.length; i++) {
-        var msg = messages[i];
+
+    if (startIdx > 0) {
+        html += '<div class="flex justify-center py-3">';
+        html += '<button id="loadEarlierBtn" class="px-4 py-1.5 text-xs rounded-2xl glass hover:bg-white/10 text-zinc-400 transition-all">';
+        html += '↑ 加载更早的消息 (' + startIdx + ' 条被隐藏)';
+        html += '</button>';
+        html += '</div>';
+    }
+
+    for (var i = 0; i < visibleMessages.length; i++) {
+        var msg = visibleMessages[i];
         var isUser = msg.role === 'user';
         var senderName = isUser ? (state.settings.userName || t('sender_you')) : (conv.character ? conv.character.name : t('sender_assistant'));
+        var actualIdx = conv.messages.indexOf(msg);
+
         html += '<div class="msg-enter ' + (isUser ? 'msg-user flex justify-end' : 'msg-assistant flex justify-start') + '">';
-        html += '<div class="max-w-[80%]">';
+        html += '<div class="max-w-[80%] msg-wrapper">';
         if (!isUser) html += '<p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(senderName) + '</p>';
-        html += '<div class="msg-bubble">' + escapeHtml(msg.content) + '</div>';
+        html += '<div class="msg-bubble">' + (isUser ? escapeHtml(msg.content) : highlightDialogue(msg.content)) + '</div>';
+        html += '<div class="msg-actions">';
+        html += '<button class="msg-action-btn copy-btn" data-action="copy" data-msg-idx="' + actualIdx + '" title="' + t('copy') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+        if (!isUser) {
+            html += '<button class="msg-action-btn retry-btn" data-action="retry" data-msg-idx="' + actualIdx + '" title="' + t('regenerate') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>';
+        }
+        html += '<button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="' + actualIdx + '" title="' + t('delete_msg') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+        html += '</div>';
         html += '</div></div>';
     }
 
@@ -1738,6 +4078,49 @@ function renderMessages() {
         html += '<div class="max-w-[80%]">';
         html += '<p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(conv.character ? conv.character.name : t('sender_assistant')) + '</p>';
         html += '<div class="msg-bubble typing-cursor" id="streamingContent"></div>';
+        html += '</div></div>';
+    }
+
+    container.innerHTML = html;
+    container.scrollTop = container.scrollHeight;
+
+    conv._lastRenderedVisibleCount = currentVisibleCount;
+
+    // Wire the "load earlier" button (currently just shows a hint — full history loading can be added later)
+    var loadBtn = document.getElementById('loadEarlierBtn');
+    if (loadBtn) {
+        loadBtn.addEventListener('click', function() {
+            // For now, just render everything (simple fallback)
+            // In a future version this can load from a separate archive or paginated source
+            container.innerHTML = '';
+            renderMessagesFullHistory(conv);
+        });
+    }
+}
+
+// Fallback: render all messages (used when user explicitly wants older history)
+function renderMessagesFullHistory(conv) {
+    var container = dom.messagesContainer;
+    var messages = conv.messages.filter(function(m) { return m.role !== 'system'; });
+
+    var html = '';
+    for (var i = 0; i < messages.length; i++) {
+        var msg = messages[i];
+        var isUser = msg.role === 'user';
+        var senderName = isUser ? (state.settings.userName || t('sender_you')) : (conv.character ? conv.character.name : t('sender_assistant'));
+        var actualIdx = conv.messages.indexOf(msg);
+
+        html += '<div class="msg-enter ' + (isUser ? 'msg-user flex justify-end' : 'msg-assistant flex justify-start') + '">';
+        html += '<div class="max-w-[80%] msg-wrapper">';
+        if (!isUser) html += '<p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(senderName) + '</p>';
+        html += '<div class="msg-bubble">' + (isUser ? escapeHtml(msg.content) : highlightDialogue(msg.content)) + '</div>';
+        html += '<div class="msg-actions">';
+        html += '<button class="msg-action-btn copy-btn" data-action="copy" data-msg-idx="' + actualIdx + '" title="' + t('copy') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+        if (!isUser) {
+            html += '<button class="msg-action-btn retry-btn" data-action="retry" data-msg-idx="' + actualIdx + '" title="' + t('regenerate') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>';
+        }
+        html += '<button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="' + actualIdx + '" title="' + t('delete_msg') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+        html += '</div>';
         html += '</div></div>';
     }
 
@@ -1795,6 +4178,7 @@ function renderCharacterCard() {
         dom.charExportBtn.classList.add('hidden');
         dom.charRemoveBtn.classList.add('hidden');
     }
+    renderWorldInfoBadge();
 }
 
 function removeCharacter() {
@@ -1807,7 +4191,7 @@ function removeCharacter() {
     }
     conv.updated = Date.now();
     persistState();
-    renderAll();
+    requestFullRender();
 }
 
 function openCharacterEditor() {
@@ -1863,7 +4247,11 @@ function saveCharacterEdits() {
     conv.updated = Date.now();
     persistState();
     dom.charEditorModal.classList.add('hidden');
-    renderAll();
+
+    // Targeted updates instead of full renderAll
+    renderCharacterUI();
+    renderMessagesOnly();
+    renderConversationListOnly();
 }
 
 function exportCharacter() {
@@ -1911,6 +4299,7 @@ function renderAll() {
     renderTopBar();
     renderTokenBar();
     updateInputState();
+    renderWorldInfoBudgetWarning();
 }
 
 function updateInputState() {
@@ -1933,9 +4322,132 @@ function updateInputState() {
     }
 }
 
+// ==================== Mobile Sidebar ====================
+function isMobile() {
+    return window.innerWidth < 768;
+}
+
+function openSidebar() {
+    dom.sidebar.classList.add('open');
+    dom.sidebarBackdrop.classList.add('open');
+}
+
+function closeSidebar() {
+    dom.sidebar.classList.remove('open');
+    dom.sidebarBackdrop.classList.remove('open');
+}
+
+function toggleSidebar() {
+    if (dom.sidebar.classList.contains('open')) {
+        closeSidebar();
+    } else {
+        openSidebar();
+    }
+}
+
 function escapeHtml(text) {
     if (!text) return '';
     return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function highlightDialogue(text) {
+    if (!text) return '';
+    var escaped = escapeHtml(text);
+    // Highlight Chinese curly double quotes “...”
+    escaped = escaped.replace(/“([\s\S]*?)”/g, '<span class="dialogue-highlight">“$1”</span>');
+    // Highlight corner brackets 「...」
+    escaped = escaped.replace(/「([\s\S]*?)」/g, '<span class="dialogue-highlight">「$1」</span>');
+    return escaped;
+}
+
+// ==================== Message Actions ====================
+function deleteMessage(actualIdx) {
+    var conv = getActiveConv();
+    if (!conv) return;
+    var msg = conv.messages[actualIdx];
+    if (!msg) return;
+    if (msg.role === 'user') {
+        // Delete user message and the following AI response if it exists
+        if (actualIdx + 1 < conv.messages.length && conv.messages[actualIdx + 1].role === 'assistant') {
+            conv.messages.splice(actualIdx, 2);
+        } else {
+            conv.messages.splice(actualIdx, 1);
+        }
+    } else {
+        // Delete only this AI message
+        conv.messages.splice(actualIdx, 1);
+    }
+    conv.updated = Date.now();
+    persistState();
+    renderMessagesOnly();
+    renderConversationListOnly();
+}
+
+function regenerateMessage(actualIdx) {
+    if (state.isGenerating) return;
+    var conv = getActiveConv();
+    if (!conv) return;
+    var msg = conv.messages[actualIdx];
+    if (!msg || msg.role !== 'assistant') return;
+    // Remove this AI message
+    conv.messages.splice(actualIdx, 1);
+    conv.updated = Date.now();
+    persistState();
+    renderMessagesOnly();
+    renderConversationListOnly(); // title/date may change
+
+    // Re-send to API (the last message should be from user now)
+    var lastMsg = conv.messages[conv.messages.length - 1];
+    if (!lastMsg || lastMsg.role !== 'user') return;
+
+    streamChat(
+        function onToken(token, fullContent) {
+            var streamingEl = document.getElementById('streamingContent');
+            if (streamingEl) {
+                streamingEl.innerHTML = highlightDialogue(fullContent);
+            } else {
+                var div = document.createElement('div');
+                div.id = 'streamingMsg';
+                div.className = 'msg-assistant flex justify-start msg-enter';
+                div.innerHTML = '<div class="max-w-[80%]"><p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">' +
+                    escapeHtml(conv.character ? conv.character.name : t('sender_assistant')) +
+                    '</p><div class="msg-bubble typing-cursor" id="streamingContent">' +
+                    highlightDialogue(fullContent) + '</div></div>';
+                dom.messagesContainer.appendChild(div);
+            }
+            dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
+        },
+        function onComplete(fullContent) {
+            var streamingEl = document.getElementById('streamingMsg');
+            if (streamingEl) streamingEl.remove();
+            var c = getActiveConv();
+            if (c && fullContent) {
+                c.messages.push({ role: 'assistant', content: fullContent });
+                c.updated = Date.now();
+                persistState();
+            }
+            state.isGenerating = false;
+            renderMessagesOnly();                 // 显式重新渲染消息列表（关键修复）
+            renderTokenBar();                     // lightweight
+            setTimeout(function() { autoSummarize(); }, 500);
+        },
+        function onError(err) {
+            var streamingEl = document.getElementById('streamingMsg');
+            if (streamingEl) streamingEl.remove();
+            state.isGenerating = false;
+            renderMessagesOnly();
+            alert('Error: ' + (err.message || err));
+        }
+    );
+    updateInputState();
+}
+
+function copyMessageText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            // Brief visual feedback could be added here
+        });
+    }
 }
 
 // ==================== Send Message ====================
@@ -1948,19 +4460,20 @@ function sendMessage() {
 
     conv.messages.push({ role: 'user', content: text });
     conv.updated = Date.now();
+    conv._wiBudgetWarning = false; // clear previous budget warning on new turn
     if (conv.title === t('title_new_chat_match')) {
         conv.title = text.slice(0, 50) + (text.length > 50 ? '...' : '');
     }
     dom.messageInput.value = '';
     dom.messageInput.style.height = 'auto';
     persistState();
-    renderAll();
+    requestFullRender();
 
     streamChat(
         function onToken(token, fullContent) {
             var streamingEl = document.getElementById('streamingContent');
             if (streamingEl) {
-                streamingEl.textContent = fullContent;
+                streamingEl.innerHTML = highlightDialogue(fullContent);
             } else {
                 var div = document.createElement('div');
                 div.id = 'streamingMsg';
@@ -1968,7 +4481,7 @@ function sendMessage() {
                 div.innerHTML = '<div class="max-w-[80%]"><p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">' +
                     escapeHtml(conv.character ? conv.character.name : t('sender_assistant')) +
                     '</p><div class="msg-bubble typing-cursor" id="streamingContent">' +
-                    escapeHtml(fullContent) + '</div></div>';
+                    highlightDialogue(fullContent) + '</div></div>';
                 dom.messagesContainer.appendChild(div);
             }
             dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
@@ -1983,14 +4496,15 @@ function sendMessage() {
                 persistState();
             }
             state.isGenerating = false;
-            renderAll();
+            renderMessagesOnly();                 // 显式重新渲染消息列表（关键修复）
+            renderTokenBar();
             setTimeout(function() { autoSummarize(); }, 500);
         },
         function onError(err) {
             var streamingEl = document.getElementById('streamingMsg');
             if (streamingEl) streamingEl.remove();
             state.isGenerating = false;
-            renderAll();
+            renderMessagesOnly();
             alert('Error: ' + (err.message || err));
         }
     );
@@ -2011,6 +4525,34 @@ function bindEvents() {
     dom.stopBtn.addEventListener('click', function() { stopGeneration(); });
     dom.newChatBtn.addEventListener('click', newConversation);
     dom.archiveBtn.addEventListener('click', archiveCurrentConversation);
+
+    // Mobile sidebar
+    dom.hamburgerBtn.addEventListener('click', toggleSidebar);
+    dom.sidebarCloseBtn.addEventListener('click', closeSidebar);
+    dom.sidebarBackdrop.addEventListener('click', closeSidebar);
+    window.addEventListener('resize', function() {
+        if (!isMobile()) closeSidebar();
+    });
+
+    // Message action buttons (event delegation)
+    dom.messagesContainer.addEventListener('click', function(e) {
+        var btn = e.target.closest('.msg-action-btn');
+        if (!btn) return;
+        var action = btn.getAttribute('data-action');
+        var idx = parseInt(btn.getAttribute('data-msg-idx'));
+        if (isNaN(idx)) return;
+        if (action === 'copy') {
+            var conv = getActiveConv();
+            if (conv && conv.messages[idx]) {
+                copyMessageText(conv.messages[idx].content);
+            }
+        } else if (action === 'delete') {
+            deleteMessage(idx);
+        } else if (action === 'retry') {
+            if (state.isGenerating) return;
+            regenerateMessage(idx);
+        }
+    });
 
     // Language switcher
     document.querySelectorAll('.lang-btn').forEach(function(btn) {
@@ -2053,6 +4595,9 @@ function bindEvents() {
     // Character export
     dom.charExportBtn.addEventListener('click', exportCharacter);
 
+    // World Book button (below character card)
+    dom.worldBookBtn.addEventListener('click', openWorldBookModal);
+
     // Settings modal
     function openSettings() {
         dom.apiEndpoint.value = state.settings.apiEndpoint;
@@ -2071,6 +4616,21 @@ function bindEvents() {
         dom.summaryEnabled.checked = state.settings.summaryEnabled !== false;
         dom.summaryThreshold.value = state.settings.summaryThreshold || 20;
         dom.summaryThresholdVal.textContent = state.settings.summaryThreshold || 20;
+
+        // World Info Budget
+        dom.worldInfoBudgetEnabled.checked = state.settings.worldInfoBudgetEnabled !== false;
+        dom.worldInfoBudget.value = state.settings.worldInfoBudget || 2048;
+        dom.worldInfoBudgetVal.textContent = state.settings.worldInfoBudget || 2048;
+
+        // Summarization API
+        dom.summarizeUseMainAPI.checked = state.settings.summarizeUseMainAPI !== false;
+        dom.summarizeApiEndpoint.value = state.settings.summarizeApiEndpoint || '';
+        dom.summarizeApiKey.value = state.settings.summarizeApiKey || '';
+        dom.summarizeModel.value = state.settings.summarizeModel || 'deepseek-chat';
+
+        // Toggle custom section visibility
+        toggleSummarizeCustomSection();
+
         dom.settingsModal.classList.remove('hidden');
     }
     function closeSettings() {
@@ -2085,10 +4645,20 @@ function bindEvents() {
         state.settings.systemPrompt = dom.systemPrompt.value.trim();
         state.settings.summaryEnabled = dom.summaryEnabled.checked;
         state.settings.summaryThreshold = parseInt(dom.summaryThreshold.value) || 20;
+
+        // World Info Budget
+        state.settings.worldInfoBudgetEnabled = dom.worldInfoBudgetEnabled.checked;
+        state.settings.worldInfoBudget = parseInt(dom.worldInfoBudget.value) || 2048;
+
+        // Summarization API
+        state.settings.summarizeUseMainAPI = dom.summarizeUseMainAPI.checked;
+        state.settings.summarizeApiEndpoint = dom.summarizeApiEndpoint.value.trim();
+        state.settings.summarizeApiKey = dom.summarizeApiKey.value.trim();
+        state.settings.summarizeModel = dom.summarizeModel.value.trim() || 'deepseek-chat';
+
         persistState();
         dom.settingsModal.classList.add('hidden');
-        updateInputState();
-        renderAll();
+        // 'settings' change will trigger targeted renders via subscription
     }
     dom.sidebarSettingsBtn.addEventListener('click', openSettings);
     dom.topSettingsBtn.addEventListener('click', openSettings);
@@ -2103,6 +4673,7 @@ function bindEvents() {
     bindSlider(dom.maxTokens, dom.maxTokensVal);
     bindSlider(dom.temperature, dom.tempVal);
     bindSlider(dom.topP, dom.topPVal);
+    bindSlider(dom.worldInfoBudget, dom.worldInfoBudgetVal);
 
     // Import modal close
     dom.importCloseBtn.addEventListener('click', function() { dom.importModal.classList.add('hidden'); });
@@ -2160,14 +4731,19 @@ function bindEvents() {
 
     // Prompt viewer
     function showFullPrompt() {
-        var messages = buildMessagesForAPI();
-        var text = '';
-        for (var i = 0; i < messages.length; i++) {
-            text += '=== ' + messages[i].role.toUpperCase() + ' ===\n';
-            text += messages[i].content + '\n\n';
+        try {
+            var messages = buildMessagesForAPI();
+            var text = '';
+            for (var i = 0; i < messages.length; i++) {
+                text += '=== ' + messages[i].role.toUpperCase() + ' ===\n';
+                text += messages[i].content + '\n\n';
+            }
+            dom.promptViewerContent.textContent = text || t('no_messages_to_send');
+            dom.promptViewerModal.classList.remove('hidden');
+        } catch (err) {
+            console.error('showFullPrompt error:', err);
+            alert('无法生成提示词预览：' + (err.message || err));
         }
-        dom.promptViewerContent.textContent = text || t('no_messages_to_send');
-        dom.promptViewerModal.classList.remove('hidden');
     }
     dom.viewPromptBtn.addEventListener('click', showFullPrompt);
     dom.promptViewerCloseBtn.addEventListener('click', function() { dom.promptViewerModal.classList.add('hidden'); });
@@ -2213,15 +4789,29 @@ function bindEvents() {
     // Summary threshold slider in settings
     bindSlider(dom.summaryThreshold, dom.summaryThresholdVal);
 
-    // Escape to close modals
+    // Summarization API section toggle helper
+    function toggleSummarizeCustomSection() {
+        var useMain = !!(dom.summarizeUseMainAPI && dom.summarizeUseMainAPI.checked);
+        if (dom.summarizeCustomApiSection) {
+            dom.summarizeCustomApiSection.style.display = useMain ? 'none' : '';
+        }
+    }
+
+    if (dom.summarizeUseMainAPI) {
+        dom.summarizeUseMainAPI.addEventListener('change', toggleSummarizeCustomSection);
+    }
+
+    // Escape to close modals / sidebar
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
+            if (isMobile() && dom.sidebar.classList.contains('open')) { closeSidebar(); return; }
             if (!dom.settingsModal.classList.contains('hidden')) closeSettings();
             if (!dom.charEditorModal.classList.contains('hidden')) dom.charEditorModal.classList.add('hidden');
             if (!dom.importModal.classList.contains('hidden')) dom.importModal.classList.add('hidden');
             if (!dom.promptViewerModal.classList.contains('hidden')) dom.promptViewerModal.classList.add('hidden');
             if (!dom.summarizeModal.classList.contains('hidden')) dom.summarizeModal.classList.add('hidden');
             if (!dom.summaryHistoryModal.classList.contains('hidden')) dom.summaryHistoryModal.classList.add('hidden');
+            if (!dom.worldBookModal.classList.contains('hidden')) closeWorldBookModal();
         }
     });
 }
