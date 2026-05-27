@@ -156,6 +156,38 @@ body {
         font-size: 16px;
     }
 
+    /* 总结管理器移动端适配：上下布局 + 操作按钮常显 */
+    @media (max-width: 767px) {
+        #summaryManagerModal .flex-1.flex.overflow-hidden {
+            flex-direction: column !important;
+        }
+        #summaryManagerModal .w-5/12 {
+            width: 100% !important;
+            border-right: none !important;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            max-height: 220px;
+        }
+        #summaryManagerModal .w-7/12 {
+            width: 100% !important;
+        }
+
+        /* 移动端让编辑/删除按钮更容易点到 */
+        #summaryManagerList .group .flex.items-center.gap-1,
+        #summaryHistoryList .group .flex.items-center.gap-1 {
+            opacity: 1 !important;
+        }
+        .summary-edit-btn, .summary-del-btn {
+            width: 32px !important;
+            height: 32px !important;
+            font-size: 15px !important;
+            background: rgba(255,255,255,0.06);
+            border-radius: 8px;
+        }
+        .summary-edit-btn:active, .summary-del-btn:active {
+            background: rgba(255,255,255,0.15);
+        }
+    }
+
     /* Mobile: character editor single column */
     #charEditorModal .grid.grid-cols-2 { grid-template-columns: 1fr; }
 
@@ -371,6 +403,19 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                     <div class="w-9 h-5 bg-white/10 rounded-full peer-checked:bg-amber-500/60 peer-checked:ring-1 peer-checked:ring-amber-500/40 transition-all after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
                 </label>
             </div>
+
+            <!-- 新增：回复后自动生成总结（独立于主开关，默认关闭） -->
+            <div class="flex items-center justify-between mt-3">
+                <div>
+                    <label class="text-xs font-semibold text-zinc-400" data-i18n="auto_summarize_on_reply_label">回复后自动生成总结</label>
+                    <p class="text-[10px] text-zinc-600 mt-0.5" data-i18n="auto_summarize_on_reply_hint">开启后，每次回复时会自动检查是否需要总结旧消息（默认关闭）</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
+                    <input type="checkbox" id="autoSummarizeOnReply" class="sr-only peer">
+                    <div class="w-9 h-5 bg-white/10 rounded-full peer-checked:bg-amber-500/60 peer-checked:ring-1 peer-checked:ring-amber-500/40 transition-all after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                </label>
+            </div>
+
             <div class="mt-3">
                 <div class="flex items-center justify-between mb-1.5">
                     <label class="text-xs font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="settings_summary_threshold">Auto-Summarize Threshold (msgs)</label>
@@ -1087,8 +1132,10 @@ var i18n = {
         import_conv_duplicate: '（已跳过重复）',
         summary_btn: '🧠 总结',
         summary_title: '对话总结',
-        summary_auto_label: '自动总结',
-        summary_auto_hint: '对话超过设定轮数后自动总结旧消息并注入上下文',
+        summary_auto_label: '自动总结（超过轮数时）',
+        summary_auto_hint: '开启后，对话超过设定轮数时会自动总结旧消息并注入上下文（默认开启）',
+        auto_summarize_on_reply_label: '回复后自动生成总结',
+        auto_summarize_on_reply_hint: '开启后，每次 AI 回复时自动检查阈值并生成总结（默认关闭）',
         summary_manual_title: '手动总结',
         summary_manual_desc: '总结最近的',
         summary_manual_turns: '轮对话',
@@ -1288,8 +1335,10 @@ var i18n = {
         import_conv_duplicate: '（已跳過重複）',
         summary_btn: '🧠 總結',
         summary_title: '對話總結',
-        summary_auto_label: '自動總結',
-        summary_auto_hint: '對話超過設定輪數後自動總結舊訊息並注入上下文',
+        summary_auto_label: '自動總結（超過輪數時）',
+        summary_auto_hint: '開啟後，對話超過設定輪數時會自動總結舊訊息並注入上下文（預設開啟）',
+        auto_summarize_on_reply_label: '回覆後自動產生總結',
+        auto_summarize_on_reply_hint: '開啟後，每次 AI 回覆時自動檢查閾值並產生總結（預設關閉）',
         summary_manual_title: '手動總結',
         summary_manual_desc: '總結最近的',
         summary_manual_turns: '輪對話',
@@ -1489,8 +1538,10 @@ var i18n = {
         import_conv_duplicate: ' (duplicates skipped)',
         summary_btn: '🧠 Summarize',
         summary_title: 'Chat Summary',
-        summary_auto_label: 'Auto-Summarize',
-        summary_auto_hint: 'Automatically summarize old messages when exceeding context length',
+        summary_auto_label: 'Auto-Summarize (when over limit)',
+        summary_auto_hint: 'When enabled, automatically summarizes old messages and injects them into context once the conversation exceeds the set turns (on by default)',
+        auto_summarize_on_reply_label: 'Auto-generate summary after reply',
+        auto_summarize_on_reply_hint: 'When enabled, automatically checks threshold and generates summary after each AI reply (off by default)',
         summary_manual_title: 'Manual Summarize',
         summary_manual_desc: 'Summarize the last',
         summary_manual_turns: 'turns',
@@ -1910,7 +1961,10 @@ function defaultSettings() {
         userName: 'User',
         systemPrompt: '',
         lang: 'zh-CN',
+        // 超过设定轮数后自动总结旧消息并注入上下文（主功能，默认开启）
         summaryEnabled: true,
+        // 每次 AI 回复后自动触发总结检查（默认关闭，由用户自行决定是否启用自动生成）
+        autoSummarizeOnReply: false,
         summaryThreshold: 10,
         // World Info (World Book) budget control
         worldInfoBudgetEnabled: true,
@@ -3917,7 +3971,11 @@ function triggerSummarization(turns) {
 }
 
 function autoSummarize() {
+    // 受两个设置控制：
+    // 1. summaryEnabled（超过轮数自动总结主开关，默认开启）
+    // 2. autoSummarizeOnReply（是否在每次回复后自动调用，默认关闭）
     if (!state.settings.summaryEnabled) return;
+    if (!state.settings.autoSummarizeOnReply) return;  // 必须同时开启「回复后自动生成」才执行
     var conv = getActiveConv();
     if (!conv) return;
     var regularMsgs = conv.messages.filter(function(m) { return m.role !== 'system'; });
@@ -3962,7 +4020,7 @@ function renderSummaryHistory() {
         html += '<div class="glass rounded-xl p-4 group" data-summary-id="' + s.id + '">';
         html += '<div class="flex items-center justify-between mb-2">';
         html += '<span class="text-[10px] text-zinc-500">' + date + ' &middot; ' + rangeText + '</span>';
-        html += '<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">';
+        html += '<div class="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">';
         html += '<button class="summary-edit-btn w-5 h-5 rounded-lg flex items-center justify-center text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all text-[10px]" data-edit-id="' + s.id + '" title="' + t('summary_edit') + '">&#9998;</button>';
         html += '<button class="summary-del-btn w-5 h-5 rounded-lg flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all text-xs" data-del-id="' + s.id + '" title="Delete">&times;</button>';
         html += '</div></div>';
@@ -4058,7 +4116,7 @@ function renderSummaryManagerList() {
         html += '<div class="glass rounded-xl p-3 group" data-summary-id="' + s.id + '">';
         html += '<div class="flex items-center justify-between mb-1.5">';
         html += '<span class="text-[10px] text-zinc-500">' + date + ' &middot; ' + rangeText + '</span>';
-        html += '<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">';
+        html += '<div class="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">';
         html += '<button class="summary-edit-btn w-5 h-5 rounded-lg flex items-center justify-center text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all text-[10px]" data-edit-id="' + s.id + '" title="' + t('summary_edit') + '">&#9998;</button>';
         html += '<button class="summary-del-btn w-5 h-5 rounded-lg flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all text-xs" data-del-id="' + s.id + '" title="Delete">&times;</button>';
         html += '</div></div>';
@@ -4334,6 +4392,7 @@ function cacheDom() {
         'summaryRecentTurns','rangeStart','rangeEnd','previewRangeBtn','rangePreview',
         'summaryGenerateBtn','summaryManagerStatus',
         'summaryEnabled','summaryThreshold','summaryThresholdVal',
+        'autoSummarizeOnReply',
         'hamburgerBtn','sidebarCloseBtn','sidebarBackdrop',
         'worldBookModal','worldBookBackdrop','worldBookBtn','wiEntryCount',
         'wiImportBtn','wiExportBtn','wiDeleteAllBtn','wiAddEntryBtn','wiCloseBtn',
@@ -4976,7 +5035,10 @@ function regenerateMessage(actualIdx) {
             // 使用增量追加而不是全量渲染，避免用户浏览历史时被强制滚到底部
             appendFinalAssistantMessage(c, fullContent);
             renderTokenBar();                     // lightweight
-            setTimeout(function() { autoSummarize(); }, 500);
+            // 仅在用户开启「自动总结」主功能 且 开启「回复后自动生成」时才触发
+            if (state.settings.summaryEnabled && state.settings.autoSummarizeOnReply) {
+                setTimeout(function() { autoSummarize(); }, 500);
+            }
         },
         function onError(err) {
             var streamingEl = document.getElementById('streamingMsg');
@@ -5048,7 +5110,10 @@ function sendMessage() {
             // 使用增量追加而不是全量渲染，避免用户浏览历史时被强制滚到底部
             appendFinalAssistantMessage(conv, fullContent);
             renderTokenBar();
-            setTimeout(function() { autoSummarize(); }, 500);
+            // 仅在用户开启「自动总结」主功能 且 开启「回复后自动生成」时才触发
+            if (state.settings.summaryEnabled && state.settings.autoSummarizeOnReply) {
+                setTimeout(function() { autoSummarize(); }, 500);
+            }
         },
         function onError(err) {
             var streamingEl = document.getElementById('streamingMsg');
@@ -5168,6 +5233,11 @@ function bindEvents() {
         dom.summaryThreshold.value = state.settings.summaryThreshold || 20;
         dom.summaryThresholdVal.textContent = state.settings.summaryThreshold || 20;
 
+        // 新增开关：回复后自动生成总结
+        if (dom.autoSummarizeOnReply) {
+            dom.autoSummarizeOnReply.checked = !!state.settings.autoSummarizeOnReply;
+        }
+
         // World Info Budget
         dom.worldInfoBudgetEnabled.checked = state.settings.worldInfoBudgetEnabled !== false;
         dom.worldInfoBudget.value = state.settings.worldInfoBudget || 2048;
@@ -5196,6 +5266,11 @@ function bindEvents() {
         state.settings.systemPrompt = dom.systemPrompt.value.trim();
         state.settings.summaryEnabled = dom.summaryEnabled.checked;
         state.settings.summaryThreshold = parseInt(dom.summaryThreshold.value) || 20;
+
+        // 新增开关
+        if (dom.autoSummarizeOnReply) {
+            state.settings.autoSummarizeOnReply = dom.autoSummarizeOnReply.checked;
+        }
 
         // World Info Budget
         state.settings.worldInfoBudgetEnabled = dom.worldInfoBudgetEnabled.checked;
