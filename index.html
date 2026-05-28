@@ -3980,11 +3980,8 @@ function triggerSummarization(turns) {
 }
 
 function autoSummarize() {
-    // 受两个设置控制：
-    // 1. summaryEnabled（超过轮数自动总结主开关，默认开启）
-    // 2. autoSummarizeOnReply（是否在每次回复后自动调用，默认关闭）
+    // 只受 summaryEnabled 控制（“自动总结（超过轮数时）”主开关，默认开启）
     if (!state.settings.summaryEnabled) return;
-    if (!state.settings.autoSummarizeOnReply) return;  // 必须同时开启「回复后自动生成」才执行
     var conv = getActiveConv();
     if (!conv) return;
     var regularMsgs = conv.messages.filter(function(m) { return m.role !== 'system'; });
@@ -5067,7 +5064,7 @@ function regenerateMessage(actualIdx) {
             // 使用增量追加而不是全量渲染，避免用户浏览历史时被强制滚到底部
             appendFinalAssistantMessage(c, fullContent);
             renderTokenBar();                     // lightweight
-            // 仅在用户开启「自动总结」主功能 且 开启「回复后自动生成」时才触发
+            // 仅在同时开启「自动总结（超过轮数时）」和「回复后自动生成总结」时才在回复后自动触发
             if (state.settings.summaryEnabled && state.settings.autoSummarizeOnReply) {
                 setTimeout(function() { autoSummarize(); }, 500);
             }
@@ -5142,7 +5139,7 @@ function sendMessage() {
             // 使用增量追加而不是全量渲染，避免用户浏览历史时被强制滚到底部
             appendFinalAssistantMessage(conv, fullContent);
             renderTokenBar();
-            // 仅在用户开启「自动总结」主功能 且 开启「回复后自动生成」时才触发
+            // 仅在同时开启「自动总结（超过轮数时）」和「回复后自动生成总结」时才在回复后自动触发
             if (state.settings.summaryEnabled && state.settings.autoSummarizeOnReply) {
                 setTimeout(function() { autoSummarize(); }, 500);
             }
