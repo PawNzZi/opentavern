@@ -179,9 +179,9 @@ body {
         font-size: 16px;
     }
 
-    /* 总结管理器移动端适配：上方历史总结 + 下方新建总结（历史为主） */
+    /* 总结管理器移动端强力修复：纯上下布局（上方历史 + 下方新建），彻底消灭右侧留空问题 */
     @media (max-width: 767px) {
-        /* 模态框尽量占满手机屏幕 */
+        /* 模态框全宽全高 */
         #summaryManagerModal > .relative.glass.rounded-3xl,
         #summaryManagerModal .relative.glass.rounded-3xl {
             width: 100% !important;
@@ -190,40 +190,53 @@ body {
             max-height: 94vh !important;
             border-radius: 16px !important;
             margin: 3vh auto !important;
+            overflow: hidden !important;
         }
 
-        /* 强制上下布局 */
-        #summaryManagerModal .flex-1.flex.overflow-hidden {
+        /* 核心容器：强制 column + 占满宽度（最高优先级） */
+        #summaryManagerModal .flex-1.flex.overflow-hidden,
+        #summaryManagerModal div.flex-1.flex.overflow-hidden {
+            display: flex !important;
             flex-direction: column !important;
-            height: 100% !important;
+            flex-wrap: nowrap !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
             min-height: 0 !important;
+            overflow: hidden !important;
         }
 
-        /* ===== 上方：历史总结（占据主要空间，可滚动） ===== */
-        #summaryManagerModal .w-5/12 {
+        /* 无论是什么 class，两个直接子元素全部强制 100% 宽 + 堆叠 */
+        #summaryManagerModal .flex-1.flex.overflow-hidden > div,
+        #summaryManagerModal div.flex-1.flex.overflow-hidden > div {
             width: 100% !important;
+            max-width: 100% !important;
+            flex-shrink: 0 !important;
+            box-sizing: border-box !important;
+        }
+
+        /* ===== 上方：历史总结（第一子元素，占据主空间） ===== */
+        #summaryManagerModal .flex-1.flex.overflow-hidden > div:first-child,
+        #summaryManagerModal div.flex-1.flex.overflow-hidden > div:first-child {
+            flex: 1 1 0% !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            padding: 12px 10px !important;
+            border-bottom: 1px solid rgba(255,255,255,0.1) !important;
             border-right: none !important;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            flex: 1 1 0% !important;           /* 关键：占据所有剩余空间 */
-            min-height: 0 !important;          /* 允许 flex 子元素正确滚动 */
-            max-height: none !important;
-            overflow-y: auto !important;
-            padding: 12px 10px !important;
-            order: 1 !important;               /* 确保在新建总结上方 */
         }
 
-        /* ===== 下方：新建总结（紧凑，限制高度） ===== */
-        #summaryManagerModal .w-7/12 {
-            width: 100% !important;
-            flex: 0 0 auto !important;         /* 不拉伸，只占自己需要的高度 */
+        /* ===== 下方：新建总结（第二子元素，限制高度） ===== */
+        #summaryManagerModal .flex-1.flex.overflow-hidden > div:last-child,
+        #summaryManagerModal div.flex-1.flex.overflow-hidden > div:last-child {
+            flex: 0 0 auto !important;
+            max-height: 36vh !important;
             padding: 12px 10px !important;
-            max-height: 38vh !important;       /* 限制新建区域高度，让历史列表有更多空间 */
             overflow-y: auto !important;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            order: 2 !important;
+            border-top: 1px solid rgba(255,255,255,0.1) !important;
         }
 
-        /* 历史列表卡片优化 */
+        /* 历史列表卡片更易读 */
         #summaryManagerList .glass.rounded-xl {
             padding: 11px 12px !important;
             margin-bottom: 8px !important;
@@ -233,7 +246,7 @@ body {
             line-height: 1.55 !important;
         }
 
-        /* 编辑/删除按钮更大更好点 */
+        /* 编辑删除按钮 */
         #summaryManagerList .group .flex.items-center.gap-1,
         #summaryHistoryList .group .flex.items-center.gap-1 {
             opacity: 1 !important;
@@ -249,16 +262,11 @@ body {
             background: rgba(255,255,255,0.2);
         }
 
-        /* 编辑总结时的文本框 */
+        /* 编辑框 */
         #summaryManagerList textarea {
             min-height: 120px !important;
             font-size: 14px !important;
             padding: 10px !important;
-        }
-
-        /* 新建区域标题和控件更紧凑 */
-        #summaryManagerModal .w-7/12 .text-xs.font-semibold {
-            margin-bottom: 6px !important;
         }
     }
 
