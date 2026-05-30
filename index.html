@@ -1428,6 +1428,8 @@ var i18n = {
         summary_generate: '生成总结',
         summary_range_invalid: '范围无效，请检查起始与结束消息序号',
         summary_covered_legacy: '（创建时索引）',
+        // 新增：总结截断警告（修复 #2）
+        summary_truncated_warning: '【注意：总结因输出长度限制被截断，建议在设置中提高“总结字数限制”后重试】',
         settings_summary_threshold: '自动总结触发阈值（消息条数）',
         settings_summary_max_words: '总结字数限制（0为不限制）',
         no_conversations: '暂无保存的对话。<br>开始新对话吧。',
@@ -1684,6 +1686,8 @@ var i18n = {
         summary_generate: '產生總結',
         summary_range_invalid: '範圍無效，請檢查起始與結束訊息序號',
         summary_covered_legacy: '（建立時索引）',
+        // 新增：总结截断警告（修复 #2）
+        summary_truncated_warning: '【注意：總結因輸出長度限制被截斷，建議在設定中提高「總結字數限制」後重試】',
         settings_summary_threshold: '自動總結觸發閾值（訊息條數）',
         settings_summary_max_words: '總結字數限制（0為不限制）',
         no_conversations: '暫無儲存的對話。<br>開始新對話吧。',
@@ -1930,6 +1934,8 @@ var i18n = {
         summary_generate: 'Generate Summary',
         summary_range_invalid: 'Invalid range. Please check start and end message numbers.',
         summary_covered_legacy: ' (index at creation)',
+        // New: truncation warning for summary (fix #2)
+        summary_truncated_warning: '[Note: Summary was truncated due to length limit. Increase "Summary word limit" in settings and retry.]',
         settings_summary_threshold: 'Auto-Summarize Trigger Threshold (messages)',
         settings_summary_max_words: 'Summary Word Count Limit (0 = unlimited)',
         no_conversations: 'No saved conversations yet.<br>Start a new chat to begin.',
@@ -5403,6 +5409,16 @@ function generateSummary(messages, callback) {
         summaryPrompt = summaryPrompt + limitSuffix;
     }
 
+    // 【修复 #2 截断】动态 max_tokens：原硬编码 512 过小，复杂剧情极易中途截断。
+    // 优先尊重用户 summaryMaxWords 设置；无限制时给 1024+ 合理预算。
+    var baseTokens = 1024;
+    var effectiveMaxTokens = baseTokens;
+    if (maxWords > 0) {
+        // 中文场景下 token≈字数的保守估算（1.65倍 + 余量），避免仍被截
+        effectiveMaxTokens = Math.max(baseTokens, Math.ceil(maxWords * 1.65) + 128);
+        if (effectiveMaxTokens > 4096) effectiveMaxTokens = 4096; // 安全上限
+    }
+
     var summaryMessages = [
         { role: 'system', content: summaryPrompt },
         { role: 'user', content: messages.map(function(m, i) {
@@ -5415,10 +5431,21 @@ function generateSummary(messages, callback) {
     fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-        body: JSON.stringify({ model: model, messages: summaryMessages, max_tokens: 512, temperature: 0.3, stream: false })
+        body: JSON.stringify({ model: model, messages: summaryMessages, max_tokens: effectiveMaxTokens, temperature: 0.3, stream: false })
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.choices && data.choices[0] && data.choices[0].message) {
-            callback(null, data.choices[0].message.content.trim());
+            var choice = data.choices[0];
+            var raw = (choice.message.content || '').trim();
+            // 检测是否因长度被截（OpenAI 兼容格式）
+            if ((choice.finish_reason === 'length' || choice.finish_reason === 'max_tokens') && raw) {
+                var truncWarn = t('summary_truncated_warning') || '';
+                if (truncWarn && !raw.startsWith('【') && !raw.startsWith('[')) {
+                    raw = truncWarn + '\n' + raw;
+                } else if (truncWarn) {
+                    raw = truncWarn + '\n' + raw;
+                }
+            }
+            callback(null, raw);
         } else {
             callback(new Error('Unexpected API response'));
         }
@@ -5532,6 +5559,21 @@ function autoSummarize() {
 
     var startIdx = regularMsgs.indexOf(toSummarize[0]);
     var endIdx = regularMsgs.indexOf(toSummarize[toSummarize.length - 1]);
+
+    // 【修复 #1 核心】增量保护：只有当前要总结的前缀比上次 maxCovered 显著增长时才生成新总结
+    // 避免“每回复一次就多一条 1-X”的 spam，以及永远显示从 1 开始的重复条目。
+    // BUFFER 给少量缓冲，让总结有足够新内容再刷新（质量更好，也省 API 调用）。
+    var lastCovered = -1;
+    if (conv.summaries && conv.summaries.length > 0) {
+        conv.summaries.forEach(function(s) {
+            if (typeof s.coveredEnd === 'number' && s.coveredEnd > lastCovered) lastCovered = s.coveredEnd;
+        });
+    }
+    var BUFFER = 4;  // 至少新增 4 条以上旧内容才触发（可按需微调）
+    if (lastCovered >= 0 && endIdx <= lastCovered + BUFFER) {
+        // 已覆盖得足够新，跳过本次自动总结（下次消息增长后再看）
+        return;
+    }
 
     performSummarization(toSummarize, startIdx, endIdx, function() {
         // 自动总结静默完成
