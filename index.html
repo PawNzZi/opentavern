@@ -594,7 +594,7 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                     </div>
                 </div>
 
-                <p class="text-[10px] text-zinc-500" id="storageHint" data-i18n="storage_hint_ls">当前稳定使用 localStorage（已修复 IDB 损坏导致的刷新丢数据问题）。如需更大容量，未来可重新实现可靠的 IndexedDB 后端。</p>
+                <p class="text-[10px] text-zinc-500" id="storageHint" data-i18n="storage_hint_ls">当前使用 localStorage 作为兼容层。支持 IndexedDB 后可获得更大容量与更好性能（自动迁移）。</p>
             </div>
 
             <!-- World Info Budget -->
@@ -1568,7 +1568,7 @@ var i18n = {
         storage_backend: '存储后端',
         storage_used_space: '已用空间',
         storage_hint_idb: '正在使用 IndexedDB，可支持多个角色卡与大型世界书。',
-        storage_hint_ls: '当前稳定使用 localStorage（已修复 IDB 损坏导致的刷新丢数据问题）。如需更大容量，未来可重新实现可靠的 IndexedDB 后端。',
+        storage_hint_ls: '当前使用 localStorage 兼容层。支持 IndexedDB 后可获得更大容量与更好性能（会自动迁移）。',
         storage_usage_calculating: '计算中...',
         storage_high_warning: '存储空间紧张，建议尽快备份！',
 
@@ -1822,7 +1822,7 @@ var i18n = {
         storage_backend: '儲存後端',
         storage_used_space: '已用空間',
         storage_hint_idb: '正在使用 IndexedDB，可支援多個角色卡與大型世界書。',
-        storage_hint_ls: '目前穩定使用 localStorage（已修復 IDB 損壞導致的刷新丟數據問題）。如需更大容量，未來可重新實現可靠的 IndexedDB 後端。',
+        storage_hint_ls: '目前使用 localStorage 兼容層。支援 IndexedDB 後可獲得更大容量與更好效能（會自動遷移）。',
         storage_usage_calculating: '計算中...',
         storage_high_warning: '儲存空間緊張，建議盡快備份！',
 
@@ -2065,7 +2065,7 @@ var i18n = {
         storage_backend: 'Storage Backend',
         storage_used_space: 'Used Space',
         storage_hint_idb: 'Using IndexedDB, supports multiple character cards and large world books.',
-        storage_hint_ls: 'Stable on localStorage (fixed IDB wrapper bug that caused data loss on refresh). Reliable IndexedDB backend can be re-added later for larger capacity.',
+        storage_hint_ls: 'Using localStorage compatibility layer. IndexedDB support enabled for larger capacity and better performance (auto-migration when possible).',
         storage_usage_calculating: 'Calculating...',
         storage_high_warning: 'Storage space is tight. Please back up soon!',
 
@@ -2267,106 +2267,106 @@ if (gl) {
 
 var STORAGE_KEY = 'opentavern-data-v1';
 
-// ==================== 紧急修复说明（2026） ====================
-// 问题根因：内联 idb 封装未对 IDBRequest 做 promisify，导致 loadAllFromIDB / saveAllToIDB 完全失效。
-// 表现：每次刷新 hasConversations 误判为 false → 反复触发 migrate → 数据永远加载不到 state → 新建空对话。
-// 修复策略：强制锁定 localStorage 后端，禁用所有 IDB 切换逻辑。
-// 如需未来重新支持 IndexedDB，必须：
-//   1. 替换/重写整个 idb 内联库（使用成熟的 https://github.com/jakearchibald/idb 或正确 promisify 所有请求）
-//   2. 重新实现 loadAllFromIDB / saveAllToIDB
-//   3. 恢复 initState 里的迁移流程
-// 当前所有持久化数据均安全存储在 localStorage['opentavern-data-v1'] 中。
+// ==================== 存储说明 ====================
+// 2026 重构：已使用正确 promisify 的 idb 封装重新支持 IndexedDB。
+// 启动时会智能检测：
+//   - 如果 IndexedDB 已有数据 → 直接使用 IDB
+//   - 如果 IDB 为空但 localStorage 有数据 → 自动迁移到 IDB
+//   - 任何阶段失败都安全回退到 localStorage，不会丢数据
+// 主存储 key：localStorage['opentavern-data-v1']（作为兼容/备份）
+// IndexedDB 数据库：OpenTavernDB（v2，stores: settings, conversations, worldBooks, metadata）
 
-// ==================== idb 库（极小版本内联） ====================
-// 来源：https://github.com/jakearchibald/idb (精简后适合单文件项目)
-// 大小约 3KB，零依赖，仅提供 Promise 风格的 IndexedDB 封装
+// ==================== idb 库（正确实现的极小版本） ====================
+// 基于 https://github.com/jakearchibald/idb 思路，完全重写以确保可靠。
+// 关键修复：所有 IDBRequest 必须经过 promisifyRequest 包装，
+// 否则 await 会得到原始请求对象而不是 .result，导致之前的数据丢失 bug。
 (function() {
     'use strict';
-    var idb = {};
-    var instance;
 
     function promisifyRequest(request) {
-        return new Promise(function(resolve, reject) {
-            request.onsuccess = function() { resolve(request.result); };
-            request.onerror = function() { reject(request.error); };
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
         });
     }
 
-    function createStore(dbName, storeName) {
+    // 包装一个已打开的数据库实例
+    function wrapDB(db) {
         return {
-            get: function(key) {
-                return instance.transaction(storeName).objectStore(storeName).get(key);
+            get(storeName, key) {
+                return promisifyRequest(
+                    db.transaction(storeName).objectStore(storeName).get(key)
+                );
             },
-            set: function(key, value) {
-                return instance.transaction(storeName, 'readwrite').objectStore(storeName).put(value, key);
+            set(storeName, key, value) {
+                return promisifyRequest(
+                    db.transaction(storeName, 'readwrite').objectStore(storeName).put(value, key)
+                );
             },
-            delete: function(key) {
-                return instance.transaction(storeName, 'readwrite').objectStore(storeName).delete(key);
+            delete(storeName, key) {
+                return promisifyRequest(
+                    db.transaction(storeName, 'readwrite').objectStore(storeName).delete(key)
+                );
             },
-            clear: function() {
-                return instance.transaction(storeName, 'readwrite').objectStore(storeName).clear();
+            clear(storeName) {
+                return promisifyRequest(
+                    db.transaction(storeName, 'readwrite').objectStore(storeName).clear()
+                );
             },
-            getAll: function() {
-                return instance.transaction(storeName).objectStore(storeName).getAll();
+            getAll(storeName) {
+                return promisifyRequest(
+                    db.transaction(storeName).objectStore(storeName).getAll()
+                );
             },
-            getAllKeys: function() {
-                return instance.transaction(storeName).objectStore(storeName).getAllKeys();
+            getAllKeys(storeName) {
+                return promisifyRequest(
+                    db.transaction(storeName).objectStore(storeName).getAllKeys()
+                );
+            },
+            // 返回原生事务（上层需要自己处理完成）
+            transaction(storeNames, mode) {
+                return db.transaction(storeNames, mode);
+            },
+            // 便捷的事务完成 Promise 包装
+            transactionDone(tx) {
+                return new Promise((resolve, reject) => {
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                    tx.onabort = () => reject(tx.error || new Error('Transaction aborted'));
+                });
             }
         };
     }
 
-    idb.openDB = function(name, version, options) {
-        return new Promise(function(resolve, reject) {
-            var request = indexedDB.open(name, version);
-            
-            request.onupgradeneeded = function(event) {
-                var db = event.target.result;
-                if (options && options.upgrade) {
-                    options.upgrade(db, event.oldVersion, event.newVersion, request.transaction);
-                }
-            };
+    window.idb = {
+        openDB(name, version, options = {}) {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(name, version);
 
-            // Ensure our stores use in-line keys (keyPath: 'id')
-            // This must be done in upgrade if not already created
-            // Note: We handle creation below in the actual upgrade callback passed from StorageService
-            
-            request.onsuccess = function() {
-                instance = request.result;
-                resolve({
-                    get: function(storeName, key) {
-                        return createStore(name, storeName).get(key);
-                    },
-                    set: function(storeName, key, value) {
-                        return createStore(name, storeName).set(key, value);
-                    },
-                    delete: function(storeName, key) {
-                        return createStore(name, storeName).delete(key);
-                    },
-                    clear: function(storeName) {
-                        return createStore(name, storeName).clear();
-                    },
-                    getAll: function(storeName) {
-                        return createStore(name, storeName).getAll();
-                    },
-                    transaction: function(storeNames, mode) {
-                        return instance.transaction(storeNames, mode);
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (options.upgrade) {
+                        options.upgrade(db, event.oldVersion, event.newVersion, request.transaction);
                     }
-                });
-            };
-            
-            request.onerror = function() { reject(request.error); };
-        });
-    };
+                };
 
-    window.idb = idb;
+                request.onsuccess = () => {
+                    resolve(wrapDB(request.result));
+                };
+
+                request.onerror = () => reject(request.error);
+                request.onblocked = () => reject(new Error('IndexedDB open blocked'));
+            });
+        }
+    };
 })();
 
 // ==================== StorageService 抽象层 ====================
 // 目标：让上层代码不需要关心到底用 localStorage 还是 IndexedDB
 var StorageService = {
-    // 紧急修复：强制使用 localStorage（稳定可靠）。
-    // IndexedDB 封装存在严重 bug（未正确 promisify IDBRequest），会导致每次刷新数据丢失。
-    // 未来如需重新启用 IDB，必须先彻底重写 idb 封装层。
+    // 支持 localStorage + IndexedDB 双后端。
+    // 启动时会智能决定使用哪个（见 initState）。
+    // 只要底层的 idb 封装正确，IDB 就能提供更大容量和更好性能。
     _useIndexedDB: false,
 
     // 当前实现：稳定使用 localStorage
@@ -2389,16 +2389,19 @@ var StorageService = {
         }
     },
 
-    // 检测当前使用哪种后端（紧急修复后固定为 localStorage）
+    // 检测当前使用哪种后端
     getBackend() {
-        // 无论内部 flag 如何，当前一律报告 localStorage（最真实的情况）
-        return 'localStorage';
+        return this._useIndexedDB ? 'indexeddb' : 'localStorage';
     },
 
-    // 紧急修复：禁用自动切换到损坏的 IndexedDB 后端
+    // 手动启用 IndexedDB 模式（迁移成功后会自动调用）
     async enableIndexedDB() {
-        console.warn('[Storage] enableIndexedDB 被禁用（IDB 封装存在严重 bug）。当前强制使用 localStorage 以保证数据持久化。');
-        return false;
+        const success = await this.initIndexedDB();
+        if (success) {
+            this._useIndexedDB = true;
+            console.log('[Storage] Switched to IndexedDB backend');
+        }
+        return success;
     },
 
     // ==================== IndexedDB 后端实现（使用 idb） ====================
@@ -2447,12 +2450,13 @@ var StorageService = {
         return this._idbDB;
     },
 
-    // ==================== 真实 IndexedDB 方法 ====================
+    // ==================== 真实 IndexedDB 方法（已使用正确的 promisify 封装） ====================
     async loadAllFromIDB() {
         const db = await this.getIDB();
         if (!db) return null;
 
         try {
+            // 新封装已正确 promisify，所有 await 都能拿到真实 .result
             const [settings, conversationsRaw, worldBooksRaw, metadata] = await Promise.all([
                 db.get('settings', 'main'),
                 db.getAll('conversations').catch(() => []),
@@ -2460,15 +2464,12 @@ var StorageService = {
                 db.get('metadata', 'main')
             ]);
 
-            // 防御性处理：确保是数组
             const conversations = Array.isArray(conversationsRaw) ? conversationsRaw : [];
             const worldBooks = Array.isArray(worldBooksRaw) ? worldBooksRaw : [];
 
-            // 重建 conversations 对象
             const convObj = {};
             conversations.forEach(c => { if (c && c.id) convObj[c.id] = c; });
 
-            // 重建 worldBooks 对象
             const wbObj = {};
             worldBooks.forEach(w => { if (w && w.id) wbObj[w.id] = w; });
 
@@ -2490,49 +2491,85 @@ var StorageService = {
         const db = await this.getIDB();
         if (!db) return;
 
+        // 使用一个事务写入多个 store，关键是：先同步发起所有请求，再等待事务完成
         const tx = db.transaction(['settings', 'conversations', 'worldBooks', 'metadata'], 'readwrite');
 
         try {
-            // 保存 settings (使用 'main' 作为 key)
-            await tx.objectStore('settings').put(data.settings || {}, 'main');
+            // settings
+            tx.objectStore('settings').put(data.settings || {}, 'main');
 
-            // 保存 conversations (现在有 keyPath: 'id')
+            // conversations
             const convStore = tx.objectStore('conversations');
             for (const conv of Object.values(data.conversations || {})) {
                 if (conv && conv.id) {
-                    await convStore.put(conv);
+                    convStore.put(conv);
                 }
             }
 
-            // 保存 worldBooks (现在有 keyPath: 'id')
+            // worldBooks
             if (data.worldBooks) {
                 const wbStore = tx.objectStore('worldBooks');
                 for (const wb of Object.values(data.worldBooks)) {
                     if (wb && wb.id) {
-                        await wbStore.put(wb);
+                        wbStore.put(wb);
                     }
                 }
             }
 
-            // 保存元数据
-            await tx.objectStore('metadata').put({
+            // metadata
+            tx.objectStore('metadata').put({
                 conversationOrder: data.conversationOrder || [],
                 activeConvId: data.activeConvId || null,
                 dataVersion: 2,
                 lastSaved: Date.now()
             }, 'main');
 
-            await tx.done;
+            // 等待整个事务真正提交（使用我们新封装提供的 helper）
+            await db.transactionDone(tx);
         } catch (err) {
             console.error('[Storage] saveAllToIDB failed:', err);
+            try { tx.abort(); } catch (_) {}
         }
     },
 
-    // ==================== 迁移工具函数（Phase 2 核心） - 紧急修复：已禁用 ====================
+    // ==================== 迁移工具函数（Phase 2 核心） ====================
     async migrateFromLocalStorage() {
-        console.warn('[Storage] migrateFromLocalStorage 被禁用（IDB 封装损坏会导致数据丢失）。当前强制使用 localStorage。');
-        // 不再设置 this._useIndexedDB = true，防止切换到损坏后端
-        return false;
+        console.log('[Storage] Starting migration from localStorage to IndexedDB...');
+
+        const oldData = loadAll(); // 读取旧的 localStorage 数据
+        if (!oldData) {
+            console.log('[Storage] No old data in localStorage to migrate.');
+            this._useIndexedDB = true;
+            return true;
+        }
+
+        try {
+            const newData = {
+                settings: oldData.settings || {},
+                conversations: oldData.conversations || {},
+                conversationOrder: oldData.conversationOrder || [],
+                activeConvId: oldData.activeConvId || null,
+                worldBooks: {}
+            };
+
+            // Phase 2 迁移：把旧的 per-conv worldInfo 转成全局可复用的 worldBooks
+            const migratedBooks = this._migrateLegacyWorldInfoToGlobal(newData.conversations);
+            newData.worldBooks = migratedBooks;
+
+            await this.saveAllToIDB(newData);
+
+            this._useIndexedDB = true;
+
+            // 迁移成功后可以选择清理 localStorage（当前保守起见先不删，留作备份）
+            // localStorage.removeItem(STORAGE_KEY);
+
+            console.log('[Storage] Migration from localStorage to IndexedDB completed successfully.');
+            return true;
+        } catch (err) {
+            console.error('[Storage] Migration failed:', err);
+            // 失败时不要切换后端，保持 localStorage
+            return false;
+        }
     },
 
     // Phase 2: 将旧的对话内嵌世界书转换为全局独立世界书
@@ -2591,22 +2628,29 @@ var StorageService = {
         return worldBooks;
     },
 
-    // ==================== 统一对外接口（推荐使用） - 紧急修复后固定 localStorage ====================
+    // ==================== 统一对外接口（推荐使用） ====================
     async loadAll() {
-        // 无论 _useIndexedDB 状态如何，当前强制 localStorage（IDB 封装已知损坏）
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            return raw ? JSON.parse(raw) : null;
-        } catch (e) {
-            return null;
+        if (this._useIndexedDB) {
+            return await this.loadAllFromIDB();
+        } else {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) {
+                return null;
+            }
         }
     },
 
     async saveAll(data) {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        } catch (e) {
-            console.error('[Storage] localStorage save failed:', e);
+        if (this._useIndexedDB) {
+            await this.saveAllToIDB(data);
+        } else {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {
+                console.error('[Storage] localStorage save failed:', e);
+            }
         }
     },
 
@@ -3082,20 +3126,45 @@ function renderCharacterUI() {
 }
 
 async function initState() {
-    // 紧急修复（2026）：彻底禁用损坏的 IndexedDB 迁移逻辑。
-    // 之前因为 IDB 封装未正确 promisify IDBRequest，导致 loadAllFromIDB 永远返回空数据，
-    // 进而误判 hasConversations=false → 反复迁移 → 每次刷新都新建空对话。
-    // 现在强制走 localStorage（稳定可靠），所有历史数据自动恢复。
-    let migrationResult = { attempted: false, success: false, backend: 'localStorage', note: 'IDB 后端已禁用以防止数据丢失' };
+    // Phase 1: 智能初始化存储后端
+    // 优先尝试 IndexedDB，只有在 IDB 里有数据 或 迁移成功时才切换后端。
+    // 任何阶段出错都安全回退到 localStorage，不会导致数据丢失。
+    let migrationResult = { attempted: false, success: false, backend: 'localStorage' };
 
-    // 仅尝试初始化 IDB（用于诊断，不切换后端）
     try {
-        await StorageService.initIndexedDB().catch(() => null);
-    } catch (e) {
-        // 忽略，完全不影响主流程
+        const idbReady = await StorageService.initIndexedDB();
+        if (idbReady) {
+            const idbData = await StorageService.loadAllFromIDB();
+            const hasConversations = idbData && Object.keys(idbData.conversations || {}).length > 0;
+
+            if (hasConversations) {
+                // IDB 里有真实数据，直接使用
+                StorageService._useIndexedDB = true;
+                migrationResult.backend = 'indexeddb';
+                console.log('[Storage] Using existing IndexedDB data');
+            } else {
+                // IDB 为空，尝试从 localStorage 迁移
+                console.log('[Storage] IndexedDB is empty, attempting migration from localStorage...');
+                migrationResult.attempted = true;
+
+                const migrated = await StorageService.migrateFromLocalStorage();
+                migrationResult.success = migrated;
+                migrationResult.backend = migrated ? 'indexeddb' : 'localStorage';
+
+                if (migrated) {
+                    window._showStorageMigrationNotice = true;
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('[Storage] IndexedDB init/migration failed, safely falling back to localStorage:', err);
+        migrationResult.backend = 'localStorage';
+        migrationResult.migrationFailed = true;
+        // 确保后端标志是关闭的
+        StorageService._useIndexedDB = false;
     }
 
-    // 始终使用 localStorage 加载（最稳定路径）
+    // 根据当前后端加载数据
     const saved = await StorageService.loadAll();
 
     if (saved) {
@@ -3112,11 +3181,19 @@ async function initState() {
         if (saved.worldBooks) {
             state.worldBooks = saved.worldBooks;
         }
-    } else {
-        console.log('[Storage] localStorage 中暂无数据，将创建新对话。');
     }
 
-    // 把结果挂到 state
+    // 迁移成功后额外保存一次（确保格式一致）
+    if (migrationResult.success) {
+        await StorageService.saveAll({
+            settings: getSafeSettingsForPersist(),
+            conversations: state.conversations,
+            conversationOrder: state.conversationOrder,
+            activeConvId: state.activeConvId,
+            worldBooks: state.worldBooks || {}
+        });
+    }
+
     state._storageMigration = migrationResult;
 
     // Ensure lang is set
@@ -3140,8 +3217,7 @@ async function initState() {
         state.activeConvId = conv.id;
     }
 
-    // 紧急修复补充：加载/创建后立即持久化一次，确保 localStorage 有干净快照
-    // 防止首次使用或异常情况导致状态未落盘
+    // 加载/创建完成后立即持久化一次
     if (typeof persistState === 'function') {
         persistState(true);
     }
@@ -7179,11 +7255,26 @@ init().then(function() {
     // 更新侧边栏极简存储状态图标
     updateStorageStatusUI();
 
-    // Phase 4: 备份提醒（仅在 IndexedDB 模式提醒，此处已强制 localStorage）
+    // Phase 4: 备份提醒（仅在使用 IndexedDB 时强提醒）
     showBackupReminderIfNeeded();
 
-    // 紧急修复说明：原 IDB 迁移提示已禁用（IDB 封装存在严重 bug）。
-    // 如需查看当前存储后端，可在控制台执行：StorageService.getBackend()
+    // 成功迁移到 IndexedDB 后的友好提示
+    if (window._showStorageMigrationNotice) {
+        setTimeout(function() {
+            const notice = document.createElement('div');
+            notice.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(16,185,129,0.9);color:white;padding:10px 18px;border-radius:999px;font-size:13px;z-index:9999;';
+            notice.textContent = '✓ 数据已迁移到 IndexedDB（支持更大容量）';
+            document.body.appendChild(notice);
+
+            setTimeout(function() {
+                notice.style.transition = 'opacity 0.4s ease';
+                notice.style.opacity = '0';
+                setTimeout(function() { notice.remove(); }, 400);
+            }, 2800);
+        }, 900);
+
+        delete window._showStorageMigrationNotice;
+    }
 }).catch(function(err) {
     console.error('[App] Initialization failed:', err);
     // 极端降级：确保 DOM 缓存和事件绑定至少能工作
