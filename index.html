@@ -5886,62 +5886,70 @@ function isUnderContextPressure(messageCount) {
     return messageCount > contextMax;
 }
 
+/**
+ * 更彻底的重构后的自动总结逻辑（2026）
+ *
+ * 设计目标：
+ * - 让用户调整「上下文长度」和「总结阈值」后，在已进行中的对话里也能明显感受到效果。
+ * - 自动总结的核心职责是控制「真正发给模型的原始消息数量」。
+ * - 减少对历史小块总结（lastCovered）的强依赖，让阈值变更更具响应性。
+ */
 function autoSummarize() {
     if (!state.settings.summaryEnabled) return;
 
     var conv = getActiveConv();
     if (!conv) return;
 
-    var regularMsgs = conv.messages.filter(function(m) { return m.role !== 'system'; });
+    var allRegular = conv.messages.filter(function(m) { return m.role !== 'system'; });
+    if (allRegular.length < 5) return;
+
+    var contextLen = state.settings.contextLength || 20;
     var threshold = state.settings.summaryThreshold || 20;
 
-    // 主要由用户自由设置的触发阈值控制
-    if (regularMsgs.length < threshold) return;
+    // 计算当前真正会发给模型的原始消息数量（已考虑历史总结的裁剪）
+    var lastCovered = getMaxSummaryCoveredEnd(conv.summaries || []);
+    var currentVisibleCount = Math.max(0, allRegular.length - lastCovered - 1);
 
-    // 【核心逻辑重构 - 增量式记忆叠加】
-    // 用户期望：第一次总结 1-6，第二次 7-12，第三次 13-18... 以此不断叠加记忆，而不是反复刷新大前缀。
-    // 做法：
-    // 1. 先找出当前所有总结里最大的 coveredEnd（即“已经总结到哪一条消息了”）
-    // 2. 本次只总结从 lastCovered+1 开始，到「当前消息 - KEEP_RECENT」为止的**增量部分**
-    // 3. 只有增量部分足够大时才触发总结
-    var KEEP_RECENT = Math.min(6, Math.max(3, Math.floor(threshold / 2)));
-    var MIN_TO_SUMMARIZE = 2;
-    var BUFFER = 3;   // 至少要有 3 条以上新增旧消息才值得总结一次（避免太碎）
+    // 目标保留窗口：根据当前上下文长度和阈值动态计算
+    // 让用户改设置后能明显影响“允许上下文长到多大才开始压缩”
+    var targetKeep = Math.max(
+        5,
+        Math.min(
+            Math.floor(contextLen * 0.65),
+            Math.floor(threshold * 0.8)
+        )
+    );
 
-    // 计算当前已经被总结的最大位置
-    var lastCovered = -1;
-    if (conv.summaries && conv.summaries.length > 0) {
-        conv.summaries.forEach(function(s) {
-            if (typeof s.coveredEnd === 'number' && s.coveredEnd > lastCovered) {
-                lastCovered = s.coveredEnd;
-            }
-        });
+    var buffer = 4; // 留一点缓冲，避免频繁小总结
+
+    if (currentVisibleCount <= targetKeep + buffer) {
+        return; // 当前可见上下文还在可接受范围内，不需要再总结
     }
 
-    // 本次增量总结的起点和终点（都是 regularMsgs 里的 0-based 索引）
-    var startIdx = lastCovered + 1;
-    var endIdx = regularMsgs.length - KEEP_RECENT - 1;
+    // 需要压缩：把 lastCovered 之后、直到“只保留 targetKeep 条”为止的内容总结掉
+    var newCoveredEnd = allRegular.length - targetKeep - 1;
 
-    // 防御：不能越界
-    if (startIdx > endIdx) return;
+    if (newCoveredEnd <= lastCovered) return;
 
-    var summarizeCount = endIdx - startIdx + 1;
-    if (summarizeCount < MIN_TO_SUMMARIZE) return;
+    var toSummarize = allRegular.slice(lastCovered + 1, newCoveredEnd + 1);
+    if (toSummarize.length < 4) return;
 
-    // BUFFER 保护：只有当本次新增的旧内容比上次总结多出足够多时，才真正生成（避免过于频繁的小总结）
-    if (lastCovered >= 0 && summarizeCount <= BUFFER) {
-        return;
-    }
-
-    // 切出本次要总结的实际消息片段
-    var toSummarize = regularMsgs.slice(startIdx, endIdx + 1);
-    if (toSummarize.length < MIN_TO_SUMMARIZE) return;
-
-    // startIdx / endIdx 已经是正确的 regularMsgs 索引，可直接传给 perform
-    performSummarization(toSummarize, startIdx, endIdx, function() {
-        // 自动总结静默完成
+    performSummarization(toSummarize, lastCovered + 1, newCoveredEnd, function() {
         renderTokenBar();
     });
+}
+
+// 辅助函数：获取当前所有总结中最大的 coveredEnd
+function getMaxSummaryCoveredEnd(summaries) {
+    var max = -1;
+    if (!summaries || summaries.length === 0) return max;
+
+    summaries.forEach(function(s) {
+        if (typeof s.coveredEnd === 'number' && s.coveredEnd > max) {
+            max = s.coveredEnd;
+        }
+    });
+    return max;
 }
 
 function renderSummaryHistory() {
