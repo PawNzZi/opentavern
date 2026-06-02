@@ -76,20 +76,20 @@ body {
 
 .msg-user .msg-bubble { background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.18); border-radius: 20px 20px 4px 20px; }
 .msg-assistant .msg-bubble { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px 20px 20px 4px; }
-.msg-bubble { padding: 14px 18px; line-height: 1.7; font-size: 0.925rem; white-space: pre-wrap; word-break: break-word; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.msg-bubble { padding: 14px 18px; line-height: 1.7; font-size: 1rem; white-space: pre-wrap; word-break: break-word; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 
 .dialogue-highlight { color: #f59e0b; }
 
 /* StatusBlock — rendered status panel inside chat messages */
-.status-block { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 12px 14px; margin: 10px 0; font-size: 0.7rem; }
+.status-block { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 12px 14px; margin: 10px 0; font-size: 0.875rem; }
 .status-block .status-header { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; color: rgba(245,158,11,0.7); }
-.status-block .status-header span:first-child { font-size: 0.85rem; }
-.status-block .status-section { color: rgba(245,158,11,0.65); font-weight: 500; font-size: 0.65rem; padding-top: 3px; }
+.status-block .status-header span:first-child { font-size: 1rem; }
+.status-block .status-section { color: rgba(245,158,11,0.65); font-weight: 500; font-size: 0.75rem; padding-top: 3px; }
 .status-block .status-row { display: flex; align-items: center; gap: 5px; padding-left: 2px; color: #d1d5db; }
-.status-block .status-row .status-icon { color: #6b7280; width: 14px; text-align: center; flex-shrink: 0; font-size: 0.65rem; }
-.status-block .status-row .status-label { font-size: 0.7rem; }
-.status-block .status-info { color: #d1d5db; font-size: 0.7rem; padding-left: 2px; }
-.status-block .status-badge { font-size: 0.55rem; padding: 1px 6px; border-radius: 99px; background: rgba(245,158,11,0.15); color: rgba(245,158,11,0.7); margin-left: auto; }
+.status-block .status-row .status-icon { color: #6b7280; width: 14px; text-align: center; flex-shrink: 0; font-size: 0.75rem; }
+.status-block .status-row .status-label { font-size: 0.8rem; }
+.status-block .status-info { color: #d1d5db; font-size: 0.8rem; padding-left: 2px; }
+.status-block .status-badge { font-size: 0.65rem; padding: 1px 6px; border-radius: 99px; background: rgba(245,158,11,0.15); color: rgba(245,158,11,0.7); margin-left: auto; }
 .status-block.status-placeholder { border-style: dashed; opacity: 0.7; }
 .status-block .status-row b { color: #d1d5db; font-weight: 500; }
 .status-block.script-rendered { padding: 0; background: transparent; border: 1px solid rgba(255,255,255,0.06); overflow: hidden; max-height: 420px; overflow-y: auto; }
@@ -131,11 +131,20 @@ body {
     }
     #sidebarBackdrop.open { opacity: 1; visibility: visible; pointer-events: auto; }
 
-    .msg-bubble { max-width: 100%; font-size: 0.875rem; padding: 12px 14px; }
+    .msg-bubble { max-width: 100%; padding: 12px 14px; }
     .msg-wrapper { max-width: 92% !important; }
 
     .msg-actions { opacity: 1; }
     .msg-action-btn { width: 30px; height: 30px; border-radius: 8px; font-size: 13px; }
+
+    /* Mobile: status block font +1 level */
+    .status-block { font-size: 1rem !important; }
+    .status-block .status-header span:first-child { font-size: 1.125rem !important; }
+    .status-block .status-section { font-size: 0.85rem !important; }
+    .status-block .status-row .status-icon { font-size: 0.85rem !important; }
+    .status-block .status-row .status-label { font-size: 0.875rem !important; }
+    .status-block .status-info { font-size: 0.875rem !important; }
+    .status-block .status-badge { font-size: 0.7rem !important; }
 
     /* Mobile: always show sidebar action buttons (hidden behind hover on desktop) */
     .conv-export-btn,
@@ -1472,8 +1481,8 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                 </button>
                 <div id="charAvatar" class="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-zinc-500 text-sm flex-shrink-0">💬</div>
                 <div class="min-w-0">
-                    <h3 id="chatTitle" class="text-sm font-semibold text-zinc-200 truncate" data-i18n="new_chat_title">New Chat</h3>
-                    <p id="chatSubtitle" class="text-[10px] text-zinc-500 truncate" data-i18n="no_character">No character loaded</p>
+                    <h3 id="chatTitle" class="text-base font-semibold text-zinc-200 truncate" data-i18n="new_chat_title">New Chat</h3>
+                    <p id="chatSubtitle" class="text-sm text-zinc-500 truncate" data-i18n="no_character">No character loaded</p>
                 </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0 topbar-actions">
@@ -3864,7 +3873,7 @@ function appendFinalAssistantMessage(conv, fullContent) {
     msgDiv.className = 'msg-enter msg-assistant flex justify-start';
     msgDiv.innerHTML = `
         <div class="max-w-[80%] msg-wrapper">
-            <p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">${escapeHtml(senderName)}</p>
+            <p class="text-sm text-zinc-500 mb-1 ml-1 font-medium">${escapeHtml(senderName)}</p>
             <div class="msg-bubble">${highlightDialogue(fullContent)}</div>
             <div class="msg-actions">
                 <button class="msg-action-btn copy-btn" data-action="copy" data-msg-idx="${actualIdx}" title="${t('copy')}">
@@ -7731,7 +7740,7 @@ function renderMessages() {
             msgDiv.className = 'msg-enter ' + (isUser ? 'msg-user flex justify-end' : 'msg-assistant flex justify-start');
             msgDiv.innerHTML = `
                 <div class="max-w-[80%] msg-wrapper">
-                    ${!isUser ? `<p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">${escapeHtml(senderName)}</p>` : ''}
+                    ${!isUser ? `<p class="text-sm text-zinc-500 mb-1 ml-1 font-medium">${escapeHtml(senderName)}</p>` : ''}
                     <div class="msg-bubble">${isUser ? escapeHtml(msg.content) : highlightDialogue(msg.content)}</div>
                     <div class="msg-actions">
                         <button class="msg-action-btn copy-btn" data-action="copy" data-msg-idx="${actualIdx}" title="${t('copy')}">
@@ -7775,7 +7784,7 @@ function renderMessages() {
 
         html += '<div class="msg-enter ' + (isUser ? 'msg-user flex justify-end' : 'msg-assistant flex justify-start') + '">';
         html += '<div class="max-w-[80%] msg-wrapper">';
-        if (!isUser) html += '<p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(senderName) + '</p>';
+        if (!isUser) html += '<p class="text-sm text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(senderName) + '</p>';
         html += '<div class="msg-bubble">' + (isUser ? escapeHtml(msg.content) : highlightDialogue(msg.content)) + '</div>';
         html += '<div class="msg-actions">';
         html += '<button class="msg-action-btn copy-btn" data-action="copy" data-msg-idx="' + actualIdx + '" title="' + t('copy') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
@@ -7792,7 +7801,7 @@ function renderMessages() {
         html += '<div class="max-w-[80%]">';
         // 流式时尽量使用当前群组发言者（如果有）
         var streamingSpeaker = getCurrentGeneratingSpeakerName(conv);
-        html += '<p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(streamingSpeaker) + '</p>';
+        html += '<p class="text-sm text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(streamingSpeaker) + '</p>';
         html += '<div class="msg-bubble typing-cursor" id="streamingContent"></div>';
         html += '</div></div>';
     }
@@ -7832,7 +7841,7 @@ function renderMessagesFullHistory(conv) {
 
         html += '<div class="msg-enter ' + (isUser ? 'msg-user flex justify-end' : 'msg-assistant flex justify-start') + '">';
         html += '<div class="max-w-[80%] msg-wrapper">';
-        if (!isUser) html += '<p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(senderName) + '</p>';
+        if (!isUser) html += '<p class="text-sm text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(senderName) + '</p>';
         html += '<div class="msg-bubble">' + (isUser ? escapeHtml(msg.content) : highlightDialogue(msg.content)) + '</div>';
         html += '<div class="msg-actions">';
         html += '<button class="msg-action-btn copy-btn" data-action="copy" data-msg-idx="' + actualIdx + '" title="' + t('copy') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
@@ -8448,7 +8457,7 @@ function regenerateMessage(actualIdx) {
                 var div = document.createElement('div');
                 div.id = 'streamingMsg';
                 div.className = 'msg-assistant flex justify-start msg-enter';
-                div.innerHTML = '<div class="max-w-[80%]"><p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">' +
+                div.innerHTML = '<div class="max-w-[80%]"><p class="text-sm text-zinc-500 mb-1 ml-1 font-medium">' +
                     escapeHtml(getCurrentGeneratingSpeakerName(conv)) +
                     '</p><div class="msg-bubble typing-cursor" id="streamingContent">' +
                     highlightDialogue(fullContent) + '</div></div>';
@@ -8558,7 +8567,7 @@ function sendMessage() {
                 var div = document.createElement('div');
                 div.id = 'streamingMsg';
                 div.className = 'msg-assistant flex justify-start msg-enter';
-                div.innerHTML = '<div class="max-w-[80%]"><p class="text-[10px] text-zinc-500 mb-1 ml-1 font-medium">' +
+                div.innerHTML = '<div class="max-w-[80%]"><p class="text-sm text-zinc-500 mb-1 ml-1 font-medium">' +
                     escapeHtml(getCurrentGeneratingSpeakerName(conv)) +
                     '</p><div class="msg-bubble typing-cursor" id="streamingContent">' +
                     highlightDialogue(fullContent) + '</div></div>';
