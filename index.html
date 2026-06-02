@@ -4216,6 +4216,65 @@ function entriesToSTFormat(worldInfo) {
     return out;
 }
 
+/**
+ * 将当前对话关联的一个或多个世界书转换为 SillyTavern 角色卡内嵌的 character_book 格式
+ * 用于导出角色卡时自动嵌入世界书数据
+ */
+function getCharacterBookForExport(conv) {
+    if (!conv) return null;
+
+    var combinedEntries = {};
+    var names = [];
+
+    // 优先使用新的全局世界书关联
+    if (Array.isArray(conv.worldBookIds) && conv.worldBookIds.length > 0) {
+        conv.worldBookIds.forEach(function(wbId) {
+            var wb = state.worldBooks && state.worldBooks[wbId];
+            if (!wb || !wb.entries) return;
+
+            if (wb.name) names.push(wb.name);
+
+            var stFormat = entriesToSTFormat(wb);
+            if (stFormat && stFormat.entries) {
+                Object.assign(combinedEntries, stFormat.entries);
+            }
+        });
+    }
+
+    // 向后兼容：如果没有新世界书，尝试使用旧的内嵌 worldInfo
+    if (Object.keys(combinedEntries).length === 0 && conv.worldInfo && conv.worldInfo.entries) {
+        var stFormat = entriesToSTFormat(conv.worldInfo);
+        if (stFormat && stFormat.entries) {
+            Object.assign(combinedEntries, stFormat.entries);
+        }
+        if (conv.worldInfo.name) names.push(conv.worldInfo.name);
+    }
+
+    if (Object.keys(combinedEntries).length === 0) return null;
+
+    // 转为 character_book 偏好的数组形式
+    var entriesArray = Object.keys(combinedEntries).map(function(uid) {
+        return combinedEntries[uid];
+    });
+
+    // 按 insertion_order 排序
+    entriesArray.sort(function(a, b) {
+        var ia = a.insertion_order != null ? a.insertion_order : 100;
+        var ib = b.insertion_order != null ? b.insertion_order : 100;
+        return ia - ib || (a.id || 0) - (b.id || 0);
+    });
+
+    var characterBook = {
+        entries: entriesArray
+    };
+
+    if (names.length > 0) {
+        characterBook.name = names.join(' + ');
+    }
+
+    return characterBook;
+}
+
 // In-memory editor state (Phase 2: global world book manager)
 var wiState = {
     modalOpen: false,
@@ -7297,6 +7356,23 @@ function exportCharacter() {
         },
         create_date: new Date().toISOString()
     };
+
+    // 自动嵌入当前对话已关联的世界书（character_book）
+    var characterBook = getCharacterBookForExport(conv);
+    if (characterBook) {
+        card.data.character_book = characterBook;
+
+        // 设置 extensions.world 提高与 SillyTavern 等工具的兼容性
+        if (!card.data.extensions) card.data.extensions = {};
+        if (characterBook.name) {
+            card.data.extensions.world = characterBook.name;
+        }
+    }
+
+    // 可选提示（控制台 + 可能的状态区域）
+    if (characterBook) {
+        console.log('[Character Export] 已自动嵌入 character_book，共 ' + characterBook.entries.length + ' 条目');
+    }
 
     var blob = new Blob([JSON.stringify(card, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
