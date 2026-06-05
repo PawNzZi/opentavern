@@ -590,7 +590,6 @@ body {
 .msg-action-btn.retry-btn:hover { color: #f59e0b; border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.08); }
 .msg-action-btn.del-btn:hover { color: #f87171; border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.08); }
 .msg-action-btn.edit-btn:hover { color: #60a5fa; border-color: rgba(96,165,250,0.3); background: rgba(96,165,250,0.08); }
-.msg-action-btn.refresh-btn:hover { color: #34d399; border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.08); }
 
 /* Wave animation for AI "thinking" bubble */
 .think-wave { display: flex; align-items: center; gap: 4px; padding: 6px 2px; }
@@ -7569,17 +7568,14 @@ function renderMessages() {
                         </button>
                         <button class="msg-action-btn retry-btn" data-action="retry" data-msg-idx="${actualIdx}" title="${t('regenerate')}">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                        </button>
+                        <button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="${actualIdx}" title="${t('delete_msg')}">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>` : ''}
                         ${isUser ? `
                         <button class="msg-action-btn edit-btn" data-action="edit" data-msg-idx="${actualIdx}" title="编辑">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        </button>
-                        <button class="msg-action-btn refresh-btn" data-action="refresh" data-msg-idx="${actualIdx}" title="重新发送">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                         </button>` : ''}
-                        <button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="${actualIdx}" title="${t('delete_msg')}">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        </button>
                     </div>
                 </div>
                 ${isUser ? userAvHtml : ''}`;
@@ -7622,12 +7618,11 @@ function renderMessages() {
         if (!isUser) {
             html += '<button class="msg-action-btn edit-btn" data-action="edit" data-msg-idx="' + actualIdx + '" title="编辑"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
             html += '<button class="msg-action-btn retry-btn" data-action="retry" data-msg-idx="' + actualIdx + '" title="' + t('regenerate') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>';
+            html += '<button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="' + actualIdx + '" title="' + t('delete_msg') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
         }
         if (isUser) {
             html += '<button class="msg-action-btn edit-btn" data-action="edit" data-msg-idx="' + actualIdx + '" title="编辑"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
-            html += '<button class="msg-action-btn refresh-btn" data-action="refresh" data-msg-idx="' + actualIdx + '" title="重新发送"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>';
         }
-        html += '<button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="' + actualIdx + '" title="' + t('delete_msg') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
         html += '</div>';
         html += '</div>';
         if (isUser) html += userAvHtml;
@@ -7681,12 +7676,11 @@ function renderMessagesFullHistory(conv) {
         if (!isUser) {
             html += '<button class="msg-action-btn edit-btn" data-action="edit" data-msg-idx="' + actualIdx + '" title="编辑"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
             html += '<button class="msg-action-btn retry-btn" data-action="retry" data-msg-idx="' + actualIdx + '" title="' + t('regenerate') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>';
+            html += '<button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="' + actualIdx + '" title="' + t('delete_msg') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
         }
         if (isUser) {
             html += '<button class="msg-action-btn edit-btn" data-action="edit" data-msg-idx="' + actualIdx + '" title="编辑"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
-            html += '<button class="msg-action-btn refresh-btn" data-action="refresh" data-msg-idx="' + actualIdx + '" title="重新发送"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>';
         }
-        html += '<button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="' + actualIdx + '" title="' + t('delete_msg') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
         html += '</div>';
         html += '</div>';
         if (isUser) html += userAvHtml;
@@ -8490,6 +8484,96 @@ function isStatusEmoji(ch) {
 }
 
 // ==================== Message Actions ====================
+function _resendToAI() {
+    var conv = getActiveConv();
+    if (!conv) return;
+    if (state.isGenerating) return;
+    var lastMsg = conv.messages[conv.messages.length - 1];
+    if (!lastMsg || lastMsg.role !== 'user') return;
+    // Set generating state (changes send button to stop, etc.)
+    state.isGenerating = true;
+    appStore.notify('isGenerating');
+    updateInputState();
+    if (isGroupChat(conv)) {
+        conv._nextGroupSpeaker = getNextGroupSpeaker(conv);
+    }
+    // Create streaming placeholder immediately with avatar + wave animation
+    var charAvHtml = _msgAvatarHTML(conv, false, getCurrentGeneratingSpeakerName(conv));
+    var div = document.createElement('div');
+    div.id = 'streamingMsg';
+    div.className = 'msg-enter msg-assistant flex items-start gap-2 justify-start';
+    div.innerHTML = charAvHtml +
+        '<div class="max-w-[72%] msg-wrapper">' +
+        '<p class="text-sm text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(getCurrentGeneratingSpeakerName(conv)) + '</p>' +
+        '<div class="msg-bubble" id="streamingContent">' +
+        '<div class="think-wave"><span></span><span></span><span></span></div>' +
+        '</div>' +
+        '<div class="msg-actions"></div>' +
+        '</div>';
+    dom.messagesContainer.appendChild(div);
+    requestAnimationFrame(function() {
+        dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
+    });
+    streamChat(
+        function onToken(token, fullContent) {
+            var streamingEl = document.getElementById('streamingContent');
+            if (streamingEl) streamingEl.innerHTML = highlightDialogue(fullContent);
+            requestAnimationFrame(function() {
+                dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
+            });
+        },
+        function onComplete(fullContent) {
+            // Transform streaming div into permanent message (no flash)
+            var streamMsgEl = document.getElementById('streamingMsg');
+            if (streamMsgEl) streamMsgEl.removeAttribute('id');
+            var c = getActiveConv();
+            if (c && fullContent) {
+                var speakerForMsg = isGroupChat(c)
+                    ? (c._nextGroupSpeaker ? c._nextGroupSpeaker.name : getCurrentGeneratingSpeakerName(c))
+                    : null;
+                var pushObj = { role: 'assistant', content: fullContent };
+                if (speakerForMsg) pushObj.speaker = speakerForMsg;
+                c.messages.push(pushObj);
+                c.updated = Date.now();
+                c._lastRenderedVisibleCount = 0;
+                if (isGroupChat(c)) c._nextGroupSpeaker = getNextGroupSpeaker(c);
+                else delete c._nextGroupSpeaker;
+                persistState();
+            }
+            state.isGenerating = false;
+            appStore.notify('isGenerating');
+            // Add action buttons to existing streaming div
+            if (streamMsgEl) {
+                var act = streamMsgEl.querySelector('.msg-actions');
+                var actualIdx = (c ? c.messages.length - 1 : -1);
+                if (act && !act.querySelector('.msg-action-btn')) {
+                    act.innerHTML =
+                        '<button class="msg-action-btn copy-btn" data-action="copy" data-msg-idx="' + actualIdx + '" title="' + t('copy') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' +
+                        '<button class="msg-action-btn edit-btn" data-action="edit" data-msg-idx="' + actualIdx + '" title="编辑"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>' +
+                        '<button class="msg-action-btn retry-btn" data-action="retry" data-msg-idx="' + actualIdx + '" title="' + t('regenerate') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>' +
+                        '<button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="' + actualIdx + '" title="' + t('delete_msg') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+                }
+            }
+            renderTokenBar();
+            requestAnimationFrame(function() {
+                dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
+            });
+            if (state.settings.summaryEnabled) setTimeout(function() { autoSummarize(); }, 500);
+        },
+        function onError(err) {
+            var se = document.getElementById('streamingMsg');
+            if (se) se.remove();
+            state.isGenerating = false;
+            appStore.notify('isGenerating');
+            renderMessagesOnly();
+            showCustomAlert('Error: ' + (err.message || err));
+        }
+    );
+    requestAnimationFrame(function() {
+        dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
+    });
+}
+
 function deleteMessage(actualIdx) {
     var conv = getActiveConv();
     if (!conv) return;
@@ -8723,9 +8807,6 @@ function bindEvents() {
             regenerateMessage(idx);
         } else if (action === 'edit') {
             openEditModal(idx);
-        } else if (action === 'refresh') {
-            if (state.isGenerating) return;
-            refreshUserMessage(idx);
         }
     });
 
@@ -8802,113 +8883,6 @@ function bindEvents() {
         dom.taEditorModal.classList.add('hidden');
         _taEditingTarget = null;
     });
-
-    function _resendToAI() {
-        var conv = getActiveConv();
-        if (!conv) return;
-        if (state.isGenerating) return;
-        var lastMsg = conv.messages[conv.messages.length - 1];
-        if (!lastMsg || lastMsg.role !== 'user') return;
-        // Set generating state (changes send button to stop, etc.)
-        state.isGenerating = true;
-        appStore.notify('isGenerating');
-        updateInputState();
-        if (isGroupChat(conv)) {
-            conv._nextGroupSpeaker = getNextGroupSpeaker(conv);
-        }
-        // Create streaming placeholder immediately with avatar + wave animation
-        var charAvHtml = _msgAvatarHTML(conv, false, getCurrentGeneratingSpeakerName(conv));
-        var div = document.createElement('div');
-        div.id = 'streamingMsg';
-        div.className = 'msg-enter msg-assistant flex items-start gap-2 justify-start';
-        div.innerHTML = charAvHtml +
-            '<div class="max-w-[72%] msg-wrapper">' +
-            '<p class="text-sm text-zinc-500 mb-1 ml-1 font-medium">' + escapeHtml(getCurrentGeneratingSpeakerName(conv)) + '</p>' +
-            '<div class="msg-bubble" id="streamingContent">' +
-            '<div class="think-wave"><span></span><span></span><span></span></div>' +
-            '</div>' +
-            '<div class="msg-actions"></div>' +
-            '</div>';
-        dom.messagesContainer.appendChild(div);
-        requestAnimationFrame(function() {
-            dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
-        });
-        streamChat(
-            function onToken(token, fullContent) {
-                var streamingEl = document.getElementById('streamingContent');
-                if (streamingEl) streamingEl.innerHTML = highlightDialogue(fullContent);
-                requestAnimationFrame(function() {
-                    dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
-                });
-            },
-            function onComplete(fullContent) {
-                // Transform streaming div into permanent message (no flash)
-                var streamMsgEl = document.getElementById('streamingMsg');
-                if (streamMsgEl) streamMsgEl.removeAttribute('id');
-                var c = getActiveConv();
-                if (c && fullContent) {
-                    var speakerForMsg = isGroupChat(c)
-                        ? (c._nextGroupSpeaker ? c._nextGroupSpeaker.name : getCurrentGeneratingSpeakerName(c))
-                        : null;
-                    var pushObj = { role: 'assistant', content: fullContent };
-                    if (speakerForMsg) pushObj.speaker = speakerForMsg;
-                    c.messages.push(pushObj);
-                    c.updated = Date.now();
-                    c._lastRenderedVisibleCount = 0;
-                    if (isGroupChat(c)) c._nextGroupSpeaker = getNextGroupSpeaker(c);
-                    else delete c._nextGroupSpeaker;
-                    persistState();
-                }
-                state.isGenerating = false;
-                appStore.notify('isGenerating');
-                // Add action buttons to existing streaming div
-                if (streamMsgEl) {
-                    var act = streamMsgEl.querySelector('.msg-actions');
-                    var actualIdx = (c ? c.messages.length - 1 : -1);
-                    if (act && !act.querySelector('.msg-action-btn')) {
-                        act.innerHTML =
-                            '<button class="msg-action-btn copy-btn" data-action="copy" data-msg-idx="' + actualIdx + '" title="' + t('copy') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' +
-                            '<button class="msg-action-btn edit-btn" data-action="edit" data-msg-idx="' + actualIdx + '" title="编辑"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>' +
-                            '<button class="msg-action-btn retry-btn" data-action="retry" data-msg-idx="' + actualIdx + '" title="' + t('regenerate') + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>' +
-                            '<button class="msg-action-btn del-btn" data-action="delete" data-msg-idx="' + actualIdx + '" title="' + t('delete_msg') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
-                    }
-                }
-                renderTokenBar();
-                requestAnimationFrame(function() {
-                    dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
-                });
-                if (state.settings.summaryEnabled) setTimeout(function() { autoSummarize(); }, 500);
-            },
-            function onError(err) {
-                var se = document.getElementById('streamingMsg');
-                if (se) se.remove();
-                state.isGenerating = false;
-                appStore.notify('isGenerating');
-                renderMessagesOnly();
-                showCustomAlert('Error: ' + (err.message || err));
-            }
-        );
-        requestAnimationFrame(function() {
-            dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
-        });
-    }
-
-    function refreshUserMessage(idx) {
-        var conv = getActiveConv();
-        if (!conv) return;
-        var msg = conv.messages[idx];
-        if (!msg || msg.role !== 'user') return;
-        var nextIdx = idx + 1;
-        if (nextIdx < conv.messages.length && conv.messages[nextIdx].role === 'assistant') {
-            conv.messages.splice(nextIdx, 1);
-        }
-        conv.updated = Date.now();
-        conv._wiCache = null;
-        conv._lastRenderedVisibleCount = 0;
-        persistState();
-        renderMessagesOnly();
-        _resendToAI();
-    }
 
     // Create new character from scratch
     dom.charCreateBtn.addEventListener('click', function() { openCharacterEditor(null); });
