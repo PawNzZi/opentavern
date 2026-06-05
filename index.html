@@ -1946,8 +1946,8 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                     <!-- 版本号 -->
                     <div id="storageStatus"
                          class="text-[9px] px-1.5 py-px rounded bg-amber-500/10 text-amber-400 font-mono cursor-pointer select-none hover:bg-amber-500/20 transition-colors"
-                         title="OpenTavern v0.0.2">
-                        v0.0.2
+                         title="OpenTavern v0.0.3">
+                        v0.0.3
                     </div>
                 </div>
                 <p class="text-[10px] text-zinc-500 leading-tight" data-i18n="app_subtitle">AI Character Chat</p>
@@ -2778,8 +2778,8 @@ function updateStorageStatusUI() {
     const el = document.getElementById('storageStatus');
     if (!el) return;
 
-    el.textContent = 'v0.0.2';
-    el.title = 'OpenTavern v0.0.2';
+    el.textContent = 'v0.0.3';
+    el.title = 'OpenTavern v0.0.3';
 
     // 点击直接打开设置（只绑定一次）
     if (!_storageStatusBound) {
@@ -7785,6 +7785,7 @@ var _qrEditingIndex = -1;
 var _taEditingTarget = null;
 var _editingCharKey = null;   // 当前正在编辑的角色卡 key，用于删除
 var _editingAvatarKey = null; // 当前正在编辑的角色卡 _avatarKey（与 conv 解耦）
+var _openedAsCreateNew = false; // 是否从 Create 按钮（null）打开的编辑器
 
 function openQuickReplyManager() {
     _qrEditingIndex = -1;
@@ -8025,6 +8026,7 @@ function deleteCharacterFromLibrary(nameOrKey) {
 
 function openCharacterEditor(explicitChar) {
     var c = explicitChar !== undefined ? explicitChar : (function() { var conv = getActiveConv(); return conv && conv.character; })();
+    _openedAsCreateNew = explicitChar === null;
     // Show export button only when editing, not when creating
     dom.charEditorExportBtn.style.display = c ? '' : 'none';
     dom.charEditName.value = c ? c.name : '';
@@ -8060,11 +8062,18 @@ function saveCharacterEdits() {
     var conv = getActiveConv();
     if (!conv) return;
 
+    // 校验：名称不能为空
+    var nameVal = dom.charEditName.value.trim();
+    if (!nameVal) {
+        showCustomAlert('请输入角色名称');
+        return;
+    }
+
     var tagsRaw = dom.charEditTags.value.trim();
     var tags = tagsRaw ? tagsRaw.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : [];
 
     var character = {
-        name: dom.charEditName.value.trim() || 'Unnamed',
+        name: nameVal,
         description: dom.charEditDescription.value,
         personality: dom.charEditPersonality.value,
         scenario: dom.charEditScenario.value,
@@ -8086,11 +8095,11 @@ function saveCharacterEdits() {
     var wasNew = !conv.character || !conv.character.name || conv.character.name === 'Unnamed';
 
     // Only replace conv.character when:
-    //   - creating a brand-new character (no _editingCharKey), OR
-    //   - editing the current conversation's character
-    // Do NOT replace when editing a different character from the manager.
+    //   - editing the current conversation's character (no explicit arg or same key)
+    // Do NOT replace when creating a new character (_openedAsCreateNew) or
+    // editing a different character from the manager.
     var convCharKey = conv.character && conv.character.name ? conv.character.name.trim().toLowerCase() : null;
-    var editingConvChar = !_editingCharKey || _editingCharKey === convCharKey;
+    var editingConvChar = !_openedAsCreateNew && _editingCharKey && _editingCharKey === convCharKey;
     if (editingConvChar) {
         conv.character = character;
     }
