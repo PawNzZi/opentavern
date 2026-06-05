@@ -1943,11 +1943,11 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
             <div class="flex-1">
                 <div class="flex items-center gap-2">
                     <p class="text-sm font-bold text-zinc-100 leading-tight">OpenTavern</p>
-                    <!-- 极简存储状态指示器 (Phase 1 补充) -->
-                    <div id="storageStatus" 
+                    <!-- 版本号 -->
+                    <div id="storageStatus"
                          class="text-[9px] px-1.5 py-px rounded bg-amber-500/10 text-amber-400 font-mono cursor-pointer select-none hover:bg-amber-500/20 transition-colors"
-                         title="OPFS">
-                        OPFS
+                         title="OpenTavern v0.0.2">
+                        v0.0.2
                     </div>
                 </div>
                 <p class="text-[10px] text-zinc-500 leading-tight" data-i18n="app_subtitle">AI Character Chat</p>
@@ -2052,12 +2052,10 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
             </div>
             <div class="flex items-center gap-2 flex-shrink-0 topbar-actions">
                 <!-- Languages removed — fixed to zh-CN -->
-                <button id="summarizeBtn" 
+                <button id="summarizeBtn"
                         class="px-2 sm:px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-500 glass hover:text-zinc-300 hover:bg-white/10 transition-all flex items-center justify-center"
                         data-i18n-title="summary_manager_title">
-                    <!-- Desktop: full text | Mobile: emoji only (适配移动端) -->
-                    <span data-i18n="summary_btn" class="hidden sm:inline">🧠 总结</span>
-                    <span class="sm:hidden text-base leading-none">🧠</span>
+                    <span class="text-base leading-none">🧠</span>
                 </button>
                 <button id="archiveBtn" class="mobile-hide-sm px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-500 glass hover:text-zinc-300 hover:bg-white/10 transition-all" data-i18n="archive" data-i18n-title="archive_title">📋 Archive</button>
                 <button id="topSettingsBtn" class="w-8 h-8 rounded-xl glass flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors">⚙️</button>
@@ -2137,7 +2135,7 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
 // ==================== i18n ====================
 var i18n = {
     'zh-CN': {
-        app_subtitle: 'AI 角色聊天1',
+        app_subtitle: 'AI 角色聊天',
         settings: '设置',
         settings_title: '设置',
         settings_api_endpoint: 'API 端点',
@@ -2184,7 +2182,7 @@ var i18n = {
         import_conv_success: '已导入',
         import_conv_success_suffix: '个对话。',
         import_conv_duplicate: '（已跳过重复）',
-        summary_btn: '🧠 总结',
+        summary_btn: '🧠',
         summary_title: '对话总结',
         summary_auto_label: '启用自动总结',
         summary_auto_hint: '当消息数量达到下方“触发阈值”时自动总结。建议上下文长度 ≥12，阈值设为上下文的 50%~70% 效果最佳。',
@@ -2774,28 +2772,23 @@ function showBackupReminderIfNeeded() {
     }, 4500);
 }
 
-// ==================== 极简存储状态 UI 更新 (Phase 1 补充) ====================
+// ==================== 版本号显示（兼作设置入口） ====================
+var _storageStatusBound = false;
 function updateStorageStatusUI() {
     const el = document.getElementById('storageStatus');
     if (!el) return;
 
-    el.textContent = 'OPFS';
-    el.style.background = 'rgba(245,158,11,0.15)';
-    el.style.color = '#fbbf24';
-    el.title = t('storage_hint_ls');
+    el.textContent = 'v0.0.2';
+    el.title = 'OpenTavern v0.0.2';
 
-    // 点击直接打开设置（Phase 1 补充，绕过按钮绑定问题）
-    el.addEventListener('click', function() {
-        const modal = document.getElementById('settingsModal');
-        if (modal) {
-            modal.classList.remove('hidden');
-            // 尝试刷新存储信息如果 openSettings 没被调用
-            if (typeof openSettings === 'function') {
-                // 如果 openSettings 已定义，调用它来填充数据
-                // 但由于可能作用域问题，这里直接用简单方式
-            }
-        }
-    });
+    // 点击直接打开设置（只绑定一次）
+    if (!_storageStatusBound) {
+        _storageStatusBound = true;
+        el.addEventListener('click', function() {
+            const modal = document.getElementById('settingsModal');
+            if (modal) modal.classList.remove('hidden');
+        });
+    }
 }
 
 // Returns a copy of settings with API keys stripped unless user explicitly opted in.
@@ -8228,6 +8221,38 @@ function toggleSidebar() {
         openSidebar();
     }
 }
+
+// ==================== Mobile Edge Swipe Gesture (左边缘右滑打开侧边栏) ====================
+var _swipeStartX = 0;
+var _swipeStartY = 0;
+var _swiping = false;
+document.addEventListener('touchstart', function(e) {
+    if (!isMobile() || dom.sidebar.classList.contains('open')) return;
+    var touch = e.touches[0];
+    if (touch.clientX <= 35) {
+        _swipeStartX = touch.clientX;
+        _swipeStartY = touch.clientY;
+        _swiping = true;
+    }
+}, { passive: true });
+
+document.addEventListener('touchmove', function(e) {
+    if (!_swiping) return;
+    var touch = e.touches[0];
+    var dx = touch.clientX - _swipeStartX;
+    var dy = Math.abs(touch.clientY - _swipeStartY);
+    // 垂直滑动大于水平 → 不是边缘滑动手势
+    if (dy > dx) { _swiping = false; return; }
+    if (dx >= 50) {
+        _swiping = false;
+        e.preventDefault(); // 阻止 iOS Safari 返回手势
+        openSidebar();
+    }
+}, { passive: false });
+
+document.addEventListener('touchend', function() {
+    _swiping = false;
+}, { passive: true });
 
 // ==================== Announcement Modal (快速开始引导) ====================
 var ANNOUNCE_KEY = 'opentavern_announce_dismissed_v1';
