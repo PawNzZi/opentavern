@@ -485,6 +485,7 @@ body {
 .status-header { cursor: pointer; user-select: none; }
 .status-header:hover { opacity: 0.85; }
 .status-toggle { display: inline-block; transition: transform 0.2s ease; font-size: 0.65rem; margin-right: 2px; }
+.wi-group-tag.active { background: rgba(245,158,11,0.20); color: #fcd34d; }
 .status-body { display: none; }
 .status-block.expanded .status-body { display: block; }
 .status-block.expanded .status-toggle { transform: rotate(90deg); }
@@ -1131,6 +1132,14 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                 <label class="text-xs font-semibold text-zinc-400 uppercase tracking-wider"><span data-i18n="settings_system_prompt">Custom System Prompt</span> <span class="text-zinc-600" data-i18n="settings_system_prompt_hint">(overrides character's system prompt)</span></label>
                 <textarea id="systemPrompt" rows="4" class="w-full mt-1.5 px-3 py-2.5 glass rounded-xl text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all resize-none" data-i18n-placeholder="settings_system_prompt_placeholder"></textarea>
             </div>
+            <div>
+                <label class="text-xs font-semibold text-zinc-400 uppercase tracking-wider"><span data-i18n="settings_persona_description">Persona Description</span> <span class="text-zinc-600" data-i18n="settings_persona_description_hint">(your character's self-description, inserted after world info)</span></label>
+                <textarea id="personaDescription" rows="3" class="w-full mt-1.5 px-3 py-2.5 glass rounded-xl text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all resize-none" placeholder="e.g. [{{user}} is a young adventurer who recently arrived in this world.]"></textarea>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-zinc-400 uppercase tracking-wider"><span data-i18n="settings_nsfw_prompt">NSFW / Auxiliary Prompt</span> <span class="text-zinc-600" data-i18n="settings_nsfw_prompt_hint">(inserted after scenario, before world info after; e.g. NSFW content rules)</span></label>
+                <textarea id="nsfwPrompt" rows="2" class="w-full mt-1.5 px-3 py-2.5 glass rounded-xl text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all resize-none" placeholder="e.g. NSFW content is allowed. Be explicit when appropriate."></textarea>
+            </div>
             <!-- Jailbreak Presets -->
             <hr class="border-white/5">
             <div>
@@ -1550,6 +1559,19 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                             <input id="wiOrder" type="number" value="100" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl text-zinc-200 focus:outline-none focus:ring-1 focus:ring-amber-500/40">
                         </div>
                     </div>
+                    <div>
+                        <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">包含组 (Group)</label>
+                        <input id="wiGroup" type="text" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl text-zinc-200 focus:outline-none focus:ring-1 focus:ring-amber-500/40" placeholder="e.g. char_info, persona, nsfw...">
+                        <div class="flex flex-wrap gap-1 mt-1.5">
+                            <button type="button" class="wi-group-tag text-[9px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-300 transition-all" data-tag="persona">persona</button>
+                            <button type="button" class="wi-group-tag text-[9px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-300 transition-all" data-tag="nsfw">nsfw</button>
+                            <button type="button" class="wi-group-tag text-[9px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-300 transition-all" data-tag="char_desc">char_desc</button>
+                            <button type="button" class="wi-group-tag text-[9px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-300 transition-all" data-tag="char_pers">char_pers</button>
+                            <button type="button" class="wi-group-tag text-[9px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-300 transition-all" data-tag="char_scenario">char_scenario</button>
+                            <button type="button" class="wi-group-tag text-[9px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-300 transition-all" data-tag="mes_example">mes_example</button>
+                            <button type="button" class="wi-group-tag text-[9px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-300 transition-all" data-tag="char_info">char_info</button>
+                        </div>
+                    </div>
 
                     <!-- Keys -->
                     <div>
@@ -1607,10 +1629,6 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                             </div>
                         </div>
                         <div>
-                            <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">包含组 (Group)</label>
-                            <input id="wiGroup" type="text" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl" placeholder="group-name">
-                        </div>
-                        <div>
                             <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">组权重</label>
                             <div class="flex gap-2 mt-1">
                                 <input id="wiGroupWeight" type="number" value="100" class="flex-1 px-3 py-2 text-sm glass rounded-xl">
@@ -1624,14 +1642,14 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                         <div class="md:col-span-1">
                             <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="wi_position">插入位置</label>
                             <select id="wiPosition" class="w-full mt-1 px-3 py-2 text-sm glass rounded-xl">
-                                <option value="0" data-i18n="pos_before_char">Before Char Defs</option>
-                                <option value="1" data-i18n="pos_after_char">After Char Defs</option>
-                                <option value="2" data-i18n="pos_before_ex">Before Example Msgs</option>
-                                <option value="3" data-i18n="pos_after_ex">After Example Msgs</option>
-                                <option value="4" data-i18n="pos_top_an">Top of Author's Note</option>
-                                <option value="5" data-i18n="pos_bottom_an">Bottom of Author's Note</option>
-                                <option value="6" data-i18n="pos_at_depth">@ Depth</option>
-                                <option value="7" data-i18n="pos_outlet">Outlet (named)</option>
+                                <option value="0" data-i18n="pos_before_char">角色前 (Before Char)</option>
+                                <option value="1" data-i18n="pos_after_char">角色后 (After Char)</option>
+                                <option value="2" data-i18n="pos_top_an">Author's Note 上方 (AN Top)</option>
+                                <option value="3" data-i18n="pos_bottom_an">Author's Note 下方 (AN Bottom)</option>
+                                <option value="4" data-i18n="pos_at_depth">@ 深度注入 (at Depth)</option>
+                                <option value="5" data-i18n="pos_em_top">示例对话上方 (EM Top)</option>
+                                <option value="6" data-i18n="pos_em_bottom">示例对话下方 (EM Bottom)</option>
+                                <option value="7" data-i18n="pos_outlet">出口 (Outlet)</option>
                             </select>
                         </div>
                         <div id="wiDepthRow" class="hidden md:col-span-1">
@@ -1951,8 +1969,8 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                     <!-- 版本号 -->
                     <div id="storageStatus"
                          class="text-[9px] px-1.5 py-px rounded bg-amber-500/10 text-amber-400 font-mono cursor-pointer select-none hover:bg-amber-500/20 transition-colors"
-                         title="OpenTavern v0.0.3">
-                        v0.0.3
+                         title="OpenTavern v0.0.6">
+                        v0.0.6
                     </div>
                 </div>
                 <p class="text-[10px] text-zinc-500 leading-tight" data-i18n="app_subtitle">AI Character Chat</p>
@@ -2057,6 +2075,10 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
             </div>
             <div class="flex items-center gap-2 flex-shrink-0 topbar-actions">
                 <!-- Languages removed — fixed to zh-CN -->
+                <button id="refreshBtn" title="刷新页面"
+                        class="w-8 h-8 rounded-xl glass flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors">
+                    <span class="text-sm leading-none">🔄</span>
+                </button>
                 <button id="summarizeBtn"
                         class="px-2 sm:px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-500 glass hover:text-zinc-300 hover:bg-white/10 transition-all flex items-center justify-center"
                         data-i18n-title="summary_manager_title">
@@ -2156,6 +2178,10 @@ var i18n = {
         settings_system_prompt: '自定义系统提示词',
         settings_system_prompt_hint: '（覆盖角色卡的系统提示词）',
         settings_system_prompt_placeholder: '可选：自定义系统级指令...',
+        settings_persona_description: '人设描述（Persona）',
+        settings_persona_description_hint: '(你的角色自述，插入在世界书后、角色描述前)',
+        settings_nsfw_prompt: 'NSFW / 辅助提示词',
+        settings_nsfw_prompt_hint: '(插入在场景后、世界书后条目之前)',
         prompt_viewer_title: '完整提示词（发送给 API）',
         copy: '复制',
         copied: '已复制！',
@@ -2325,14 +2351,14 @@ var i18n = {
         wi_ignore_budget: '忽略预算限制',
         wi_automation_id: '自动化 ID (STscript)',
         wi_disable: '禁用此条目',
-        pos_before_char: 'Before Char Defs',
-        pos_after_char: 'After Char Defs',
-        pos_before_ex: 'Before Example Msgs',
-        pos_after_ex: 'After Example Msgs',
-        pos_top_an: 'Top of Author\'s Note',
-        pos_bottom_an: 'Bottom of Author\'s Note',
-        pos_at_depth: '@ Depth',
-        pos_outlet: 'Outlet (named)',
+        pos_before_char: '角色前 (Before Char)',
+        pos_after_char: '角色后 (After Char)',
+        pos_top_an: 'Author\'s Note 上方 (AN Top)',
+        pos_bottom_an: 'Author\'s Note 下方 (AN Bottom)',
+        pos_at_depth: '@ 深度注入 (at Depth)',
+        pos_em_top: '示例对话上方 (EM Top)',
+        pos_em_bottom: '示例对话下方 (EM Bottom)',
+        pos_outlet: '出口 (Outlet)',
         role_system: 'System',
         role_user: 'User',
         role_assistant: 'Assistant',
@@ -2594,6 +2620,7 @@ var StorageService = {
     _avatarDir: 'avatars',
     _avatarUrlCache: {},
     _avatarUrlOrder: [],
+    _pendingAvatarLoads: {},  // key → Promise, prevents concurrent OPFS reads for same key
 
     async _getRoot() {
         if (this._root) return this._root;
@@ -2646,10 +2673,12 @@ var StorageService = {
             var writable = await fh.createWritable();
             await writable.write(pngBlob);
             await writable.close();
+            // Invalidate caches so next read gets the new file
             if (this._avatarUrlCache[key]) {
                 URL.revokeObjectURL(this._avatarUrlCache[key]);
                 delete this._avatarUrlCache[key];
             }
+            delete this._pendingAvatarLoads[key];
         } catch (e) {
             console.warn('[Storage] saveAvatar failed:', e.message);
         }
@@ -2657,22 +2686,33 @@ var StorageService = {
 
     async getAvatarUrl(key) {
         if (!key) return null;
+        // Return cached URL if available
         if (this._avatarUrlCache[key]) return this._avatarUrlCache[key];
-        try {
-            var dir = await this._getAvatarDir();
-            var fh;
-            try { fh = await dir.getFileHandle(key + '.png'); }
-            catch (e) { return null; }
-            var file = await fh.getFile();
-            var url = URL.createObjectURL(file);
-            this._avatarUrlCache[key] = url;
-            this._avatarUrlOrder.push(key);
-            while (this._avatarUrlOrder.length > 15) {
-                var old = this._avatarUrlOrder.shift();
-                if (this._avatarUrlCache[old]) { URL.revokeObjectURL(this._avatarUrlCache[old]); delete this._avatarUrlCache[old]; }
-            }
-            return url;
-        } catch (e) { return null; }
+        // Return pending promise if already loading (prevents concurrent OPFS reads)
+        if (this._pendingAvatarLoads[key]) return this._pendingAvatarLoads[key];
+
+        var self = this;
+        var promise = (async function() {
+            try {
+                var dir = await self._getAvatarDir();
+                var fh;
+                try { fh = await dir.getFileHandle(key + '.png'); }
+                catch (e) { return null; }  // file doesn't exist
+                var file = await fh.getFile();
+                var url = URL.createObjectURL(file);
+                self._avatarUrlCache[key] = url;
+                self._avatarUrlOrder.push(key);
+                // No LRU eviction: blob URLs are auto-released on page close/refresh.
+                // Evicting them would force unnecessary OPFS re-reads that can fail.
+                return url;
+            } catch (e) { return null; }
+        })();
+
+        this._pendingAvatarLoads[key] = promise;
+        // Clean up pending entry when done (pass or fail)
+        promise.then(function() { delete self._pendingAvatarLoads[key]; },
+                     function() { delete self._pendingAvatarLoads[key]; });
+        return promise;
     },
 
     async removeAvatar(key) {
@@ -2783,8 +2823,8 @@ function updateStorageStatusUI() {
     const el = document.getElementById('storageStatus');
     if (!el) return;
 
-    el.textContent = 'v0.0.3';
-    el.title = 'OpenTavern v0.0.3';
+    el.textContent = 'v0.0.6';
+    el.title = 'OpenTavern v0.0.6';
 
     // 点击直接打开设置（只绑定一次）
     if (!_storageStatusBound) {
@@ -2898,7 +2938,23 @@ function defaultSettings() {
         summarizeUseMainAPI: true,
         summarizeApiEndpoint: '',
         summarizeApiKey: '',
-        summarizeModel: 'deepseek-chat'
+        summarizeModel: 'deepseek-chat',
+
+        // === SillyTavern-compatible prompt fields ===
+        // Persona description (user persona / self-description)
+        personaDescription: '',
+        // NSFW / Auxiliary prompt (inserted after scenario, before worldInfoAfter)
+        nsfwPrompt: '',
+        // Format templates for character card fields
+        personalityFormat: "{{char}}'s personality: {{personality}}",
+        scenarioFormat: 'Scenario: {{scenario}}',
+        // World Info format template ({0} = the triggered WI entry content)
+        wiFormat: '{0}',
+        // Chat markers
+        newChatPrompt: '[Start a new Chat]',
+        newExampleChatPrompt: '[Example Chat]',
+        // Assistant prefill (Claude-compatible; empty = disabled)
+        assistantPrefill: ''
     };
 }
 
@@ -3113,8 +3169,15 @@ function fetchModels() {
     if (!endpoint) { showCustomAlert('请先填写 API Endpoint。'); return; }
     if (!apiKey) { showCustomAlert('请先填写 API Key。'); return; }
 
-    var base = endpoint.replace(/\/+$/, '').replace(/\/chat\/completions$/, '').replace(/\/v1$/, '');
-    var url = base + '/v1/models';
+    var base = endpoint.replace(/\/+$/, '').replace(/\/chat\/completions$/, '');
+    // If the endpoint already contains a version path like /v2, use it; otherwise default to /v1
+    var versionMatch = base.match(/\/(v[0-9]+)$/);
+    var url;
+    if (versionMatch) {
+        url = base + '/models';           // e.g. https://qianfan.baidubce.com/v2/models
+    } else {
+        url = base.replace(/\/v[0-9]+$/, '') + '/v1/models';
+    }
 
     var btn = dom.fetchModelsBtn;
     var origText = btn.textContent;
@@ -3423,69 +3486,132 @@ function showGroupMentionPanel(conv) {
     modal.classList.remove('hidden');
 }
 
-function buildGroupSystemPrompt(conv, wiByPos) {
+function buildGroupSystemPrompt(conv, wiByPos, wiExtras) {
     if (!isGroupChat(conv)) {
-        return buildSystemPrompt(conv.character, wiByPos);
+        return buildSystemPrompt(conv.character, wiByPos, wiExtras);
     }
 
     const members = getGroupMembers(conv);
     const forcedSpeaker = conv._forcedSpeaker || getCurrentSpeakerCharacter(conv);
     const userName = state.settings.userName || 'User';
+    const settings = state.settings;
+    const extras = wiExtras || {};
+
+    // === Resolve fields with priority logic ===
+    // personaDescription, nsfw: WI entries → settings → skip
+    var personaDesc = (extras.personaDescription && extras.personaDescription.trim())
+        ? extras.personaDescription.trim()
+        : (settings.personaDescription || '');
+
+    var nsfwContent = (extras.nsfwPrompt && extras.nsfwPrompt.trim())
+        ? extras.nsfwPrompt.trim()
+        : (settings.nsfwPrompt || '');
+
+    // Build extra macros for the forced speaker
+    var extraMacros = {
+        personality: forcedSpeaker ? (forcedSpeaker.personality || '') : '',
+        scenario: forcedSpeaker ? (forcedSpeaker.scenario || '') : '',
+        description: forcedSpeaker ? (forcedSpeaker.description || '') : '',
+        persona: personaDesc
+    };
 
     let parts = [];
 
-    // 首先尊重用户在设置中填写的自定义系统提示词
-    var customSysPrompt = state.settings.systemPrompt;
-    if (customSysPrompt && customSysPrompt.trim()) {
-        parts.push(replacePlaceholders(customSysPrompt.trim(), 'Assistant', userName));
+    // ① main — Main system prompt
+    // Priority: forced speaker's char → settings → skip
+    var mainContent = (forcedSpeaker && forcedSpeaker.system_prompt && forcedSpeaker.system_prompt.trim())
+        ? forcedSpeaker.system_prompt.trim()
+        : (state.settings.systemPrompt || '');
+    if (mainContent && mainContent.trim()) {
+        parts.push({ role: 'system', content: replacePlaceholders(mainContent.trim(), forcedSpeaker ? forcedSpeaker.name : 'Assistant', userName, extraMacros), identifier: 'main' });
     }
 
-    // ========== 群组多角色严格指令（放在自定义提示词之后） ==========
-    parts.push(`你正在进行一个多角色群组对话。以下是本群组中所有角色的**完整、未经删减**的角色资料。你必须严格按照每个角色提供的完整资料进行扮演，绝对不能混淆任何角色的性格、背景、说话方式或知识。
+    // ② Group multi-character strict instructions
+    parts.push({ role: 'system', content: `你正在进行一个多角色群组对话。以下是本群组中所有角色的**完整、未经删减**的角色资料。你必须严格按照每个角色提供的完整资料进行扮演，绝对不能混淆任何角色的性格、背景、说话方式或知识。
 
 **严格规则：**
 - 每个角色都有自己独立且完整的设定，请严格遵守。
 - 当用户消息中包含 @角色名（例如 @普拉娜）时，被提及的角色应该是本轮的主要回应者。
 - 没有 @ 时，你可以根据上下文自然决定由谁发言，但仍必须严格保持每个角色的独立性。
-- 绝对不要将不同角色的特质混在一起。`);
+- 绝对不要将不同角色的特质混在一起。`, identifier: 'groupInstructions' });
 
-    // 群组场景覆盖
-    if (conv.group.scenarioOverride && conv.group.scenarioOverride.trim()) {
-        parts.push(replacePlaceholders(conv.group.scenarioOverride, forcedSpeaker ? forcedSpeaker.name : 'Assistant', userName));
+    // ③ Persona description (WI → settings → skip)
+    if (personaDesc && personaDesc.trim()) {
+        parts.push({ role: 'system', content: replacePlaceholders(personaDesc.trim(), forcedSpeaker ? forcedSpeaker.name : 'Assistant', userName, extraMacros), identifier: 'personaDescription' });
     }
 
-    // ========== 完整注入所有角色信息（强制默认行为） ==========
+    // ④ Group scenario override
+    if (conv.group.scenarioOverride && conv.group.scenarioOverride.trim()) {
+        parts.push({ role: 'system', content: replacePlaceholders(conv.group.scenarioOverride, forcedSpeaker ? forcedSpeaker.name : 'Assistant', userName), identifier: 'groupScenario' });
+    }
+
+    // ⑤ All character cards injected as separate blocks
+    //    Each char field uses: character card → WI extras → skip
     if (members.length > 0) {
-        parts.push('\n=== 群组角色完整资料（以下所有角色信息必须严格遵守） ===\n');
+        parts.push({ role: 'system', content: '=== 群组角色完整资料（以下所有角色信息必须严格遵守） ===', identifier: 'groupCharHeader' });
+
+        // Char supplements from WI (tagged "角色补充"/"char_info") — inserted after header, before member blocks
+        if (extras.charSupplements && extras.charSupplements.length > 0) {
+            extras.charSupplements.forEach(function(supp) {
+                parts.push({ role: 'system', content: replacePlaceholders(supp.content, forcedSpeaker ? forcedSpeaker.name : 'Assistant', userName, extraMacros), identifier: 'charSupplement' });
+            });
+        }
 
         members.forEach((member, index) => {
             const c = member.character;
             const charName = c.name || `角色${index + 1}`;
+
+            // Resolve char fields per member: char → WI extras → skip
+            var memDesc = (c.description && c.description.trim())
+                ? c.description.trim()
+                : ((extras.description && extras.description.trim()) ? extras.description.trim() : '');
+            var memPers = (c.personality && c.personality.trim())
+                ? c.personality.trim()
+                : ((extras.personality && extras.personality.trim()) ? extras.personality.trim() : '');
+            var memScenario = (c.scenario && c.scenario.trim())
+                ? c.scenario.trim()
+                : ((extras.scenario && extras.scenario.trim()) ? extras.scenario.trim() : '');
+
+            var charMacros = {
+                personality: memPers,
+                scenario: memScenario,
+                description: memDesc,
+                persona: personaDesc
+            };
+
+            // Each character gets their own description block as a separate system message
             let charBlock = `=== ${charName} ===\n`;
+            if (memDesc) charBlock += `Description: ${replacePlaceholders(memDesc, charName, userName, charMacros)}\n\n`;
+            if (memPers) {
+                var persFormat = settings.personalityFormat || "{{char}}'s personality: {{personality}}";
+                charBlock += replacePlaceholders(persFormat, charName, userName, charMacros) + '\n\n';
+            }
+            if (memScenario) {
+                var scenFormat = settings.scenarioFormat || 'Scenario: {{scenario}}';
+                charBlock += replacePlaceholders(scenFormat, charName, userName, charMacros) + '\n\n';
+            }
+            if (c.system_prompt) charBlock += `System Prompt: ${replacePlaceholders(c.system_prompt, charName, userName, charMacros)}\n\n`;
 
-            if (c.system_prompt) charBlock += `System Prompt: ${replacePlaceholders(c.system_prompt, charName, userName)}\n\n`;
-            if (c.post_history_instructions) charBlock += `Post-History Instructions: ${replacePlaceholders(c.post_history_instructions, charName, userName)}\n\n`;
-            if (c.personality) charBlock += `Personality: ${replacePlaceholders(c.personality, charName, userName)}\n\n`;
-            if (c.scenario) charBlock += `Scenario: ${replacePlaceholders(c.scenario, charName, userName)}\n\n`;
-            if (c.description) charBlock += `Description: ${replacePlaceholders(c.description, charName, userName)}\n\n`;
-            if (c.mes_example) charBlock += `Example Dialogues:\n${replacePlaceholders(c.mes_example, charName, userName)}\n\n`;
-            if (c.creator_notes) charBlock += `Creator Notes: ${c.creator_notes}\n\n`;
-
-            parts.push(charBlock.trim());
+            parts.push({ role: 'system', content: charBlock.trim(), identifier: 'charBlock_' + charName });
         });
     }
 
-    // 明确标注当前被 @ 的角色（如果有）
-    if (forcedSpeaker) {
-        parts.push(`\n【本轮用户特别指定】用户在本条消息中 @ 了 ${forcedSpeaker.name}。请优先让 ${forcedSpeaker.name} 作为主要回应者进行回复，同时保持其他角色的独立性。`);
+    // ⑥ NSFW prompt (WI → settings → skip)
+    if (nsfwContent && nsfwContent.trim()) {
+        parts.push({ role: 'system', content: replacePlaceholders(nsfwContent.trim(), forcedSpeaker ? forcedSpeaker.name : 'Assistant', userName, extraMacros), identifier: 'nsfw' });
     }
 
-    // World Info
+    // ⑦ Highlight @mentioned character
+    if (forcedSpeaker) {
+        parts.push({ role: 'system', content: `【本轮用户特别指定】用户在本条消息中 @ 了 ${forcedSpeaker.name}。请优先让 ${forcedSpeaker.name} 作为主要回应者进行回复，同时保持其他角色的独立性。`, identifier: 'forcedSpeaker' });
+    }
+
+    // ⑧ World Info injection
     if (wiByPos) {
         parts = injectWorldInfoIntoSystem(parts, wiByPos, forcedSpeaker ? forcedSpeaker.name : 'Assistant', userName);
     }
 
-    return parts.join('\n\n').trim();
+    return parts;
 }
 
 // ==================== App State ====================
@@ -3908,24 +4034,40 @@ function stripPNGMetadata(arrayBuffer) {
 }
 
 
-function replacePlaceholders(text, charName, userName) {
+function replacePlaceholders(text, charName, userName, extraMacros) {
     if (!text) return '';
-    return text
+    var result = text
         .replace(/\{\{char\}\}/gi, charName)
         .replace(/\{\{user\}\}/gi, userName || 'User');
+    // Support additional macros from character card fields and settings
+    if (extraMacros) {
+        if (extraMacros.personality !== undefined) result = result.replace(/\{\{personality\}\}/gi, extraMacros.personality);
+        if (extraMacros.scenario !== undefined) result = result.replace(/\{\{scenario\}\}/gi, extraMacros.scenario);
+        if (extraMacros.description !== undefined) result = result.replace(/\{\{description\}\}/gi, extraMacros.description);
+        if (extraMacros.persona !== undefined) result = result.replace(/\{\{persona\}\}/gi, extraMacros.persona);
+    }
+    return result;
 }
 
 
 // World Info position constants (must be defined early)
+// SillyTavern-compatible World Info position constants
+// ST: 0=before, 1=after, 2=ANTop, 3=ANBottom, 4=atDepth, 5=EMTop, 6=EMBottom, 7=outlet
 var WI_POS = {
     BEFORE_CHAR: 0, AFTER_CHAR: 1,
-    BEFORE_EX: 2, AFTER_EX: 3,
-    TOP_AN: 4, BOTTOM_AN: 5,
-    AT_DEPTH: 6, OUTLET: 7
+    TOP_AN: 2, BOTTOM_AN: 3,
+    AT_DEPTH: 4,
+    EM_TOP: 5, EM_BOTTOM: 6,
+    OUTLET: 7
 };
 var WI_ROLE = { SYSTEM: 0, USER: 1, ASSISTANT: 2 };
 
 function injectWorldInfoIntoSystem(systemParts, wiByPos, charName, userName) {
+    // systemParts is an array of {role, content, [name], [identifier]} objects
+    // Inserts worldInfoBefore after 'main', worldInfoAfter at end of system parts,
+    // and Author's Note entries at end.
+    // NOTE: EM (example message) entries are handled separately in buildMessagesForAPI
+    //       since they need to be positioned around dialogue examples.
     if (!wiByPos) return systemParts;
 
     function joinEntries(list) {
@@ -3937,67 +4079,260 @@ function injectWorldInfoIntoSystem(systemParts, wiByPos, charName, userName) {
 
     var before = joinEntries(wiByPos[WI_POS.BEFORE_CHAR] || []);
     var after = joinEntries(wiByPos[WI_POS.AFTER_CHAR] || []);
-    var beforeEx = joinEntries(wiByPos[WI_POS.BEFORE_EX] || []);
-    var afterEx = joinEntries(wiByPos[WI_POS.AFTER_EX] || []);
     var topAN = joinEntries(wiByPos[WI_POS.TOP_AN] || []);
     var botAN = joinEntries(wiByPos[WI_POS.BOTTOM_AN] || []);
 
-    if (before) systemParts.unshift(before);
-    if (after) systemParts.push(after);
+    // ② worldInfoBefore: insert after 'main' identifier, before personaDescription
+    if (before) {
+        var insertAfter = 0;
+        for (var i = 0; i < systemParts.length; i++) {
+            if (systemParts[i].identifier === 'main') { insertAfter = i + 1; break; }
+        }
+        systemParts.splice(insertAfter, 0, { role: 'system', content: before, identifier: 'worldInfoBefore' });
+    }
 
-    if (beforeEx) systemParts.push('Example context (lore):\n' + beforeEx);
-    if (afterEx) systemParts.push('Example context (lore):\n' + afterEx);
+    // ⑧ worldInfoAfter: append at end of system preamble (before dialogue examples)
+    if (after) {
+        systemParts.push({ role: 'system', content: after, identifier: 'worldInfoAfter' });
+    }
 
-    if (topAN || botAN) {
-        var an = [];
-        if (topAN) an.push(topAN);
-        if (botAN) an.push(botAN);
-        systemParts.push("[Author's Note / World Lore]\n" + an.join('\n'));
+    // Author's Note entries (appended after worldInfoAfter, before dialogue examples)
+    if (topAN) {
+        systemParts.push({ role: 'system', content: topAN, identifier: 'authorNoteTop' });
+    }
+    if (botAN) {
+        systemParts.push({ role: 'system', content: botAN, identifier: 'authorNoteBottom' });
     }
 
     return systemParts;
 }
 
-function buildSystemPrompt(character, worldInfoByPos) {
+// Format world info content using wi_format template
+function formatWorldInfo(value) {
+    if (!value) return '';
+    var format = state.settings.wiFormat || '{0}';
+    if (!format.trim()) return value;
+    return format.replace(/\{0\}/g, value);
+}
+
+// Extract special-purpose content from activated world book entries
+// Scans entry comment/group fields for identifying keywords.
+// Used for fallback: personaDescription/nsfw from WI → settings;
+// description/personality/scenario/mes_example from char → WI.
+//
+// Char supplements: entries tagged "角色补充"/"char_info"/"char_supplement"
+// are removed from their normal WI position and inserted inline right after
+// charDescription (④½), sorted by order.
+function extractSpecialWIEntries(activatedEntries) {
+    var result = {
+        personaDescription: null,
+        nsfwPrompt: null,
+        description: null,
+        personality: null,
+        scenario: null,
+        mes_example: null,
+        charSupplements: [],       // {uid, content, order} — inserted after charDescription
+        _extractedUids: {}         // uid → true, for filtering from normal WI positions
+    };
+    if (!activatedEntries || !activatedEntries.length) return result;
+
+    // Tags that mark an entry as char supplement (checked first, takes priority)
+    var CHAR_SUPP_TAGS = ['char_info', 'char_supplement', '角色补充', 'char_detail', '角色详情'];
+
+    activatedEntries.forEach(function(e) {
+        var comment = (e.comment || '').toLowerCase();
+        var group = (e.group || '').toLowerCase();
+        var content = (e.content || '').trim();
+        if (!content) return;
+
+        // === Char Supplement check (runs first; entries with this tag skip other extractions) ===
+        var isCharSupplement = false;
+        for (var t = 0; t < CHAR_SUPP_TAGS.length; t++) {
+            if (comment.indexOf(CHAR_SUPP_TAGS[t]) !== -1 || group.indexOf(CHAR_SUPP_TAGS[t]) !== -1) {
+                isCharSupplement = true;
+                break;
+            }
+        }
+        if (isCharSupplement) {
+            result.charSupplements.push({
+                uid: (e.uid != null) ? e.uid : content.slice(0, 20),
+                content: content,
+                order: (e.order != null) ? e.order : 100
+            });
+            result._extractedUids[e.uid] = true;
+            return; // don't also use as other extraction types
+        }
+
+        // Persona description: entry tagged with "persona" / "人设" / "user_desc"
+        if (!result.personaDescription &&
+            (comment.indexOf('persona') !== -1 || comment.indexOf('人设') !== -1 || comment.indexOf('user_desc') !== -1 ||
+             group.indexOf('persona') !== -1 || group.indexOf('人设') !== -1 || group.indexOf('user_desc') !== -1)) {
+            result.personaDescription = content;
+            result._extractedUids[e.uid] = true;
+        }
+
+        // NSFW prompt: entry tagged with "nsfw" / "nsfw"
+        if (!result.nsfwPrompt &&
+            (comment.indexOf('nsfw') !== -1 || group.indexOf('nsfw') !== -1)) {
+            result.nsfwPrompt = content;
+            result._extractedUids[e.uid] = true;
+        }
+
+        // Character description: entry tagged with "description" / "角色描述" / "char_desc"
+        if (!result.description &&
+            (comment.indexOf('description') !== -1 || comment.indexOf('char_desc') !== -1 ||
+             comment.indexOf('角色描述') !== -1 || group.indexOf('description') !== -1 || group.indexOf('char_desc') !== -1)) {
+            result.description = content;
+            result._extractedUids[e.uid] = true;
+        }
+
+        // Character personality: entry tagged with "personality" / "性格" / "char_pers"
+        if (!result.personality &&
+            (comment.indexOf('personality') !== -1 || comment.indexOf('char_pers') !== -1 ||
+             comment.indexOf('性格') !== -1 || group.indexOf('personality') !== -1 || group.indexOf('char_pers') !== -1)) {
+            result.personality = content;
+            result._extractedUids[e.uid] = true;
+        }
+
+        // Scenario: entry tagged with "scenario" / "场景" / "char_scenario"
+        if (!result.scenario &&
+            (comment.indexOf('scenario') !== -1 || comment.indexOf('char_scenario') !== -1 ||
+             comment.indexOf('场景') !== -1 || group.indexOf('scenario') !== -1 || group.indexOf('char_scenario') !== -1)) {
+            result.scenario = content;
+            result._extractedUids[e.uid] = true;
+        }
+
+        // mes_example: entry tagged with "mes_example" / "example_dialogue" / "示例对话"
+        if (!result.mes_example &&
+            (comment.indexOf('mes_example') !== -1 || comment.indexOf('example_dialogue') !== -1 ||
+             comment.indexOf('示例对话') !== -1 || group.indexOf('mes_example') !== -1 || group.indexOf('example_dialogue') !== -1)) {
+            result.mes_example = content;
+            result._extractedUids[e.uid] = true;
+        }
+    });
+
+    // Sort char supplements by order (highest first)
+    if (result.charSupplements.length > 0) {
+        result.charSupplements.sort(function(a, b) { return (b.order || 0) - (a.order || 0); });
+    }
+
+    return result;
+}
+
+function buildSystemPrompt(character, worldInfoByPos, wiExtras) {
+    // Returns an array of {role, content, identifier, [name]} parts
+    // Each part becomes a SEPARATE message in the final messages array
+    // Order follows SillyTavern's promptManagerDefaultPromptOrder (see MD guide §3)
+    //
+    // Priority for fields:
+    //   personaDescription, nsfw: WI entries → settings → skip
+    //   description, personality, scenario, mes_example: character card → WI entries → skip
     var parts = [];
     var charName = character ? character.name : 'Assistant';
     var userName = state.settings.userName || 'User';
+    var settings = state.settings;
+    var extras = wiExtras || {};
 
-    // NOTE: jailbreak + post_history_instructions moved to end of buildMessagesForAPI
-    // (SillyTavern-compatible: highest priority by being closest to model response)
+    // === Resolve fields with priority logic ===
 
-    var sysPrompt = state.settings.systemPrompt;
-    if (!sysPrompt && character && character.system_prompt) {
-        sysPrompt = character.system_prompt;
+    // personaDescription: WI entries first, then settings
+    var personaDesc = (extras.personaDescription && extras.personaDescription.trim())
+        ? extras.personaDescription.trim()
+        : (settings.personaDescription || '');
+
+    // nsfw: WI entries first, then settings
+    var nsfwContent = (extras.nsfwPrompt && extras.nsfwPrompt.trim())
+        ? extras.nsfwPrompt.trim()
+        : (settings.nsfwPrompt || '');
+
+    // charDescription: character card first, then WI entries
+    var charDesc = (character && character.description && character.description.trim())
+        ? character.description.trim()
+        : ((extras.description && extras.description.trim()) ? extras.description.trim() : '');
+
+    // charPersonality: character card first, then WI entries
+    var charPers = (character && character.personality && character.personality.trim())
+        ? character.personality.trim()
+        : ((extras.personality && extras.personality.trim()) ? extras.personality.trim() : '');
+
+    // scenario: character card first, then WI entries
+    var charScenario = (character && character.scenario && character.scenario.trim())
+        ? character.scenario.trim()
+        : ((extras.scenario && extras.scenario.trim()) ? extras.scenario.trim() : '');
+
+    // Build extra macros for template substitution
+    var extraMacros = {
+        personality: charPers,
+        scenario: charScenario,
+        description: charDesc,
+        persona: personaDesc
+    };
+
+    // === SillyTavern prompt order: §3 of the guide ===
+
+    // ① main — Main system prompt (defines AI's basic behavior)
+    // Priority: character card → settings → skip
+    var mainContent = (character && character.system_prompt && character.system_prompt.trim())
+        ? character.system_prompt.trim()
+        : (settings.systemPrompt || '');
+    if (mainContent && mainContent.trim()) {
+        parts.push({ role: 'system', content: replacePlaceholders(mainContent.trim(), charName, userName, extraMacros), identifier: 'main' });
     }
-    if (sysPrompt) {
-        parts.push(replacePlaceholders(sysPrompt, charName, userName));
+
+    // ② worldInfoBefore — Inserted right after main (handled below via injectWorldInfoIntoSystem)
+
+    // ③ personaDescription — User persona / self-description
+    if (personaDesc && personaDesc.trim()) {
+        parts.push({ role: 'system', content: replacePlaceholders(personaDesc, charName, userName, extraMacros), identifier: 'personaDescription' });
     }
 
-    // Inject depth_prompt (character lore / backstory from V2/V3 extensions)
-    // This is the detailed character profile that goes between instructions and card info
+    // Inject depth_prompt (character lore / backstory from V2/V3 extensions) — placed after persona
     if (character && character.depth_prompt && character.depth_prompt.prompt) {
-        parts.push(replacePlaceholders(character.depth_prompt.prompt, charName, userName));
+        parts.push({ role: 'system', content: replacePlaceholders(character.depth_prompt.prompt, charName, userName, extraMacros), identifier: 'depthPrompt' });
     }
 
-    if (character) {
-        var charInfo = [];
-        if (character.personality) charInfo.push('Personality: ' + replacePlaceholders(character.personality, charName, userName));
-        if (character.scenario) charInfo.push('Scenario: ' + replacePlaceholders(character.scenario, charName, userName));
-        if (character.description) charInfo.push(replacePlaceholders(character.description, charName, userName));
-        if (charInfo.length > 0) parts.push(charInfo.join('\n\n'));
+    // ④ charDescription — Character card: description field
+    if (charDesc) {
+        parts.push({ role: 'system', content: replacePlaceholders(charDesc, charName, userName, extraMacros), identifier: 'charDescription' });
     }
 
-    // World Info injection (before/after char + example/AN positions)
+    // ④½ Char Supplements — WI entries tagged "角色补充"/"char_info" inserted inline after description
+    if (extras.charSupplements && extras.charSupplements.length > 0) {
+        extras.charSupplements.forEach(function(supp) {
+            parts.push({ role: 'system', content: replacePlaceholders(supp.content, charName, userName, extraMacros), identifier: 'charSupplement' });
+        });
+    }
+
+    // ⑤ charPersonality — Character card: personality field (wrapped by personality_format)
+    if (charPers) {
+        var persFormat = settings.personalityFormat || "{{char}}'s personality: {{personality}}";
+        var persContent = replacePlaceholders(persFormat, charName, userName, extraMacros);
+        parts.push({ role: 'system', content: persContent, identifier: 'charPersonality' });
+    }
+
+    // ⑥ scenario — Character card: scenario field (wrapped by scenario_format)
+    if (charScenario) {
+        var scenFormat = settings.scenarioFormat || 'Scenario: {{scenario}}';
+        var scenContent = replacePlaceholders(scenFormat, charName, userName, extraMacros);
+        parts.push({ role: 'system', content: scenContent, identifier: 'scenario' });
+    }
+
+    // ⑦ nsfw / Auxiliary Prompt
+    if (nsfwContent && nsfwContent.trim()) {
+        parts.push({ role: 'system', content: replacePlaceholders(nsfwContent.trim(), charName, userName, extraMacros), identifier: 'nsfw' });
+    }
+
+    // ⑧ worldInfoAfter — Inserted after nsfw (appended at end of system parts)
+
+    // Inject world info entries at proper positions
     if (worldInfoByPos) {
         parts = injectWorldInfoIntoSystem(parts, worldInfoByPos, charName, userName);
     }
 
-    if (character && character.mes_example) {
-        parts.push('Example dialogues:\n' + replacePlaceholders(character.mes_example, charName, userName));
-    }
+    // NOTE: dialogueExamples, chatHistory, and jailbreak are handled by buildMessagesForAPI
+    //       (they are "marker" type entries that get filled by separate logic)
 
-    return parts.join('\n\n').trim();
+    return parts;
 }
 
 // Check if a character uses status blocks (by scanning first_mes and world book)
@@ -4025,6 +4360,49 @@ function characterUsesStatusBlocks(character) {
     return false;
 }
 
+// Parse mes_example (SillyTavern <START> format) into separate example messages
+// Each <START> block contains alternating {{user}}: and {{char}}: lines
+// These become system messages with name='example_user' / 'example_assistant'
+function parseMesExample(mesExample, charName, userName) {
+    if (!mesExample || !mesExample.trim()) return [];
+    var messages = [];
+    // Split by <START> markers
+    var blocks = mesExample.split(/<START>/gi);
+    for (var i = 0; i < blocks.length; i++) {
+        var block = blocks[i].trim();
+        if (!block) continue;
+        // Split block into individual lines
+        var lines = block.split(/\n/);
+        for (var j = 0; j < lines.length; j++) {
+            var line = lines[j].trim();
+            if (!line) continue;
+            // Check for {{user}}: or {{char}}: prefix
+            var userMatch = line.match(/^\{\{user\}\}\s*:\s*/i);
+            var charMatch = line.match(/^\{\{char\}\}\s*:\s*/i);
+            // Also support plain "UserName:" and "CharName:" prefix
+            var plainUserPrefix = (userName || 'User') + ':';
+            var plainCharPrefix = charName + ':';
+            var isPlainUser = line.indexOf(plainUserPrefix) === 0;
+            var isPlainChar = line.indexOf(plainCharPrefix) === 0;
+            if (userMatch) {
+                var content = line.slice(userMatch[0].length);
+                messages.push({ role: 'system', content: replacePlaceholders(content, charName, userName), name: 'example_user' });
+            } else if (charMatch) {
+                var content = line.slice(charMatch[0].length);
+                messages.push({ role: 'system', content: replacePlaceholders(content, charName, userName), name: 'example_assistant' });
+            } else if (isPlainUser) {
+                var content = line.slice(plainUserPrefix.length);
+                messages.push({ role: 'system', content: replacePlaceholders(content, charName, userName), name: 'example_user' });
+            } else if (isPlainChar) {
+                var content = line.slice(plainCharPrefix.length);
+                messages.push({ role: 'system', content: replacePlaceholders(content, charName, userName), name: 'example_assistant' });
+            }
+            // Lines without recognizable prefix are skipped
+        }
+    }
+    return messages;
+}
+
 function buildMessagesForAPI() {
     var conv = getActiveConv();
     normalizeConversation(conv);
@@ -4034,28 +4412,149 @@ function buildMessagesForAPI() {
     var charName = currentChar ? currentChar.name : (conv.character ? conv.character.name : 'Assistant');
     var userName = state.settings.userName || 'User';
     var maxMsgs = state.settings.contextLength;
+    var settings = state.settings;
 
     // Activate World Info for this conversation
     var wiResult = getActivatedWorldInfo(conv);
     var wiByPos = wiResult.byPosition || {};
 
-    // 群组模式使用新构建逻辑，单角色保持原有行为
-    var systemContent = isGroup 
-        ? buildGroupSystemPrompt(conv, wiByPos)
-        : buildSystemPrompt(conv.character, wiByPos);
+    // Extract special-purpose entries from activated WI (persona, nsfw, char fields)
+    var wiExtras = extractSpecialWIEntries(wiResult.entries || []);
+
+    // === Resolve fields with priority logic ===
+    // personaDescription, nsfw: WI → settings → skip
+    // description, personality, scenario, mes_example: char → WI → skip
+
+    var personaDesc = (wiExtras.personaDescription && wiExtras.personaDescription.trim())
+        ? wiExtras.personaDescription.trim()
+        : (settings.personaDescription || '');
+
+    var nsfwContent = (wiExtras.nsfwPrompt && wiExtras.nsfwPrompt.trim())
+        ? wiExtras.nsfwPrompt.trim()
+        : (settings.nsfwPrompt || '');
+
+    var charDesc = (currentChar && currentChar.description && currentChar.description.trim())
+        ? currentChar.description.trim()
+        : ((wiExtras.description && wiExtras.description.trim()) ? wiExtras.description.trim() : '');
+
+    var charPers = (currentChar && currentChar.personality && currentChar.personality.trim())
+        ? currentChar.personality.trim()
+        : ((wiExtras.personality && wiExtras.personality.trim()) ? wiExtras.personality.trim() : '');
+
+    var charScenario = (currentChar && currentChar.scenario && currentChar.scenario.trim())
+        ? currentChar.scenario.trim()
+        : ((wiExtras.scenario && wiExtras.scenario.trim()) ? wiExtras.scenario.trim() : '');
+
+    // mes_example: char first, then WI
+    var mesExample = (currentChar && currentChar.mes_example && currentChar.mes_example.trim())
+        ? currentChar.mes_example.trim()
+        : ((wiExtras.mes_example && wiExtras.mes_example.trim()) ? wiExtras.mes_example.trim() : null);
+    // Also fallback to conv.character if currentChar is null
+    if (!mesExample && !currentChar && conv.character && conv.character.mes_example && conv.character.mes_example.trim()) {
+        mesExample = conv.character.mes_example.trim();
+    }
+
+    // Build extra macros for template substitution (using resolved values)
+    var extraMacros = {
+        personality: charPers,
+        scenario: charScenario,
+        description: charDesc,
+        persona: personaDesc
+    };
+
+    // ====================================================================
+    // Step 0: Remove extracted entries from normal WI positions
+    // Entries tagged as persona/nsfw/char_supplement etc. are extracted by
+    // extractSpecialWIEntries and inserted at dedicated positions instead.
+    // Filter them out of wiByPos to avoid appearing twice.
+    // ====================================================================
+    if (wiExtras._extractedUids && Object.keys(wiExtras._extractedUids).length > 0) {
+        Object.keys(wiByPos).forEach(function(pos) {
+            wiByPos[pos] = wiByPos[pos].filter(function(e) {
+                return !wiExtras._extractedUids[e.uid];
+            });
+            if (wiByPos[pos].length === 0) delete wiByPos[pos];
+        });
+    }
+
+    // ====================================================================
+    // Step 1: Build system prompt parts (each becomes a SEPARATE message)
+    // Order: main → worldInfoBefore → personaDescription → charDescription →
+    //        charPersonality → scenario → nsfw → worldInfoAfter → AN/EM entries
+    // ====================================================================
+    var systemParts = isGroup
+        ? buildGroupSystemPrompt(conv, wiByPos, wiExtras)
+        : buildSystemPrompt(currentChar || conv.character, wiByPos, wiExtras);
 
     var apiMessages = [];
-    if (systemContent) apiMessages.push({ role: 'system', content: systemContent });
 
-    // Inject summaries as a second system message if any exist
+    // Add all system prompt parts as separate messages
+    for (var i = 0; i < systemParts.length; i++) {
+        var part = systemParts[i];
+        if (part.content && part.content.trim()) {
+            // Apply wi_format to world info entries
+            var content = part.content;
+            if (part.identifier === 'worldInfoBefore' || part.identifier === 'worldInfoAfter') {
+                content = formatWorldInfo(content);
+            }
+            var msg = { role: part.role, content: content };
+            if (part.name) msg.name = part.name;
+            apiMessages.push(msg);
+        }
+    }
+
+    // ====================================================================
+    // Step 2: Dialogue examples (parsed from mes_example)
+    // Each example becomes a system message with name=example_user/example_assistant
+    // Preceded by [Example Chat] marker
+    // Priority: char → WI extras → skip
+    // ====================================================================
+    if (mesExample) {
+        var exampleMsgs = parseMesExample(mesExample, charName, userName);
+        if (exampleMsgs.length > 0) {
+            apiMessages.push({ role: 'system', content: settings.newExampleChatPrompt || '[Example Chat]' });
+            for (var e = 0; e < exampleMsgs.length; e++) {
+                apiMessages.push(exampleMsgs[e]);
+            }
+        }
+    }
+
+    // EM top/bottom world info entries go around dialogue examples
+    var emTopEntries = wiByPos[WI_POS.EM_TOP] || [];
+    var emBottomEntries = wiByPos[WI_POS.EM_BOTTOM] || [];
+    if (emTopEntries.length > 0) {
+        var emTopContent = emTopEntries.map(function(e) {
+            return replacePlaceholders(e.content || '', charName, userName, extraMacros);
+        }).join('\n\n');
+        if (emTopContent.trim()) {
+            apiMessages.push({ role: 'system', content: emTopContent, identifier: 'emTop' });
+        }
+    }
+    if (emBottomEntries.length > 0) {
+        var emBottomContent = emBottomEntries.map(function(e) {
+            return replacePlaceholders(e.content || '', charName, userName, extraMacros);
+        }).join('\n\n');
+        if (emBottomContent.trim()) {
+            apiMessages.push({ role: 'system', content: emBottomContent, identifier: 'emBottom' });
+        }
+    }
+
+    // ====================================================================
+    // Step 3: Summaries (if any)
+    // ====================================================================
     if (conv.summaries && conv.summaries.length > 0) {
         var summaryText = conv.summaries.map(function(s) { return s.text; }).join('\n---\n');
         apiMessages.push({ role: 'system', content: '[以下是先前对话的自动摘要，供上下文参考]\n' + summaryText });
     }
 
-    // 【核心修复1 兼容增强】基于最后一个 summary 的 coveredEnd 向前裁剪
-    // 1. 新总结会通过 performSummarization 物理移除消息（最优路径）
-    // 2. 旧存档 / 未 prune 的对话也能立刻受益，不会把已总结的旧消息再塞进 prompt
+    // ====================================================================
+    // Step 4: [Start a new Chat] marker — separates preamble from chat history
+    // ====================================================================
+    apiMessages.push({ role: 'system', content: settings.newChatPrompt || '[Start a new Chat]' });
+
+    // ====================================================================
+    // Step 5: Chat history messages
+    // ====================================================================
     var regularMsgs = conv.messages.filter(function(m) { return m.role !== 'system'; });
     var lastCovered = -1;
     if (conv.summaries && conv.summaries.length > 0) {
@@ -4071,22 +4570,21 @@ function buildMessagesForAPI() {
         regularMsgs = regularMsgs.slice(regularMsgs.length - maxMsgs);
     }
 
-    // 关键修复：必须深拷贝消息对象，防止后续 Outlet 替换污染原始 conv.messages
+    // Deep copy to prevent outlet replacement from polluting original conv.messages
     var clonedRegularMsgs = regularMsgs.map(function(m) {
         return { role: m.role, content: m.content };
     });
     apiMessages = apiMessages.concat(clonedRegularMsgs);
 
-    // 群组模式下，消息里的 speaker 信息由渲染层处理，这里不需要额外改动 prompt 里的 role 名称
-    // （未来可在此处根据 speaker 给 assistant 消息加特殊标记）
-
-    // @D (Depth) insertions: support positive and negative depth + correct roles
+    // ====================================================================
+    // Step 6: Depth injections (World Info atDepth entries)
+    // ====================================================================
     var depthEntries = wiByPos[WI_POS.AT_DEPTH] || [];
     if (depthEntries.length > 0) {
         depthEntries.forEach(function(e) {
             var d = (e.depth != null) ? e.depth : 4;
             var role = (e.role === 0) ? 'system' : (e.role === 1 ? 'user' : 'assistant');
-            var content = replacePlaceholders(e.content || '', charName, userName);
+            var content = replacePlaceholders(e.content || '', charName, userName, extraMacros);
 
             var insertIdx;
             if (d < 0) {
@@ -4104,8 +4602,9 @@ function buildMessagesForAPI() {
         });
     }
 
-    // === Outlet Support ===
-    // Resolve {{outlet::Name}} in all messages（在克隆对象上操作，不会污染原始存储）
+    // ====================================================================
+    // Step 7: Outlet Support — resolve {{outlet::Name}} in all messages
+    // ====================================================================
     var wiOutlets = wiResult.outlets || {};
     if (Object.keys(wiOutlets).length > 0) {
         apiMessages.forEach(function(msg) {
@@ -4115,7 +4614,7 @@ function buildMessagesForAPI() {
                     var entries = wiOutlets[name];
                     if (!entries || entries.length === 0) return '';
                     var combined = entries.map(function(e) {
-                        return replacePlaceholders(e.content || '', charName, userName);
+                        return replacePlaceholders(e.content || '', charName, userName, extraMacros);
                     }).join('\n\n');
                     return combined;
                 });
@@ -4123,27 +4622,44 @@ function buildMessagesForAPI() {
         });
     }
 
-    // If character has status templates in world book, inject format as last system msg
+    // ====================================================================
+    // Step 8: Status template (if character uses status blocks)
+    // ====================================================================
     var statusTemplate = getActiveStatusTemplate(conv);
     if (statusTemplate) {
         apiMessages.push({ role: 'system', content: '【强制要求】在回复完成之后，必须根据对话内容更新并输出状态栏，格式严格参照：\n' + statusTemplate });
     }
 
-    // === SillyTavern-compatible: jailbreak + PHI at the bottom (highest priority) ===
-    // Inject jailbreak preset last (maximum recency bias for bypassing restrictions)
-    var jbName = state.settings.activeJailbreakPreset;
-    if (jbName && state.settings.jailbreakPresets && state.settings.jailbreakPresets[jbName]) {
-        var jbText = replacePlaceholders(state.settings.jailbreakPresets[jbName], charName, userName);
+    // ====================================================================
+    // Step 9: Jailbreak + Post-History Instructions (LAST system messages)
+    // ST-compatible: jailbreak is the final system message for maximum influence
+    // ====================================================================
+    // 9a. Jailbreak preset (global)
+    var jbName = settings.activeJailbreakPreset;
+    if (jbName && settings.jailbreakPresets && settings.jailbreakPresets[jbName]) {
+        var jbText = replacePlaceholders(settings.jailbreakPresets[jbName], charName, userName, extraMacros);
         if (jbText.trim()) apiMessages.push({ role: 'system', content: jbText.trim() });
     }
-    // Post-history instructions — injected as last user message, right before model response
+    // 9b. Post-history instructions (character card override) — role: system, NOT user!
+    //     In ST, this goes as a system message at the very end for maximum recency bias
     if (currentChar && currentChar.post_history_instructions) {
-        var phiText = replacePlaceholders(currentChar.post_history_instructions, charName, userName);
-        if (phiText.trim()) apiMessages.push({ role: 'user', content: phiText.trim() });
+        var phiText = replacePlaceholders(currentChar.post_history_instructions, charName, userName, extraMacros);
+        if (phiText.trim()) apiMessages.push({ role: 'system', content: phiText.trim() });
     }
 
+    // ====================================================================
+    // Step 10: Assistant prefill (Claude-compatible; last assistant message)
+    // ====================================================================
+    if (settings.assistantPrefill && settings.assistantPrefill.trim()) {
+        apiMessages.push({ role: 'assistant', content: replacePlaceholders(settings.assistantPrefill.trim(), charName, userName, extraMacros) });
+    }
+
+    // Final pass: ensure all placeholders are resolved in all messages
     return apiMessages.map(function(m) {
-        return { role: m.role, content: replacePlaceholders(m.content, charName, userName) };
+        var finalContent = replacePlaceholders(m.content, charName, userName, extraMacros);
+        var msg = { role: m.role, content: finalContent };
+        if (m.name) msg.name = m.name;
+        return msg;
     });
 }
 
@@ -4284,9 +4800,10 @@ function getMergedWorldInfoForConv(conv) {
 // Map SillyTavern position strings to numeric constants
 var WI_POS_MAP = {
     'before_char': 0, 'after_char': 1,
-    'before_ex': 2, 'after_ex': 3,
-    'top_an': 4, 'bot_an': 5,
-    'at_depth': 6, 'outlet': 7
+    'top_an': 2, 'bot_an': 3,
+    'at_depth': 4,
+    'em_top': 5, 'em_bottom': 6,
+    'outlet': 7
 };
 
 // Normalize a single entry from SillyTavern format to app internal format
@@ -4596,22 +5113,28 @@ function openWorldBookModal() {
     wiState.primaryKeys = [];
     wiState.secondaryKeys = [];
 
-    // Phase 2: If the conversation has assigned world books, open the first one by default
+    // Phase 2: If conversation has linked books, open directly to entries of the first one
     if (Array.isArray(conv.worldBookIds) && conv.worldBookIds.length > 0) {
         wiState.currentWorldBookId = conv.worldBookIds[0];
+        wiState.viewMode = 'entries';
+        var firstBook = state.worldBooks && state.worldBooks[conv.worldBookIds[0]];
+        dom.wiBookName.value = firstBook ? (firstBook.name || '') : '';
+    } else {
+        wiState.viewMode = 'books';
+        wiState.currentWorldBookId = null;
     }
 
     dom.worldBookModal.classList.remove('hidden');
     wiState.modalOpen = true;
-
-    // Phase 2: Start by showing the global world book list
-    wiState.viewMode = 'books';
-    wiState.currentWorldBookId = null;
     wiState.selectedUid = null;
 
-    // Mobile: set initial panel
+    // Mobile: set initial panel based on viewMode
     if (isMobileView()) {
-        navigateMobilePanel('books', t('world_book_mobile_books'));
+        if (wiState.viewMode === 'entries') {
+            navigateMobilePanel('entries', dom.wiBookName.value || t('world_book_mobile_entries'));
+        } else {
+            navigateMobilePanel('books', t('world_book_mobile_books'));
+        }
     }
 
     renderWIEntryList('');
@@ -4628,7 +5151,8 @@ function openWorldBookModal() {
 
 function closeWorldBookModal() {
     if (wiState.dirty) {
-        persistState();
+        persistState(true);  // immediate: flush now, don't rely on debounce
+        wiState.dirty = false;
         // 世界书条目有变更，清除激活缓存
         var conv = getActiveConv();
         if (conv) conv._wiCache = null;
@@ -4667,6 +5191,27 @@ function wireWorldBookListeners() {
     }
 
     dom.wiAddEntryBtn.addEventListener('click', addNewWIEntry);
+
+    // Group tag quick-fill buttons (delegated)
+    document.getElementById('wiEditorForm').addEventListener('click', function(e) {
+        var btn = e.target.closest('.wi-group-tag');
+        if (!btn || !wiState.selectedUid) return;
+        var tag = btn.getAttribute('data-tag');
+        if (!tag) return;
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        if (!entry) return;
+        // Toggle: click to add, click again to remove
+        var current = (entry.group || '');
+        if (current === tag) {
+            entry.group = '';
+            dom.wiGroup.value = '';
+        } else {
+            entry.group = tag;
+            dom.wiGroup.value = tag;
+        }
+        wiState.dirty = true;
+        _updateGroupTagHighlights();
+    });
 
     // Phase 2: Create new global world book
     if (dom.wiNewBookBtn) {
@@ -4886,6 +5431,23 @@ function wireWorldBookListeners() {
     });
 }
 
+// Sync group tag button highlights with current entry.group value
+function _updateGroupTagHighlights() {
+    var currentGroup = '';
+    if (wiState.selectedUid) {
+        var entry = getActiveWI().entries[wiState.selectedUid];
+        if (entry) currentGroup = entry.group || '';
+    }
+    document.querySelectorAll('.wi-group-tag').forEach(function(btn) {
+        var tag = btn.getAttribute('data-tag');
+        if (tag === currentGroup) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
 function addWIKeyFromInput(isPrimary) {
     var input = isPrimary ? dom.wiKeyInput : dom.wiSecInput;
     var val = input.value.trim();
@@ -4987,6 +5549,7 @@ function fillEditorFromEntry(entry) {
     dom.wiProbVal.textContent = dom.wiProbability.value;
 
     dom.wiGroup.value = entry.group || '';
+    _updateGroupTagHighlights();
     dom.wiGroupWeight.value = entry.groupWeight != null ? entry.groupWeight : 100;
     dom.wiPrioritize.checked = !!entry.groupOverride;
     dom.wiUseGroupScoring.checked = !!entry.useGroupScoring;
@@ -5295,6 +5858,7 @@ function renderWIEntryList(filter) {
                     '</div>' +
                 '</div>' +
                 '<div class="flex items-center gap-1 text-[10px] text-right flex-shrink-0">' +
+                    (entry.group ? '<span class="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 font-medium">' + escapeHtml(entry.group) + '</span>' : '') +
                     '<span class="tabular-nums text-zinc-400">' + (entry.order != null ? entry.order : 100) + '</span>' +
                     '<button class="wi-list-del opacity-35 hover:opacity-100 active:bg-red-500/20 text-red-400 min-w-[26px] min-h-[26px] rounded inline-flex items-center justify-center text-xs" data-uid="' + uidStr + '">✕</button>' +
                 '</div>' +
@@ -6095,6 +6659,8 @@ function streamChat(onToken, onComplete, onError) {
         var decoder = new TextDecoder();
         var buffer = '';
         var fullContent = '';
+        var finishReason = null;
+        var streamFlag = null;  // DeepSeek content moderation flag
 
         function pump() {
             reader.read().then(function(result) {
@@ -6102,6 +6668,11 @@ function streamChat(onToken, onComplete, onError) {
                     state.isGenerating = false;
                     appStore.notify('isGenerating');
                     state.abortController = null;
+                    // If stream ended with no content and a content-flag, surface the reason
+                    if (!fullContent && streamFlag != null && streamFlag !== 0) {
+                        onError(new Error('内容被审核拦截（flag=' + streamFlag + '），请调整输入内容后重试'));
+                        return;
+                    }
                     onComplete(fullContent);
                     return;
                 }
@@ -6116,11 +6687,23 @@ function streamChat(onToken, onComplete, onError) {
                         state.isGenerating = false;
                         appStore.notify('isGenerating');
                         state.abortController = null;
+                        if (!fullContent && streamFlag != null && streamFlag !== 0) {
+                            onError(new Error('内容被审核拦截（flag=' + streamFlag + '），请调整输入内容后重试'));
+                            return;
+                        }
                         onComplete(fullContent);
                         return;
                     }
                     try {
                         var json = JSON.parse(data);
+                        // Collect DeepSeek content moderation flag if present
+                        if (json.choices && json.choices[0] && json.choices[0].flag != null) {
+                            streamFlag = json.choices[0].flag;
+                        }
+                        // Check for finish_reason with no content (model refused / empty response)
+                        if (json.choices && json.choices[0] && json.choices[0].finish_reason) {
+                            finishReason = json.choices[0].finish_reason;
+                        }
                         var delta = json.choices && json.choices[0] && json.choices[0].delta;
                         if (delta && delta.content) {
                             fullContent += delta.content;
@@ -6955,7 +7538,8 @@ function newConversation(charOrChars) {
             charForGreeting = charOrChars;
         }
     }
-    charForGreeting = charForGreeting || (current && current.character ? current.character : null);
+    // Always prefer conv.character (the new conversation's character) over current.character
+    // Using current.character can grab the wrong character when conversations accumulate
     charForGreeting = charForGreeting || conv.character;
     if (isSingleChar && conv.character && conv.messages.length === 0 &&
         charForGreeting && charForGreeting.alternate_greetings && charForGreeting.alternate_greetings.length > 0) {
@@ -7243,14 +7827,14 @@ function cacheDom() {
         'presetDeepseek','presetGrok','presetOpenrouter','presetCustom','saveProviderBtn',
         'contextLength','contextLenVal',
         'maxTokens','maxTokensVal','temperature','tempVal','topP','topPVal',
-        'userName','userAvatar','userAvatarInput','systemPrompt','jbDropdownBtn','jbDropdownLabel','jbDropdownMenu','jbNewBtn',
+        'userName','userAvatar','userAvatarInput','systemPrompt','personaDescription','nsfwPrompt','jbDropdownBtn','jbDropdownLabel','jbDropdownMenu','jbNewBtn',
         'jbEditModal','jbEditBackdrop','jbEditTitle','jbEditName','jbEditContent','jbEditSave','jbEditCancel',
         'importFileInput',
         'greetingModal','greetingBackdrop','greetingCloseBtn','greetingList','greetingCharName',
         'taEditorModal','taEditorBackdrop','taEditorCloseBtn','taEditorTitle','taEditorTextarea','taEditorCancel','taEditorSaveBtn',
         'promptViewerModal','promptViewerBackdrop','promptViewerCloseBtn','promptViewerContent','copyPromptBtn',
         'archiveBtn','tokenPill','tokenCount','tokenBar','tokenMax','newChatBtn',
-        'topSettingsBtn','viewPromptBtn',
+        'topSettingsBtn','refreshBtn','viewPromptBtn',
         'exportAllBtn','convImportFile',
         'themeToggleBtn','themeToggleIcon',
         'charCardEmpty','charCardPreview','charCardAvatar','charCardName',
@@ -7314,9 +7898,10 @@ function cacheDom() {
 }
 
 // ==================== Conversation Export / Import ====================
-function exportConversation(id) {
+async function exportConversation(id) {
     var conv = state.conversations[id];
     if (!conv) return;
+    if (!await showCustomConfirm('确定导出对话「' + (conv.title || '未命名') + '」？')) return;
     downloadJsonFile(
         { version: 1, type: 'opentavern-export', exported_at: new Date().toISOString(), conversations: [conv] },
         (conv.title || 'conversation').replace(/[^a-zA-Z0-9一-鿿]/g, '_') + '.json'
@@ -7440,20 +8025,29 @@ function renderConversationList() {
     });
 }
 
-// Helper: generate avatar HTML for chat messages. Loads image async, shows initial letter placeholder.
-var _msgAvatarCounter = 0;
+// Helper: generate avatar HTML for chat messages.
+// Uses data-avatar-key attribute for stable async loading — no volatile DOM IDs.
+// Call _loadPendingAvatars() after inserting the HTML into DOM.
 function _msgAvatarHTML(conv, isUser, name) {
     var initial = (name || '?').charAt(0).toUpperCase();
     var avatarKey = isUser ? (state.settings._userAvatarKey || null) : (conv && conv.character ? conv.character._avatarKey : null);
-    var id = 'msgav-' + (++_msgAvatarCounter);
-    // Load image async if key exists
-    if (avatarKey) {
-        StorageService.getAvatarUrl(avatarKey).then(function(url) {
-            var el = document.getElementById(id);
-            if (el && url) el.innerHTML = '<img src="' + url + '" class="w-full h-full object-cover rounded-md">';
+    var keyAttr = avatarKey ? (' data-avatar-key="' + escapeHtml(avatarKey) + '"') : '';
+    return '<div class="msg-avatar w-8 h-8 rounded-md bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden"' + keyAttr + '>' + initial + '</div>';
+}
+
+// Post-render sweep: find all avatar placeholders with data-avatar-key and load their images.
+// Safe against re-renders — targets elements by stable attribute instead of volatile IDs.
+function _loadPendingAvatars(root) {
+    var placeholders = (root || document).querySelectorAll('.msg-avatar[data-avatar-key]:not(.avatar-loaded)');
+    for (var i = 0; i < placeholders.length; i++) {
+        var el = placeholders[i];
+        var key = el.getAttribute('data-avatar-key');
+        if (!key) continue;
+        el.classList.add('avatar-loaded'); // mark immediately to prevent re-entry
+        StorageService.getAvatarUrl(key).then(function(url) {
+            if (url) el.innerHTML = '<img src="' + url + '" class="w-full h-full object-cover rounded-md">';
         });
     }
-    return '<div id="' + id + '" class="w-8 h-8 rounded-md bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">' + initial + '</div>';
 }
 
 function enhanceTextarea(ta, label) {
@@ -7589,6 +8183,7 @@ function renderMessages() {
             fragment.appendChild(msgDiv);
         }
         container.appendChild(fragment);
+        _loadPendingAvatars(container);
         requestAnimationFrame(function() { container.scrollTop = container.scrollHeight; });
 
         conv._lastRenderedVisibleCount = currentVisibleCount;
@@ -7636,6 +8231,7 @@ function renderMessages() {
     }
 
     container.innerHTML = html;
+    _loadPendingAvatars(container);
     requestAnimationFrame(function() {
         container.scrollTop = container.scrollHeight;
     });
@@ -7694,6 +8290,7 @@ function renderMessagesFullHistory(conv) {
     }
 
     container.innerHTML = html;
+    _loadPendingAvatars(container);
     requestAnimationFrame(function() { container.scrollTop = container.scrollHeight; });
 }
 
@@ -8109,6 +8706,10 @@ function saveCharacterEdits() {
         const key = character.name.trim().toLowerCase();
         if (!state.characters) state.characters = {};
         state.characters[key] = JSON.parse(JSON.stringify(character));
+        // 如果改了名字，删除旧 key 的残留条目（防止角色选择器出现重复）
+        if (_editingCharKey && _editingCharKey !== key) {
+            delete state.characters[_editingCharKey];
+        }
     }
 
     if (editingConvChar && wasNew && character.first_mes && conv.messages.length === 0) {
@@ -8401,7 +9002,9 @@ function buildStatusFromLines(tag, rawLines) {
     }
     if (!lines.length) return '';
 
-    var html = '<div class="status-block">';
+    // During generation keep status panel open so it doesn't jump
+    var isGenerating = state.isGenerating;
+    var html = '<div class="status-block' + (isGenerating ? ' expanded' : '') + '">';
     html += '<div class="status-header"><span class="status-toggle">▶</span><span>📊</span><span>STATUS</span></div>';
     html += '<div class="status-body">';
 
@@ -8517,6 +9120,7 @@ function _resendToAI() {
         '<div class="msg-actions"></div>' +
         '</div>';
     dom.messagesContainer.appendChild(div);
+    _loadPendingAvatars(dom.messagesContainer);
     requestAnimationFrame(function() {
         dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
     });
@@ -8687,6 +9291,7 @@ function sendMessage() {
         '<div class="msg-actions"></div>' +
         '</div>';
     dom.messagesContainer.appendChild(streamDiv);
+    _loadPendingAvatars(dom.messagesContainer);
     requestAnimationFrame(function() {
         dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
     });
@@ -9047,6 +9652,8 @@ function bindEvents() {
             });
         }
         dom.systemPrompt.value = state.settings.systemPrompt;
+        dom.personaDescription.value = state.settings.personaDescription || '';
+        dom.nsfwPrompt.value = state.settings.nsfwPrompt || '';
         // Load jailbreak presets
         _jbRefreshUI();
         dom.summaryEnabled.checked = state.settings.summaryEnabled !== false;
@@ -9276,6 +9883,8 @@ function bindEvents() {
         state.settings.topP = parseFloat(dom.topP.value) || 0.9;
         state.settings.userName = dom.userName.value.trim() || 'User';
         state.settings.systemPrompt = dom.systemPrompt.value.trim();
+        state.settings.personaDescription = dom.personaDescription.value.trim();
+        state.settings.nsfwPrompt = dom.nsfwPrompt.value.trim();
         state.settings.summaryEnabled = dom.summaryEnabled.checked;
         if (dom.summaryThreshold) {
             state.settings.summaryThreshold = parseInt(dom.summaryThreshold.value) || 12;
@@ -9326,6 +9935,7 @@ function bindEvents() {
         appStore.notify('settings');
     }
     if (dom.topSettingsBtn) dom.topSettingsBtn.addEventListener('click', openSettings);
+    if (dom.refreshBtn) dom.refreshBtn.addEventListener('click', function() { location.reload(); });
 
     // ==================== Theme Toggle ====================
     function applyTheme(mode) {
