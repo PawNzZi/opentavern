@@ -9152,6 +9152,11 @@ function _resendToAI() {
             }
             state.isGenerating = false;
             appStore.notify('isGenerating');
+            // Auto-collapse status blocks after streaming completes
+            var allStatusBlocks = document.querySelectorAll('.status-block.expanded');
+            for (var sbi = 0; sbi < allStatusBlocks.length; sbi++) {
+                allStatusBlocks[sbi].classList.remove('expanded');
+            }
             // Add action buttons to existing streaming div
             if (streamMsgEl) {
                 var act = streamMsgEl.querySelector('.msg-actions');
@@ -9326,6 +9331,11 @@ function sendMessage() {
             }
             state.isGenerating = false;
             appStore.notify('isGenerating');
+            // Auto-collapse status blocks after streaming completes
+            var allStatusBlocks = document.querySelectorAll('.status-block.expanded');
+            for (var sbi = 0; sbi < allStatusBlocks.length; sbi++) {
+                allStatusBlocks[sbi].classList.remove('expanded');
+            }
             // Add action buttons to the existing streaming div
             if (streamMsgEl) {
                 var act = streamMsgEl.querySelector('.msg-actions');
