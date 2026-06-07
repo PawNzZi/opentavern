@@ -247,7 +247,7 @@ body.light-mode .conv-item.active {
 body.light-mode .conv-item:hover:not(.active) { background: rgba(0,0,0,0.025); }
 
 /* ===== Inputs & textareas ===== */
-body.light-mode input, body.light-mode textarea {
+body.light-mode input, body.light-mode textarea, body.light-mode select {
     background: rgba(0,0,0,0.018);
     color: #1c1917;
     border-color: rgba(0,0,0,0.10);
@@ -268,6 +268,17 @@ body.light-mode .modal-overlay .glass {
     background: rgba(255,255,255,0.94);
     box-shadow: 0 4px 24px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
     border-color: rgba(0,0,0,0.08);
+}
+/* Provider dropdown — light mode background */
+body.light-mode #charEditProviderMenu {
+    background: rgba(255,255,255,0.96);
+    border-color: rgba(0,0,0,0.10);
+}
+body.light-mode #charEditProviderMenu .char-provider-opt:hover {
+    background: rgba(0,0,0,0.05);
+}
+body.light-mode #charEditProviderMenu .char-provider-opt.text-amber-400 {
+    color: #c2410c;
 }
 /* Modal headers with dark backgrounds → lighten */
 body.light-mode .modal-overlay .bg-black\/20,
@@ -1334,6 +1345,25 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                 <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="char_editor_tags">Tags (comma separated)</label>
                 <input id="charEditTags" type="text" class="w-full mt-1 px-3 py-2 glass rounded-xl text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" placeholder="tag1, tag2, tag3">
             </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">AI Provider (Per-Character)</label>
+                    <div class="relative mt-1" id="charEditProviderWrap">
+                        <button id="charEditProviderBtn" type="button" class="w-full flex items-center justify-between px-3 py-2 glass rounded-xl text-sm text-zinc-200 border border-white/10 hover:border-amber-500/30 transition-all">
+                            <span id="charEditProviderLabel">使用全局设置</span>
+                            <svg class="w-4 h-4 text-zinc-500 flex-shrink-0 ml-2 transition-transform duration-200" id="charEditProviderArrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div id="charEditProviderMenu" class="absolute left-0 right-0 top-full mt-1 rounded-xl border border-white/10 py-1 shadow-xl z-[200] hidden" style="background:rgba(24,24,27,0.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);">
+                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-white/10 transition-colors" data-provider="">使用全局设置 (Use Global)</button>
+                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-white/10 transition-colors" data-provider="deepseek">DeepSeek</button>
+                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-white/10 transition-colors" data-provider="grok">Grok</button>
+                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-white/10 transition-colors" data-provider="openrouter">OpenRouter</button>
+                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-white/10 transition-colors" data-provider="custom">自定义 (Custom)</button>
+                        </div>
+                    </div>
+                </div>
+                <div></div>
+            </div>
             <div>
                 <label class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider" data-i18n="char_editor_description">Description</label>
                 <textarea id="charEditDescription" rows="6" class="w-full mt-1 px-3 py-2 glass rounded-xl text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all resize-none"></textarea>
@@ -1969,8 +1999,8 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                     <!-- 版本号 -->
                     <div id="storageStatus"
                          class="text-[9px] px-1.5 py-px rounded bg-amber-500/10 text-amber-400 font-mono cursor-pointer select-none hover:bg-amber-500/20 transition-colors"
-                         title="OpenTavern v0.0.6">
-                        v0.0.6
+                         title="OpenTavern v0.0.8">
+                        v0.0.8
                     </div>
                 </div>
                 <p class="text-[10px] text-zinc-500 leading-tight" data-i18n="app_subtitle">AI Character Chat</p>
@@ -2176,12 +2206,12 @@ var i18n = {
         settings_top_p: 'Top P',
         settings_user_name: '你的名字（替换 {{user}}）',
         settings_system_prompt: '自定义系统提示词',
-        settings_system_prompt_hint: '（覆盖角色卡的系统提示词）',
+        settings_system_prompt_hint: '（优先使用角色卡中的系统提示词）',
         settings_system_prompt_placeholder: '可选：自定义系统级指令...',
         settings_persona_description: '人设描述（Persona）',
-        settings_persona_description_hint: '(你的角色自述，插入在世界书后、角色描述前)',
+        settings_persona_description_hint: '(你的角色自述，插入在世界书后、角色描述前，优先使用世界书中的user)',
         settings_nsfw_prompt: 'NSFW / 辅助提示词',
-        settings_nsfw_prompt_hint: '(插入在场景后、世界书后条目之前)',
+        settings_nsfw_prompt_hint: '(插入在场景后、世界书后条目之前，优先使用世界书中的nsfw)',
         prompt_viewer_title: '完整提示词（发送给 API）',
         copy: '复制',
         copied: '已复制！',
@@ -2823,8 +2853,8 @@ function updateStorageStatusUI() {
     const el = document.getElementById('storageStatus');
     if (!el) return;
 
-    el.textContent = 'v0.0.6';
-    el.title = 'OpenTavern v0.0.6';
+    el.textContent = 'v0.0.8';
+    el.title = 'OpenTavern v0.0.8';
 
     // 点击直接打开设置（只绑定一次）
     if (!_storageStatusBound) {
@@ -2969,6 +2999,7 @@ var API_PRESETS = {
 // ==================== Per-Provider Config Storage ====================
 // ==================== Per-Provider Config Storage (OPFS) ====================
 var PROVIDER_CONFIG_FILE = 'opentavern-provider-configs.json';
+var _providerConfigCache = null;  // in-memory cache, loaded at init & updated on save
 
 async function _readProviderConfigFile() {
     try {
@@ -3035,11 +3066,15 @@ async function applySavedProviderConfig(key) {
 async function saveCurrentProviderConfig() {
     var key = detectCurrentProvider();
     if (!key) { showCustomAlert('无法检测到供应商信息，请先选择一个供应商。'); return; }
-    await saveProviderConfig(key, {
+    var config = {
         endpoint: dom.apiEndpoint.value.trim(),
         apiKey: dom.apiKey.value.trim(),
         model: dom.modelName.value.trim()
-    });
+    };
+    await saveProviderConfig(key, config);
+    // Sync in-memory cache for per-character provider override
+    if (!_providerConfigCache) _providerConfigCache = {};
+    _providerConfigCache[key] = config;
     await updateProviderBadges();
     showToast('AI供应商信息已保存');
 }
@@ -3722,6 +3757,9 @@ async function initState() {
         }
     }
 
+    // Load per-provider configs into memory cache (for per-character provider override)
+    _providerConfigCache = await loadProviderConfigs();
+
     // Reset runtime-only render state (not persisted)
     Object.values(state.conversations || {}).forEach(function(c) {
         c._lastRenderedVisibleCount = 0;
@@ -3865,6 +3903,7 @@ function importCharacterCard(jsonData) {
         depth_prompt: depthPrompt,
         talkativeness: ext.talkativeness != null ? ext.talkativeness : 0.5,
         creator: d.creator || '',
+        provider: d.provider || '',  // per-character AI provider override
         _avatarKey: null,       // OPFS key for avatar PNG blob
     };
 }
@@ -4574,6 +4613,26 @@ function buildMessagesForAPI() {
     var clonedRegularMsgs = regularMsgs.map(function(m) {
         return { role: m.role, content: m.content };
     });
+
+    // DeepSeek 角色沉浸指令：仅追加到第一轮 user 消息末尾
+    var INNER_OS_MARKER = (
+        "\n\n【角色沉浸要求】在你的思考过程（<think>标签内）中，请遵守以下规则：\n"
+        + "1. 请以角色第一人称进行内心独白，用括号包裹内心活动，例如\"（心想：……）\"或\"(内心OS：……)\"\n"
+        + "2. 用第一人称描写角色的内心感受，例如\"我心想\"\"我觉得\"\"我暗自\"等\n"
+        + "3. 思考内容应沉浸在角色中，通过内心独白分析剧情和规划回复"
+    );
+    // Per-character provider takes precedence for DeepSeek immersion marker
+    var resolved = _resolveEffectiveProvider();
+    var provider = resolved ? resolved.providerKey : detectCurrentProvider();
+    if (provider === 'deepseek') {
+        for (var u = 0; u < clonedRegularMsgs.length; u++) {
+            if (clonedRegularMsgs[u].role === 'user') {
+                clonedRegularMsgs[u].content += INNER_OS_MARKER;
+                break; // 只追加到第一轮 user，后续轮次不添加
+            }
+        }
+    }
+
     apiMessages = apiMessages.concat(clonedRegularMsgs);
 
     // ====================================================================
@@ -4978,7 +5037,8 @@ function handleMobileBack() {
     if (!isMobileView()) return;
     switch (wiState.mobilePanel) {
         case 'editor':
-            // Go back to entry list
+            // Go back to entry list — re-render to reflect in-memory edits
+            renderWIEntryList(dom.wiSearch ? dom.wiSearch.value.trim() : '');
             showNoSelection();
             var wb = state.worldBooks && state.worldBooks[wiState.currentWorldBookId];
             navigateMobilePanel('entries', wb ? (wb.name || t('world_book_mobile_entries')) : t('world_book_mobile_entries'));
@@ -5733,6 +5793,11 @@ async function deleteWorldBook(wbId) {
 }
 
 function selectWIEntry(uid) {
+    // If switching away from a previously edited entry, refresh the list
+    // to reflect in-memory changes (comment, group, keys, etc.)
+    if (wiState.selectedUid && wiState.selectedUid !== String(uid)) {
+        renderWIEntryList(dom.wiSearch ? dom.wiSearch.value.trim() : '');
+    }
     wiState.selectedUid = String(uid);
     var entry = getActiveWI().entries[wiState.selectedUid];
     fillEditorFromEntry(entry);
@@ -6602,9 +6667,35 @@ function processTimedEffects(conv, activatedEntries) {
 }
 
 // ==================== API Client ====================
+
+// Resolve effective provider config for the current conversation.
+// Returns { endpoint, apiKey, model, providerKey } if the character
+// has a bound provider with saved config; otherwise returns null.
+// Callers should fall back to state.settings when null.
+function _resolveEffectiveProvider() {
+    var conv = getActiveConv();
+    var charProvider = conv && conv.character && conv.character.provider;
+    if (!charProvider || !_providerConfigCache) return null;
+    var config = _providerConfigCache[charProvider];
+    if (!config || !config.endpoint) return null;
+    return {
+        endpoint: config.endpoint,
+        apiKey: config.apiKey || state.settings.apiKey,
+        model: config.model || state.settings.model,
+        providerKey: charProvider
+    };
+}
+
 function streamChat(onToken, onComplete, onError) {
     var settings = state.settings;
-    if (!settings.apiEndpoint || !settings.apiKey) {
+
+    // Per-character provider override
+    var resolved = _resolveEffectiveProvider();
+    var effectiveEndpoint = resolved ? resolved.endpoint : settings.apiEndpoint;
+    var effectiveApiKey = resolved ? resolved.apiKey : settings.apiKey;
+    var effectiveModel = resolved ? resolved.model : settings.model;
+
+    if (!effectiveEndpoint || !effectiveApiKey) {
         onError(new Error(t('no_api_error')));
         return;
     }
@@ -6624,16 +6715,16 @@ function streamChat(onToken, onComplete, onError) {
     state.abortController = controller;
     state.isGenerating = true;
 
-    var endpoint = normalizeApiEndpoint(settings.apiEndpoint);
+    var endpoint = normalizeApiEndpoint(effectiveEndpoint);
 
     fetch(endpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + settings.apiKey
+            'Authorization': 'Bearer ' + effectiveApiKey
         },
         body: JSON.stringify({
-            model: settings.model,
+            model: effectiveModel,
             messages: messages,
             max_tokens: settings.maxTokens,
             temperature: settings.temperature,
@@ -7401,15 +7492,6 @@ function newConversation(charOrChars) {
     var conv = defaultConversation();
     var current = getActiveConv();
 
-    // Copy world books from current conversation (if any)
-    if (current && current.worldBookIds && current.worldBookIds.length > 0) {
-        conv.worldBookIds = current.worldBookIds.slice();
-    }
-    // 兼容旧版 worldInfo
-    if (current && current.worldInfo) {
-        conv.worldInfo = JSON.parse(JSON.stringify(current.worldInfo));
-    }
-
     // ===== 单角色模式（原有逻辑） =====
     if (!charOrChars || !Array.isArray(charOrChars)) {
         const character = charOrChars || (current && current.character ? current.character : null);
@@ -7842,7 +7924,7 @@ function cacheDom() {
         'charImportBtn','charCreateBtn','charManagerBtn',
         'charManagerModal','charManagerBackdrop','charManagerCloseBtn','charManagerList',
         'charEditorModal','charEditorBackdrop','charEditorCloseBtn','charEditorCancelBtn','charEditorDelBtn','charEditorSaveBtn','charEditorExportBtn',
-        'charEditName','charEditTags','charEditDescription','charEditPersonality','charEditScenario',
+        'charEditName','charEditTags','charEditProviderWrap','charEditProviderBtn','charEditProviderLabel','charEditProviderMenu','charEditProviderArrow','charEditDescription','charEditPersonality','charEditScenario',
         'charEditFirstMes','charEditMesExample','charEditSystemPrompt','charEditPostHistory','charEditCreatorNotes',
         'charEditAvatar','charEditAvatarInput',
         'summarizeBtn','summarizeModal','summarizeBackdrop','summarizeTurns',
@@ -8044,9 +8126,13 @@ function _loadPendingAvatars(root) {
         var key = el.getAttribute('data-avatar-key');
         if (!key) continue;
         el.classList.add('avatar-loaded'); // mark immediately to prevent re-entry
-        StorageService.getAvatarUrl(key).then(function(url) {
-            if (url) el.innerHTML = '<img src="' + url + '" class="w-full h-full object-cover rounded-md">';
-        });
+        // Capture el/key in closure to avoid var hoisting bug where all .then() callbacks
+        // reference the last element in the loop
+        (function(el, key) {
+            StorageService.getAvatarUrl(key).then(function(url) {
+                if (url) el.innerHTML = '<img src="' + url + '" class="w-full h-full object-cover rounded-md">';
+            });
+        })(el, key);
     }
 }
 
@@ -8383,6 +8469,7 @@ var _taEditingTarget = null;
 var _editingCharKey = null;   // 当前正在编辑的角色卡 key，用于删除
 var _editingAvatarKey = null; // 当前正在编辑的角色卡 _avatarKey（与 conv 解耦）
 var _openedAsCreateNew = false; // 是否从 Create 按钮（null）打开的编辑器
+var _editingCharProvider = ''; // 当前正在编辑的角色卡 provider binding
 
 function openQuickReplyManager() {
     _qrEditingIndex = -1;
@@ -8628,6 +8715,8 @@ function openCharacterEditor(explicitChar) {
     dom.charEditorExportBtn.style.display = c ? '' : 'none';
     dom.charEditName.value = c ? c.name : '';
     dom.charEditTags.value = c && c.tags ? c.tags.join(', ') : '';
+    _editingCharProvider = c ? (c.provider || '') : '';
+    _refreshProviderDropdownUI();
     dom.charEditDescription.value = c ? c.description : '';
     dom.charEditPersonality.value = c ? c.personality : '';
     dom.charEditScenario.value = c ? c.scenario : '';
@@ -8680,6 +8769,7 @@ function saveCharacterEdits() {
         post_history_instructions: dom.charEditPostHistory.value,
         creator_notes: dom.charEditCreatorNotes.value,
         tags: tags,
+        provider: _editingCharProvider || '',
         alternate_greetings: conv.character ? conv.character.alternate_greetings : [],
         // Preserve imported V2/V3 extension fields not shown in the editor
         depth_prompt: conv.character ? conv.character.depth_prompt : null,
@@ -8731,6 +8821,59 @@ function saveCharacterEdits() {
     renderMessagesOnly();
     renderConversationListOnly();
     appStore.notify('conversations'); // 对话列表可能显示角色名
+}
+
+// ==================== 角色卡 Provider 自定义下拉控件 ====================
+var PROVIDER_LABELS = {
+    '': '使用全局设置 (Use Global)',
+    'deepseek': 'DeepSeek',
+    'grok': 'Grok',
+    'openrouter': 'OpenRouter',
+    'custom': '自定义 (Custom)'
+};
+var PROVIDER_OPTIONS = ['', 'deepseek', 'grok', 'openrouter', 'custom'];
+
+function _refreshProviderDropdownUI() {
+    var key = _editingCharProvider || '';
+    dom.charEditProviderLabel.textContent = PROVIDER_LABELS[key] || PROVIDER_LABELS[''];
+    // Highlight active option in menu
+    var opts = dom.charEditProviderMenu.querySelectorAll('.char-provider-opt');
+    for (var i = 0; i < opts.length; i++) {
+        var val = opts[i].getAttribute('data-provider') || '';
+        if (val === key) {
+            opts[i].classList.add('text-amber-400');
+            opts[i].classList.remove('text-zinc-300');
+        } else {
+            opts[i].classList.remove('text-amber-400');
+            opts[i].classList.add('text-zinc-300');
+        }
+    }
+}
+
+function _toggleProviderDropdown() {
+    var menu = dom.charEditProviderMenu;
+    var arrow = dom.charEditProviderArrow;
+    var isOpen = !menu.classList.contains('hidden');
+    if (isOpen) {
+        menu.classList.add('hidden');
+        arrow.style.transform = '';
+    } else {
+        _refreshProviderDropdownUI();
+        menu.classList.remove('hidden');
+        arrow.style.transform = 'rotate(180deg)';
+    }
+}
+
+function _selectProvider(key) {
+    _editingCharProvider = key || '';
+    _refreshProviderDropdownUI();
+    dom.charEditProviderMenu.classList.add('hidden');
+    dom.charEditProviderArrow.style.transform = '';
+}
+
+function _closeProviderDropdown() {
+    dom.charEditProviderMenu.classList.add('hidden');
+    dom.charEditProviderArrow.style.transform = '';
 }
 
 async function exportCharacter() {
@@ -9555,6 +9698,27 @@ function bindEvents() {
         renderCharManagerList();
     });
     dom.charEditorSaveBtn.addEventListener('click', saveCharacterEdits);
+
+    // ---- Provider 自定义下拉控件 ----
+    dom.charEditProviderBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        _toggleProviderDropdown();
+    });
+    // Click on a menu option
+    dom.charEditProviderMenu.querySelectorAll('.char-provider-opt').forEach(function(opt) {
+        opt.addEventListener('click', function(e) {
+            e.stopPropagation();
+            _selectProvider(opt.getAttribute('data-provider') || '');
+        });
+    });
+    // Close when clicking outside
+    document.addEventListener('click', function(e) {
+        if (dom.charEditProviderMenu && !dom.charEditProviderMenu.classList.contains('hidden')) {
+            if (!dom.charEditProviderWrap.contains(e.target)) {
+                _closeProviderDropdown();
+            }
+        }
+    });
     dom.charEditorExportBtn.addEventListener('click', exportCharacter);
 
     // Avatar upload — click shows overlay briefly, then auto-hides after 100ms
