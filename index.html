@@ -259,6 +259,12 @@ body.light-mode textarea::placeholder { color: #a8a29e; }
 /* Handled globally — all scrollbars hidden */
 
 /* ===== Modal system ===== */
+/* Provider dropdown — default (dark mode) background */
+.provider-dropdown-menu {
+    background: rgba(24,24,27,0.96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
 /* Lighter overlay */
 body.light-mode .modal-overlay {
     background: rgba(0,0,0,0.22);
@@ -274,8 +280,12 @@ body.light-mode #charEditProviderMenu {
     background: rgba(255,255,255,0.96);
     border-color: rgba(0,0,0,0.10);
 }
+body.light-mode #charEditProviderMenu .char-provider-opt {
+    color: #18181b;
+    border-bottom-color: rgba(0,0,0,0.08);
+}
 body.light-mode #charEditProviderMenu .char-provider-opt:hover {
-    background: rgba(0,0,0,0.05);
+    color: #c2410c;
 }
 body.light-mode #charEditProviderMenu .char-provider-opt.text-amber-400 {
     color: #c2410c;
@@ -1358,12 +1368,12 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px;
                             <span id="charEditProviderLabel">使用全局设置</span>
                             <svg class="w-4 h-4 text-zinc-500 flex-shrink-0 ml-2 transition-transform duration-200" id="charEditProviderArrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                         </button>
-                        <div id="charEditProviderMenu" class="absolute left-0 right-0 top-full mt-1 rounded-xl border border-white/10 py-1 shadow-xl z-[200] hidden" style="background:rgba(24,24,27,0.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);">
-                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-white/10 transition-colors" data-provider="">使用全局设置 (Use Global)</button>
-                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-white/10 transition-colors" data-provider="deepseek">DeepSeek</button>
-                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-white/10 transition-colors" data-provider="grok">Grok</button>
-                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-white/10 transition-colors" data-provider="openrouter">OpenRouter</button>
-                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-white/10 transition-colors" data-provider="custom">自定义 (Custom)</button>
+                        <div id="charEditProviderMenu" class="provider-dropdown-menu absolute left-0 right-0 top-full mt-1 rounded-xl border border-white/10 shadow-xl z-[200] hidden">
+                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 transition-colors border-b border-white/5 last:border-b-0" data-provider="">使用全局设置 (Use Global)</button>
+                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 transition-colors border-b border-white/5 last:border-b-0" data-provider="deepseek">DeepSeek</button>
+                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 transition-colors border-b border-white/5 last:border-b-0" data-provider="grok">Grok</button>
+                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 transition-colors border-b border-white/5 last:border-b-0" data-provider="openrouter">OpenRouter</button>
+                            <button class="char-provider-opt w-full text-left px-3 py-2 text-sm text-zinc-300 transition-colors" data-provider="custom">自定义 (Custom)</button>
                         </div>
                     </div>
                 </div>
