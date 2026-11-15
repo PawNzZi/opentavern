@@ -1,13 +1,42 @@
 /// 设置（阶段 0：显示本地数据位置与版本）。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/store/tavern_store.dart';
 import '../theme.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  String _version = '…';
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadVersion());
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final PackageInfo info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() => _version = '${info.version} (${info.buildNumber})');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _version = '未知');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +63,7 @@ class SettingsPage extends StatelessWidget {
                   _row('角色 / 世界书 / 对话',
                       '${store.characters.length} / ${store.worlds.length} / ${store.chats.length}'),
                   const Divider(height: 0.5, thickness: 0.5, color: TavernColors.separator),
-                  _row('版本', '0.1.0 (阶段 0)'),
+                  _row('版本', _version),
                 ],
               ),
             ),

@@ -9,9 +9,13 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
+
+import '../models/tavern_card.dart';
 
 class TavernStore {
   TavernStore._();
@@ -88,6 +92,88 @@ class TavernStore {
       'worlds': incoming['worlds'] is List ? incoming['worlds'] : <dynamic>[],
       'chats': incoming['chats'] is List ? incoming['chats'] : <dynamic>[],
     };
+    await save();
+  }
+
+  /// 导入一张角色卡：写头像、必要时拆出内嵌世界书、落库。
+  Future<Map<String, dynamic>> importCard(TavernCard card, {Uint8List? avatar}) async {
+    const Uuid uuid = Uuid();
+    final String id = 'c_${uuid.v4()}';
+    final int now = DateTime.now().millisecondsSinceEpoch;
+
+    String avatarPath = '';
+    if (avatar != null && avatar.isNotEmpty) {
+      final Directory dir = Directory(p.join(_dir.path, 'avatars'));
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      final File file = File(p.join(dir.path, '$id.png'));
+      await file.writeAsBytes(avatar, flush: true);
+      avatarPath = file.path;
+    }
+
+    final List<String> worldIds = <String>[];
+    final TavernWorld? book = card.book;
+    if (book != null && book.entries.isNotEmpty) {
+      final String worldId = 'w_${uuid.v4()}';
+      _data['worlds'].add(<String, dynamic>{
+        'id': worldId,
+        'name': book.name,
+        'entries': book.entries.map((TavernWorldEntry e) => e.toJson()).toList(),
+        'ownerCharacterId': id,
+        'createdAt': now,
+        'updatedAt': now,
+      });
+      worldIds.add(worldId);
+    }
+
+    final Map<String, dynamic> record = <String, dynamic>{
+      'id': id,
+      'name': card.name,
+      'avatar': avatarPath,
+      'description': card.description,
+      'personality': card.personality,
+      'scenario': card.scenario,
+      'firstMes': card.firstMes,
+      'example': card.example,
+      'creatorNotes': card.creatorNotes,
+      'systemPrompt': card.systemPrompt,
+      'postHistory': card.postHistory,
+      'alternateGreetings': card.alternateGreetings,
+      'tags': card.tags,
+      'creator': card.creator,
+      'characterVersion': card.characterVersion,
+      'extensions': card.extensions,
+      'voice': card.voice,
+      'spec': card.spec,
+      'specVersion': card.specVersion,
+      'worldIds': worldIds,
+      'createdAt': now,
+      'updatedAt': now,
+    };
+    (_data['characters'] as List).add(record);
+    await save();
+    return record;
+  }
+
+  /// 删除角色（连带它的头像文件与归属世界书）。
+  Future<void> deleteCharacter(String id) async {
+    final List<dynamic> characters = _data['characters'] as List;
+    final int index = characters.indexWhere((Object? item) => item is Map && item['id'] == id);
+    if (index < 0) return;
+    final Map<dynamic, dynamic> record = characters[index] as Map;
+    final String avatar = '${record['avatar'] ?? ''}';
+    if (avatar.isNotEmpty) {
+      try {
+        final File file = File(avatar);
+        if (await file.exists()) await file.delete();
+      } catch (_) {
+        // 删不掉不影响数据
+      }
+    }
+    characters.removeAt(index);
+    final List<dynamic> worlds = _data['worlds'] as List;
+    worlds.removeWhere((Object? item) => item is Map && item['ownerCharacterId'] == id);
     await save();
   }
 
