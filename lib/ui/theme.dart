@@ -27,7 +27,7 @@ class TavernColors {
 class TavernRadius {
   const TavernRadius._();
 
-  static const double card = 14;
+  static const double card = 12;
   static const double field = 10;
   static const double pill = 999;
 }
@@ -36,8 +36,9 @@ class TavernText {
   const TavernText._();
 
   static const TextStyle largeTitle = TextStyle(
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: FontWeight.w700,
+    letterSpacing: 0.37,
     color: TavernColors.text,
   );
 
@@ -47,15 +48,21 @@ class TavernText {
     color: TavernColors.text,
   );
 
+  /// 列表行标题（iOS 正文 17）。
+  static const TextStyle cell = TextStyle(
+    fontSize: 17,
+    color: TavernColors.text,
+  );
+
   static const TextStyle body = TextStyle(
-    fontSize: 15,
-    height: 1.5,
+    fontSize: 17,
+    height: 1.45,
     color: TavernColors.text,
   );
 
   static const TextStyle secondary = TextStyle(
-    fontSize: 13,
-    height: 1.45,
+    fontSize: 15,
+    height: 1.4,
     color: TavernColors.textSecondary,
   );
 

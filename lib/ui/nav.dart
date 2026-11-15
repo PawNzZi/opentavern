@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import 'ios_kit.dart';
 import 'theme.dart';
 
 Future<T?> pushPage<T>(BuildContext context, Widget page) {
@@ -25,7 +26,7 @@ class CardBox extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: TavernColors.surface,
-        borderRadius: BorderRadius.circular(TavernRadius.card),
+        borderRadius: BorderRadius.circular(12),
       ),
       clipBehavior: Clip.antiAlias,
       child: child,
@@ -48,54 +49,7 @@ class NavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double top = MediaQuery.paddingOf(context).top;
-    return Container(
-      padding: EdgeInsets.only(top: top),
-      decoration: const BoxDecoration(
-        color: TavernColors.bg,
-        border: Border(bottom: BorderSide(color: TavernColors.separator, width: 0.5)),
-      ),
-      child: SizedBox(
-        height: 44,
-        child: Row(
-          children: <Widget>[
-            SizedBox(
-              width: 56,
-              child: showBack
-                  ? Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        onPressed: () => Navigator.of(context).maybePop(),
-                        icon: const Icon(Icons.chevron_left, size: 26),
-                        color: TavernColors.text,
-                        splashRadius: 20,
-                      ),
-                    )
-                  : null,
-            ),
-            Expanded(
-              child: Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TavernText.title,
-              ),
-            ),
-            SizedBox(
-              width: 56,
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: actions,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return IosNavBar(title: title, actions: actions, showBack: showBack);
   }
 }
 
@@ -114,8 +68,13 @@ class InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget body = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    final Widget body = Container(
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: TavernColors.separator, width: 0.5),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

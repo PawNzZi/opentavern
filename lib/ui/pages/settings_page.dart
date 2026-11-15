@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/settings/app_settings.dart';
 import '../../core/store/tavern_store.dart';
+import '../ios_kit.dart';
 import '../nav.dart';
 import '../theme.dart';
 import 'backup_page.dart';
@@ -69,60 +70,68 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
         children: <Widget>[
           const Text('设置', style: TavernText.largeTitle),
-          const SectionTitle('账号'),
-          CardBox(
-            child: _row('身份与称呼', '${_settings.userName} · 用户设定', () {
-              unawaited(_open(const ProfilePage()));
-            }),
+          const IosSectionHeader('账号'),
+          IosGroup(
+            children: <Widget>[
+              IosCell(
+                title: '身份与称呼',
+                subtitle: '${_settings.userName} · 用户设定',
+                onTap: () => unawaited(_open(const ProfilePage())),
+              ),
+            ],
           ),
-          const SectionTitle('模型'),
-          CardBox(
-            child: _row('AI 供应商', _providerSubtitle, () {
-              unawaited(_open(const ProviderPage()));
-            }),
+          const IosSectionHeader('模型'),
+          IosGroup(
+            children: <Widget>[
+              IosCell(
+                title: 'AI 供应商',
+                subtitle: _providerSubtitle,
+                onTap: () => unawaited(_open(const ProviderPage())),
+              ),
+              IosCell(
+                title: '生成参数',
+                subtitle: '历史 ${_settings.historyLimit} 条 · 温度 ${_settings.temperature.toStringAsFixed(2)}',
+                onTap: () => unawaited(_open(const GenerationPage())),
+              ),
+              IosCell(
+                title: '提示词',
+                subtitle: '段落顺序与主提示词',
+                onTap: () => unawaited(_open(const PromptSettingsPage())),
+              ),
+              IosCell(
+                title: '剧情记忆',
+                subtitle: _settings.memoryAuto ? '自动压缩开' : '仅手动压缩',
+                onTap: () => unawaited(_open(const MemorySettingsPage())),
+              ),
+            ],
           ),
-          CardBox(
-            child: _row('生成参数', '历史 ${_settings.historyLimit} 条 · 温度 ${_settings.temperature.toStringAsFixed(2)}', () {
-              unawaited(_open(const GenerationPage()));
-            }),
+          const IosSectionHeader('数据'),
+          IosGroup(
+            children: <Widget>[
+              IosCell(
+                title: '数据与备份',
+                subtitle: '${store.characters.length} 角色 · ${store.chats.length} 对话',
+                onTap: () => unawaited(_open(const BackupPage())),
+              ),
+            ],
           ),
-          CardBox(
-            child: _row('提示词', '段落顺序与主提示词', () {
-              unawaited(_open(const PromptSettingsPage()));
-            }),
-          ),
-          CardBox(
-            child: _row('剧情记忆', _settings.memoryAuto ? '自动压缩开' : '仅手动压缩', () {
-              unawaited(_open(const MemorySettingsPage()));
-            }),
-          ),
-          const SectionTitle('数据'),
-          CardBox(
-            child: _row('数据与备份', '${store.characters.length} 角色 · ${store.chats.length} 对话', () {
-              unawaited(_open(const BackupPage()));
-            }),
-          ),
-          const SectionTitle('关于'),
-          CardBox(
-            child: Column(
-              children: <Widget>[
-                InfoRow(label: '版本', value: _version),
-                InfoRow(label: '存储位置', value: store.dataFilePath),
-                const InfoRow(label: '说明', value: '单机版：数据只保存在本机，AI 直连你配置的供应商。'),
-              ],
-            ),
+          const IosSectionHeader('关于'),
+          IosGroup(
+            children: <Widget>[
+              IosCell(title: '版本', trailing: Text(_version, style: TavernText.caption)),
+              IosCell(
+                title: '存储位置',
+                subtitle: store.dataFilePath,
+              ),
+              const IosCell(
+                title: '说明',
+                subtitle: '单机版：数据只保存在本机，AI 直连你配置的供应商。',
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _row(String title, String subtitle, VoidCallback onTap) {
-    return ListTile(
-      title: Text(title, style: TavernText.body),
-      subtitle: Text(subtitle, style: TavernText.caption),
-      trailing: const Icon(Icons.chevron_right, size: 18, color: TavernColors.textFaint),
-      onTap: onTap,
-    );
-  }
 }

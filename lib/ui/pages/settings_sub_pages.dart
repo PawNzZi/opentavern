@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/ai/provider_client.dart';
 import '../../core/settings/app_settings.dart';
+import '../ios_kit.dart';
 import '../nav.dart';
 import '../toast.dart';
 import '../theme.dart';
@@ -154,12 +155,12 @@ class _ProviderPageState extends State<ProviderPage> {
                   child: Column(
                     children: <Widget>[
                       for (final String kind in <String>['none', 'deepseek', 'openrouter', 'custom'])
-                        ListTile(
-                          title: Text(_providerLabels[kind]!, style: TavernText.body),
+                        IosCell(
+                          title: _providerLabels[kind]!,
+                          onTap: () => _pickKind(kind),
                           trailing: _kind == kind
                               ? const Icon(Icons.check, size: 18, color: TavernColors.accent)
                               : null,
-                          onTap: () => _pickKind(kind),
                         ),
                     ],
                   ),
@@ -311,10 +312,12 @@ class _GenerationPageState extends State<GenerationPage> {
                         5,
                         (double value) => _settings.setRecursionDepth(value.round()),
                       ),
-                      SwitchListTile(
-                        title: const Text('历史里带角色名', style: TavernText.body),
-                        value: _settings.includeNames,
-                        onChanged: (bool value) => setState(() => _settings.setIncludeNames(value)),
+                      IosCell(
+                        title: '历史里带角色名',
+                        trailing: IosSwitch(
+                          value: _settings.includeNames,
+                          onChanged: (bool value) => setState(() => _settings.setIncludeNames(value)),
+                        ),
                       ),
                     ],
                   ),
@@ -514,13 +517,15 @@ class _MemorySettingsPageState extends State<MemorySettingsPage> {
                 CardBox(
                   child: Column(
                     children: <Widget>[
-                      SwitchListTile(
-                        title: const Text('自动压缩', style: TavernText.body),
-                        subtitle: const Text('消息超过历史条数两倍时自动整理', style: TavernText.caption),
-                        value: _settings.memoryAuto,
-                        onChanged: (bool value) {
-                          setState(() => _settings.setMemoryAuto(value));
-                        },
+                      IosCell(
+                        title: '自动压缩',
+                        subtitle: '消息超过历史条数两倍时自动整理',
+                        trailing: IosSwitch(
+                          value: _settings.memoryAuto,
+                          onChanged: (bool value) {
+                            setState(() => _settings.setMemoryAuto(value));
+                          },
+                        ),
                       ),
                       ListTile(
                         title: const Text('摘要输出上限', style: TavernText.body),
