@@ -1,0 +1,24 @@
+﻿{
+  "project": "open-tavern",
+  "platform": "ios",
+  "github": {
+    "owner": "PawNzZi",
+    "repo": "openTavern"
+  },
+  "provider": "github",
+  "codemagic": {},
+  "bitrise": {},
+  "ios": {
+    "path": "ios",
+    "scheme": "Runner",
+    "bundleId": "cn.lingyikz.tavern",
+    "configuration": "Release"
+  },
+  "flutter": {
+    "version": "3.47.9",
+    "watch": {}
+  },
+  "reactNative": {},
+  "kmp": {},
+  "mobai": {}
+}
