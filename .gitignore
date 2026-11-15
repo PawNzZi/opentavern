@@ -46,3 +46,7 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# 构建产物（IPA 不入库）
+/dist/
+
