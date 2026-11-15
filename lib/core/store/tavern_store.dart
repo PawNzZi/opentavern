@@ -32,6 +32,9 @@ class TavernStore {
     'chats': <dynamic>[],
   };
 
+  /// 直接访问底层数据（设置等模块需要原地读写）。
+  Map<String, dynamic> get rawData => _data;
+
   String get directoryPath => _dir.path;
 
   String get dataFilePath => p.join(_dir.path, 'data.json');
@@ -174,6 +177,102 @@ class TavernStore {
     characters.removeAt(index);
     final List<dynamic> worlds = _data['worlds'] as List;
     worlds.removeWhere((Object? item) => item is Map && item['ownerCharacterId'] == id);
+    await save();
+  }
+
+  Map<String, dynamic>? character(String id) => _find('characters', id);
+
+  Map<String, dynamic>? world(String id) => _find('worlds', id);
+
+  Map<String, dynamic>? chat(String id) => _find('chats', id);
+
+  Map<String, dynamic>? _find(String key, String id) {
+    final Object? raw = _data[key];
+    if (raw is! List) return null;
+    for (final Object? item in raw) {
+      if (item is Map && '${item['id']}' == id) {
+        return item.map((Object? k, Object? v) => MapEntry<String, dynamic>('$k', v));
+      }
+    }
+    return null;
+  }
+
+  /// 直接拿到可修改的条目引用（不复制）。
+  Map? mutable(String key, String id) {
+    final Object? raw = _data[key];
+    if (raw is! List) return null;
+    for (final Object? item in raw) {
+      if (item is Map && '${item['id']}' == id) return item;
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> get worldsOfCharacter {
+    return worlds;
+  }
+
+  /// 新建世界书（导入备份/手动新建用）。
+  Future<Map<String, dynamic>> addWorld(String name, {String ownerCharacterId = ''}) async {
+    final String id = 'w_${const Uuid().v4()}';
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    final Map<String, dynamic> world = <String, dynamic>{
+      'id': id,
+      'name': name,
+      'entries': <dynamic>[],
+      'ownerCharacterId': ownerCharacterId,
+      'createdAt': now,
+      'updatedAt': now,
+    };
+    (_data['worlds'] as List).add(world);
+    await save();
+    return world;
+  }
+
+  Future<void> deleteWorld(String id) async {
+    (_data['worlds'] as List).removeWhere((Object? item) => item is Map && '${item['id']}' == id);
+    await save();
+  }
+
+  /// 新建对话（第一条消息是开场白）。
+  Future<Map<String, dynamic>> addChat(
+    String characterId, {
+    required String firstMes,
+    String title = '',
+  }) async {
+    final String id = 't_${const Uuid().v4()}';
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    final Map<String, dynamic> chat = <String, dynamic>{
+      'id': id,
+      'characterId': characterId,
+      'title': title,
+      'messages': <dynamic>[
+        if (firstMes.trim().isNotEmpty)
+          <String, dynamic>{
+            'id': 'm_${const Uuid().v4()}',
+            'role': 'assistant',
+            'text': firstMes,
+            'at': now,
+          },
+      ],
+      'variables': <String, dynamic>{},
+      'memory': null,
+      'createdAt': now,
+      'updatedAt': now,
+    };
+    (_data['chats'] as List).add(chat);
+    await save();
+    return chat;
+  }
+
+  Future<void> deleteChat(String id) async {
+    (_data['chats'] as List).removeWhere((Object? item) => item is Map && '${item['id']}' == id);
+    await save();
+  }
+
+  Future<void> touchChat(String id) async {
+    final Map? chat = mutable('chats', id);
+    if (chat == null) return;
+    chat['updatedAt'] = DateTime.now().millisecondsSinceEpoch;
     await save();
   }
 

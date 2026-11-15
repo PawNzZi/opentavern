@@ -121,7 +121,7 @@ class ProviderClient {
   /// 流式对话：逐段产出增量文本。
   Stream<String> streamChat({
     required AiProviderConfig config,
-    required List<Map<String, String>> messages,
+    required List<Map<String, dynamic>> messages,
     int? maxTokens,
     double? temperature,
     List<String>? stop,

@@ -10,7 +10,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/card/card_io.dart';
 import '../../core/store/tavern_store.dart';
+import '../nav.dart';
 import '../theme.dart';
+import 'character_detail_page.dart';
 import '../toast.dart';
 
 class CharactersPage extends StatefulWidget {
@@ -157,6 +159,10 @@ class _CharactersPageState extends State<CharactersPage> {
       itemBuilder: (BuildContext context, int index) {
         final Map<String, dynamic> character = _characters[index];
         return GestureDetector(
+          onTap: () => unawaited(
+            pushPage<void>(context, CharacterDetailPage(characterId: '${character['id']}'))
+                .then((_) => setState(() => _characters = TavernStore.instance.characters)),
+          ),
           onLongPress: () => unawaited(_remove(character)),
           child: Container(
             padding: const EdgeInsets.all(12),
