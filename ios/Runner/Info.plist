@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>openTavern</string>
+	<string>酒馆</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>openTavern</string>
+	<string>Tavern</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -66,5 +66,15 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>选择角色卡、背景与聊天图片</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>保存生成的图片与角色卡</string>
+	<key>NSCameraUsageDescription</key>
+	<string>拍摄角色卡或聊天图片</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>录制语音输入与语音消息</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>将语音转写为文字</string>
 </dict>
 </plist>
