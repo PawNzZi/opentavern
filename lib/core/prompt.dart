@@ -127,29 +127,37 @@ class PromptBuilder {
     var history = <Map<String, dynamic>>[];
     var used = systemTokens;
     var dropped = 0;
+    var imageCount = 0;
 
     for (var i = session.messages.length - 1; i >= 0; i--) {
       final m = session.messages[i];
       if (m.hidden || m.isSystem) continue;
-      if (m.text.trim().isEmpty) continue;
+      if (m.text.trim().isEmpty && m.attachments.isEmpty) continue;
       final content = applyRegexScripts(
         m.text,
         AppStore.instance.regexScripts,
         stage: 'prompt',
         characterName: character.name,
       );
-      final tokens = estimateTokens(content) + 4;
+      final includedImages = <ChatAttachment>[];
+      for (final att in m.attachments) {
+        if (imageCount >= 2) break;
+        includedImages.add(att);
+        imageCount++;
+      }
+      final tokens =
+          estimateTokens(content) + 4 + includedImages.length * 850;
       if (used + tokens > maxPrompt) {
         dropped = i + 1;
         break;
       }
       history.add({
         'role': m.isUser ? 'user' : 'assistant',
-        'content': m.attachments.isEmpty
+        'content': includedImages.isEmpty
             ? content
             : <Map<String, dynamic>>[
                 {'type': 'text', 'text': content},
-                for (final att in m.attachments)
+                for (final att in includedImages)
                   {
                     'type': 'image',
                     'mime': att.mime,

@@ -18,6 +18,8 @@ class LoreScreen extends StatefulWidget {
 }
 
 class _LoreScreenState extends State<LoreScreen> {
+  final _query = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +29,7 @@ class _LoreScreenState extends State<LoreScreen> {
   @override
   void dispose() {
     AppStore.instance.removeListener(_sync);
+    _query.dispose();
     super.dispose();
   }
 
@@ -102,7 +105,17 @@ class _LoreScreenState extends State<LoreScreen> {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final books = AppStore.instance.lorebooks;
+    final q = _query.text.trim().toLowerCase();
+    final books = AppStore.instance.lorebooks.where((book) {
+      if (q.isEmpty) return true;
+      if (book.name.toLowerCase().contains(q)) return true;
+      return book.entries.any(
+        (e) =>
+            e.name.toLowerCase().contains(q) ||
+            e.content.toLowerCase().contains(q) ||
+            e.keys.any((k) => k.toLowerCase().contains(q)),
+      );
+    }).toList();
     return TavernScaffold(
       intensity: 1.05,
       child: SafeArea(
@@ -134,7 +147,11 @@ class _LoreScreenState extends State<LoreScreen> {
               subtitle: '关键词触发的设定集，让角色记得整个世界。',
             ),
             const SizedBox(height: 20),
-            const SearchField(hint: '搜索世界书或条目'),
+            SearchField(
+              hint: '搜索世界书或条目',
+              controller: _query,
+              onChanged: (_) => setState(() {}),
+            ),
             const SizedBox(height: 8),
             const SectionLabel('全部世界书'),
             for (final book in books) ...[
@@ -270,7 +287,32 @@ class _LorebookPageState extends State<LorebookPage> {
               subtitle:
                   '${book.entries.length} 条 · ${book.linked ?? (book.isGlobal ? "全局" : "未绑定")}',
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                GlassPill(
+                  label: book.entries.every((e) => e.enabled)
+                      ? '全部停用'
+                      : '全部启用',
+                  icon: Icons.toggle_on_outlined,
+                  height: 30,
+                  onTap: () async {
+                    final enable = !book.entries.every((e) => e.enabled);
+                    for (final e in book.entries) {
+                      e.enabled = enable;
+                    }
+                    await AppStore.instance.saveLorebooks();
+                    if (mounted) setState(() {});
+                  },
+                ),
+                const Spacer(),
+                Text(
+                  '${book.entries.length} 条',
+                  style: appText(11, FontWeight.w400, p.textTertiary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             if (book.entries.isEmpty)
               Glass(
                 radius: 22,
