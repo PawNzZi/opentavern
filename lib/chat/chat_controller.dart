@@ -265,6 +265,30 @@ class ChatController extends ChangeNotifier {
     _save();
   }
 
+  void deleteAfter(ChatMessage message) {
+    final index = messages.indexOf(message);
+    if (index < 0 || index == messages.length - 1) return;
+    messages.removeRange(index + 1, messages.length);
+    _session.updatedAt = DateTime.now().millisecondsSinceEpoch;
+    notifyListeners();
+    _save();
+  }
+
+  void regenerateFrom(ChatMessage message) {
+    final index = messages.indexOf(message);
+    if (index < 0 || isGenerating) return;
+    if (index < messages.length - 1) {
+      messages.removeRange(index + 1, messages.length);
+    }
+    if (message.isUser) {
+      _startGeneration();
+    } else {
+      message.text = '';
+      streamingMessage = message;
+      _startGeneration(regenerate: true);
+    }
+  }
+
   ChatSession? branchAt(ChatMessage message) {
     final index = messages.indexOf(message);
     if (index < 0) return null;

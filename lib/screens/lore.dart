@@ -265,6 +265,15 @@ class _LorebookPageState extends State<LorebookPage> {
     showTavernToast(context, uri == null ? '已取消导出' : '世界书已导出');
   }
 
+  Future<void> _moveEntry(int index, int delta) async {
+    final target = index + delta;
+    if (target < 0 || target >= widget.book.entries.length) return;
+    final entry = widget.book.entries.removeAt(index);
+    widget.book.entries.insert(target, entry);
+    await AppStore.instance.saveLorebooks();
+    if (mounted) setState(() {});
+  }
+
   Future<void> _deleteEntry(LoreEntry entry) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -401,12 +410,33 @@ class _LorebookPageState extends State<LorebookPage> {
                           );
                           if (mounted) setState(() {});
                         },
-                        trailing: GlassCircleButton(
-                          icon: Icons.delete_outline_rounded,
-                          size: 30,
-                          iconSize: 14,
-                          blur: 0,
-                          onTap: () => _deleteEntry(book.entries[i]),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            GlassCircleButton(
+                              icon: Icons.keyboard_arrow_up_rounded,
+                              size: 28,
+                              iconSize: 15,
+                              blur: 0,
+                              onTap: () => _moveEntry(i, -1),
+                            ),
+                            const SizedBox(width: 2),
+                            GlassCircleButton(
+                              icon: Icons.keyboard_arrow_down_rounded,
+                              size: 28,
+                              iconSize: 15,
+                              blur: 0,
+                              onTap: () => _moveEntry(i, 1),
+                            ),
+                            const SizedBox(width: 2),
+                            GlassCircleButton(
+                              icon: Icons.delete_outline_rounded,
+                              size: 28,
+                              iconSize: 14,
+                              blur: 0,
+                              onTap: () => _deleteEntry(book.entries[i]),
+                            ),
+                          ],
                         ),
                       ),
                       if (i != book.entries.length - 1)

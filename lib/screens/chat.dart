@@ -305,8 +305,40 @@ class _ChatScreenState extends State<ChatScreen> {
         _toast('正在朗读…');
       case '翻译':
         _toast('已翻译为中文');
+      case '删除后续':
+        _confirmDeleteAfter(message);
+      case '从此重写':
+        _chat.regenerateFrom(message);
+        _toast('将从这条消息重新生成');
       case '查看推理':
         _toast('展开推理内容');
+    }
+  }
+
+  Future<void> _confirmDeleteAfter(ChatMessage message) async {
+    final index = _chat.messages.indexOf(message);
+    final count = _chat.messages.length - index - 1;
+    if (index < 0 || count <= 0) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除后续消息'),
+        content: Text('将删除这条消息之后的 $count 条消息，不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      _chat.deleteAfter(message);
+      _toast('已删除后续消息');
     }
   }
 
@@ -1467,6 +1499,8 @@ class _MessageMenu extends StatelessWidget {
       (Icons.delete_outline_rounded, '删除', p.danger),
       (Icons.bookmark_add_outlined, '书签', p.textPrimary),
       (Icons.call_split_rounded, '分支', p.textPrimary),
+      (Icons.restart_alt_rounded, '从此重写', p.amber),
+      (Icons.playlist_remove_rounded, '删除后续', p.danger),
       (Icons.volume_up_rounded, '朗读', p.textPrimary),
       (Icons.translate_rounded, '翻译', p.textPrimary),
       (Icons.auto_awesome_rounded, '查看推理', p.amber),
