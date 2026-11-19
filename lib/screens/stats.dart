@@ -6,14 +6,24 @@ import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
 
-class StatsPage extends StatelessWidget {
+class StatsPage extends StatefulWidget {
   const StatsPage({super.key});
+
+  @override
+  State<StatsPage> createState() => _StatsPageState();
+}
+
+class _StatsPageState extends State<StatsPage> {
+  String? _selected;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final store = AppStore.instance;
-    final sessions = store.sessions;
+    final allSessions = store.sessions;
+    final sessions = _selected == null
+        ? allSessions
+        : allSessions.where((s) => s.characterName == _selected).toList();
     final messages = sessions.expand((s) => s.messages).toList();
     final chars = messages.fold<int>(0, (sum, m) => sum + m.text.length);
 
@@ -27,18 +37,21 @@ class StatsPage extends StatelessWidget {
     final maxWeek = week.fold<int>(1, (a, b) => b > a ? b : a);
 
     final perCharacter = <String, int>{};
-    for (final session in sessions) {
+    for (final session in allSessions) {
       perCharacter[session.characterName] =
           (perCharacter[session.characterName] ?? 0) + session.messages.length;
     }
-    final ranking = perCharacter.entries.toList()
+    final names = perCharacter.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
+    final ranking = _selected == null
+        ? names.take(5).toList()
+        : names.where((e) => e.key == _selected).toList();
 
     const days = ['一', '二', '三', '四', '五', '六', '日'];
     return DetailPage(
       eyebrow: 'INSIGHTS',
       title: '统计',
-      subtitle: '你写了多少，角色回了多少。',
+      subtitle: _selected == null ? '你写了多少，角色回了多少。' : '只看 $_selected。',
       children: [
         const SizedBox(height: 18),
         Glass(
@@ -131,6 +144,28 @@ class StatsPage extends StatelessWidget {
           ),
         ),
         const SectionLabel('角色'),
+        if (names.isNotEmpty) ...[
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              GlassPill(
+                label: '全部',
+                height: 30,
+                selected: _selected == null,
+                onTap: () => setState(() => _selected = null),
+              ),
+              for (final entry in names.take(8))
+                GlassPill(
+                  label: entry.key,
+                  height: 30,
+                  selected: _selected == entry.key,
+                  onTap: () => setState(() => _selected = entry.key),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
         Glass(
           radius: 24,
           blur: 24,
@@ -145,7 +180,7 @@ class StatsPage extends StatelessWidget {
                     style: appText(12.5, FontWeight.w400, p.textTertiary),
                   ),
                 ),
-              for (var i = 0; i < ranking.take(5).length; i++) ...[
+              for (var i = 0; i < ranking.length; i++) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 9),
                   child: Row(
@@ -182,7 +217,10 @@ class StatsPage extends StatelessWidget {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(3),
                               child: LinearProgressIndicator(
-                                value: ranking[i].value / ranking.first.value,
+                                value: ranking[i].value /
+                                    (ranking.first.value == 0
+                                        ? 1
+                                        : ranking.first.value),
                                 minHeight: 4,
                                 backgroundColor:
                                     p.textTertiary.withValues(alpha: .12),
@@ -200,7 +238,7 @@ class StatsPage extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (i != ranking.take(5).length - 1) const Hairline(indent: 44),
+                if (i != ranking.length - 1) const Hairline(indent: 44),
               ],
             ],
           ),

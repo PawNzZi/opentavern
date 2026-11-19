@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/character_png.dart';
 import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -47,6 +48,28 @@ class DataPage extends StatelessWidget {
     );
     if (!context.mounted) return;
     showTavernToast(context, uri == null ? '已取消导出' : '备份已导出');
+  }
+
+  Future<void> _exportCharactersPngZip(BuildContext context) async {
+    final archive = Archive();
+    for (final character in AppStore.instance.characters) {
+      final bytes = await buildCharacterCardPng(character);
+      final safe = character.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      archive.addFile(ArchiveFile('$safe.png', bytes.length, bytes));
+    }
+    final zipped = ZipEncoder().encode(archive);
+    if (zipped == null) return;
+    final uri = await FilePickerPlatform.instance.saveFile(
+      fileName: 'opentavern-character-cards.zip',
+      bytes: Uint8List.fromList(zipped),
+      mimeType: 'application/zip',
+      dialogTitle: '导出全部 PNG 角色卡',
+    );
+    if (!context.mounted) return;
+    showTavernToast(
+      context,
+      uri == null ? '已取消导出' : '已导出 ${AppStore.instance.characters.length} 张角色卡',
+    );
   }
 
   Future<void> _exportCharactersZip(BuildContext context) async {
@@ -199,8 +222,17 @@ class DataPage extends StatelessWidget {
             ),
             const Hairline(indent: 56),
             SettingRow(
+              icon: Icons.collections_bookmark_outlined,
+              title: '导出全部角色卡 PNG',
+              subtitle: '每张都带 chara / ccv3 元数据，打包为 ZIP',
+              value: '${store.characters.length} 张',
+              iconColor: p.amber,
+              onTap: () => _exportCharactersPngZip(context),
+            ),
+            const Hairline(indent: 56),
+            SettingRow(
               icon: Icons.archive_outlined,
-              title: '导出全部角色卡',
+              title: '导出全部角色卡 JSON',
               subtitle: '打包为 ZIP，内含每个角色的 V2 JSON',
               value: '${store.characters.length} 个',
               iconColor: p.violet,

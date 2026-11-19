@@ -5,7 +5,7 @@ import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../core/png_card_export.dart';
+import '../core/character_png.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/routes.dart';
@@ -330,8 +330,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
     BuildContext context,
     DemoCharacter character,
   ) async {
-    final png = await _characterPng(character);
-    final bytes = embedCardInPng(png, character.toCardJson());
+    final bytes = await buildCharacterCardPng(character);
     final uri = await FilePickerPlatform.instance.saveFile(
       fileName: '${character.name}.png',
       bytes: bytes,
