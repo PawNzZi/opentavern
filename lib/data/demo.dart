@@ -61,6 +61,8 @@ class DemoCharacter {
 
   DemoCharacter copyWith({
     String? name,
+    String? creator,
+    String? version,
     String? title,
     String? tagline,
     String? description,
@@ -85,8 +87,8 @@ class DemoCharacter {
       initial: (name ?? this.name).isEmpty ? initial : (name ?? this.name).characters.first,
       title: title ?? this.title,
       tagline: tagline ?? this.tagline,
-      creator: creator,
-      version: version,
+      creator: creator ?? this.creator,
+      version: version ?? this.version,
       description: description ?? this.description,
       greeting: greeting ?? this.greeting,
       tags: tags ?? this.tags,
