@@ -5,19 +5,24 @@ class ChatAttachment {
     required this.id,
     required this.name,
     required this.mime,
-    required this.base64,
+    this.base64 = '',
+    this.text = '',
   });
 
   final String id;
   final String name;
   final String mime;
   final String base64;
+  final String text;
+
+  bool get isImage => mime.startsWith('image/');
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'mime': mime,
         'base64': base64,
+        'text': text,
       };
 
   factory ChatAttachment.fromJson(Map<String, dynamic> json) {
@@ -26,6 +31,7 @@ class ChatAttachment {
       name: (json['name'] ?? 'image').toString(),
       mime: (json['mime'] ?? 'image/png').toString(),
       base64: (json['base64'] ?? '').toString(),
+      text: (json['text'] ?? '').toString(),
     );
   }
 }

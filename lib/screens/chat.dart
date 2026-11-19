@@ -124,6 +124,34 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Future<void> _pickFile(BuildContext sheetContext) async {
+    Navigator.of(sheetContext).pop();
+    final file = await FilePickerPlatform.instance.pickFile();
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    final name = file.name;
+    final ext = name.split('.').last.toLowerCase();
+    const textExts = {'txt', 'md', 'markdown', 'json', 'csv', 'yaml', 'yml', 'log'};
+    if (!textExts.contains(ext)) {
+      _toast('目前只支持 TXT / MD / JSON / CSV 等文本文件');
+      return;
+    }
+    var text = utf8.decode(bytes, allowMalformed: true).trim();
+    if (text.length > 20000) text = text.substring(0, 20000);
+    if (!mounted) return;
+    setState(() {
+      _hasText = true;
+      _pending.add(
+        ChatAttachment(
+          id: 'att-${DateTime.now().microsecondsSinceEpoch}',
+          name: name,
+          mime: 'text/plain',
+          text: text,
+        ),
+      );
+    });
+  }
+
   Future<void> _pickImage(BuildContext sheetContext) async {
     Navigator.of(sheetContext).pop();
     final file = await FilePickerPlatform.instance.pickFile();
@@ -195,7 +223,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         icon: Icons.attach_file_rounded,
                         label: '文件',
                         color: p.sage,
-                        onTap: () => _toast('已打开文件'),
+                        onTap: () => _pickFile(context),
                       ),
                       _AttachAction(
                         icon: Icons.photo_camera_outlined,
@@ -456,17 +484,43 @@ class _ChatScreenState extends State<ChatScreen> {
                             itemCount: _pending.length,
                             separatorBuilder: (_, __) => const SizedBox(width: 8),
                             itemBuilder: (context, i) {
+                              final att = _pending[i];
                               return Stack(
                                 children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.memory(
-                                      base64Decode(_pending[i].base64),
-                                      width: 60,
+                                  if (!att.isImage)
+                                    Container(
+                                      width: 150,
                                       height: 60,
-                                      fit: BoxFit.cover,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        color: p.textPrimary.withValues(alpha: .06),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.description_outlined, size: 18, color: p.amber),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              att.name,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: appText(10.5, FontWeight.w500, p.textPrimary),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  else
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.memory(
+                                        base64Decode(att.base64),
+                                        width: 60,
+                                        height: 60,
+                                        fit: BoxFit.cover,
+                                      ),
                                     ),
-                                  ),
                                   Positioned(
                                     right: 0,
                                     top: 0,
@@ -1530,16 +1584,65 @@ class _AttachmentStrip extends StatelessWidget {
       runSpacing: 6,
       children: [
         for (final item in attachments)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.memory(
-              base64Decode(item.base64),
-              width: 92,
-              height: 92,
-              fit: BoxFit.cover,
+          if (!item.isImage)
+            Container(
+              constraints: const BoxConstraints(maxWidth: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.black.withValues(alpha: .28),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.description_outlined, size: 16, color: Colors.white70),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      item.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 10.5, color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            GestureDetector(
+              onTap: () => _showImage(context, item.base64),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.memory(
+                  base64Decode(item.base64),
+                  width: 92,
+                  height: 92,
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
-          ),
       ],
     );
   }
+}
+
+void _showImage(BuildContext context, String data) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.zero,
+      child: GestureDetector(
+        onTap: () => Navigator.pop(context),
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 4,
+          child: Center(
+            child: Image.memory(base64Decode(data), fit: BoxFit.contain),
+          ),
+        ),
+      ),
+    ),
+  );
 }

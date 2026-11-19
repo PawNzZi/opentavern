@@ -133,14 +133,18 @@ class PromptBuilder {
       final m = session.messages[i];
       if (m.hidden || m.isSystem) continue;
       if (m.text.trim().isEmpty && m.attachments.isEmpty) continue;
-      final content = applyRegexScripts(
+      var content = applyRegexScripts(
         m.text,
         AppStore.instance.regexScripts,
         stage: 'prompt',
         characterName: character.name,
       );
+      for (final att in m.attachments.where((a) => !a.isImage)) {
+        if (att.text.trim().isEmpty) continue;
+        content += '\n\n[附件 ${att.name}]\n${att.text.trim()}';
+      }
       final includedImages = <ChatAttachment>[];
-      for (final att in m.attachments) {
+      for (final att in m.attachments.where((a) => a.isImage)) {
         if (imageCount >= 2) break;
         includedImages.add(att);
         imageCount++;
