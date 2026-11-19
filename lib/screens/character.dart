@@ -310,7 +310,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   iconColor: p.sage,
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    showTavernToast(sheetContext, '已复制角色');
+                    showTavernToast(context, '已复制角色');
                   },
                 ),
                 const Hairline(indent: 56),
@@ -320,7 +320,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   iconColor: p.violet,
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    showTavernToast(sheetContext, '已导出 PNG');
+                    showTavernToast(context, '已导出 PNG');
                   },
                 ),
                 const Hairline(indent: 56),
@@ -330,7 +330,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   iconColor: p.danger,
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    showTavernToast(sheetContext, '删除需要二次确认');
+                    showTavernToast(context, '删除需要二次确认');
                   },
                 ),
               ],
