@@ -50,6 +50,28 @@ class DataPage extends StatelessWidget {
     showTavernToast(context, uri == null ? '已取消导出' : '备份已导出');
   }
 
+  Future<void> _exportWorldsZip(BuildContext context) async {
+    final archive = Archive();
+    for (final book in AppStore.instance.lorebooks) {
+      final data = utf8.encode(AppStore.instance.exportLorebookJson(book));
+      final safe = book.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      archive.addFile(ArchiveFile('$safe.json', data.length, data));
+    }
+    final zipped = ZipEncoder().encode(archive);
+    if (zipped == null) return;
+    final uri = await FilePickerPlatform.instance.saveFile(
+      fileName: 'opentavern-worldbooks.zip',
+      bytes: Uint8List.fromList(zipped),
+      mimeType: 'application/zip',
+      dialogTitle: '导出全部世界书',
+    );
+    if (!context.mounted) return;
+    showTavernToast(
+      context,
+      uri == null ? '已取消导出' : '已导出 ${AppStore.instance.lorebooks.length} 本世界书',
+    );
+  }
+
   Future<void> _exportCharactersPngZip(BuildContext context) async {
     final archive = Archive();
     for (final character in AppStore.instance.characters) {
@@ -228,6 +250,15 @@ class DataPage extends StatelessWidget {
               value: '${store.characters.length} 张',
               iconColor: p.amber,
               onTap: () => _exportCharactersPngZip(context),
+            ),
+            const Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.menu_book_outlined,
+              title: '导出全部世界书',
+              subtitle: '打包为 ZIP，内含每本世界书的 JSON',
+              value: '${store.lorebooks.length} 本',
+              iconColor: p.sage,
+              onTap: () => _exportWorldsZip(context),
             ),
             const Hairline(indent: 56),
             SettingRow(

@@ -320,15 +320,57 @@ class _MessageHit extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Text(
-              snippet,
+            Text.rich(
+              TextSpan(
+                children: _highlightSpans(
+                  snippet,
+                  query,
+                  appText(11.5, FontWeight.w400, p.textSecondary, height: 1.4),
+                  p.amber,
+                ),
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: appText(11.5, FontWeight.w400, p.textSecondary, height: 1.4),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+List<TextSpan> _highlightSpans(
+  String text,
+  String query,
+  TextStyle style,
+  Color highlight,
+) {
+  final q = query.toLowerCase();
+  if (q.isEmpty) return [TextSpan(text: text, style: style)];
+  final lower = text.toLowerCase();
+  final spans = <TextSpan>[];
+  var start = 0;
+  while (true) {
+    final index = lower.indexOf(q, start);
+    if (index < 0) {
+      if (start < text.length) {
+        spans.add(TextSpan(text: text.substring(start), style: style));
+      }
+      break;
+    }
+    if (index > start) {
+      spans.add(TextSpan(text: text.substring(start, index), style: style));
+    }
+    spans.add(
+      TextSpan(
+        text: text.substring(index, index + q.length),
+        style: style.copyWith(
+          color: highlight,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+    start = index + q.length;
+  }
+  return spans;
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -45,6 +46,25 @@ class _LoreScreenState extends State<LoreScreen> {
     final file = await FilePickerPlatform.instance.pickFile();
     if (file == null) return;
     final bytes = await file.readAsBytes();
+    if (file.name.toLowerCase().endsWith('.zip')) {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      var imported = 0;
+      for (final entry in archive.files) {
+        if (!entry.isFile || !entry.name.toLowerCase().endsWith('.json')) {
+          continue;
+        }
+        final data = entry.content as List<int>;
+        final book = await AppStore.instance.importLorebook(
+          Uint8List.fromList(data),
+          entry.name.split('/').last,
+        );
+        if (book != null) imported++;
+      }
+      if (!mounted) return;
+      showTavernToast(context, '已导入 $imported 本世界书');
+      setState(() {});
+      return;
+    }
     final book = await AppStore.instance.importLorebook(bytes, file.name);
     if (!mounted) return;
     showTavernToast(

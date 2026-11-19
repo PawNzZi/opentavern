@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import '../chat/chat_controller.dart';
 import '../core/docx_text.dart';
 import '../core/models.dart';
+import '../core/pdf_text.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
@@ -140,10 +141,16 @@ class _ChatScreenState extends State<ChatScreen> {
         _toast('无法读取 DOCX 文本');
         return;
       }
+    } else if (ext == 'pdf') {
+      text = extractPdfText(bytes);
+      if (text == null) {
+        _toast('无法读取 PDF 文本（可能是扫描件）');
+        return;
+      }
     } else if (textExts.contains(ext)) {
       text = utf8.decode(bytes, allowMalformed: true).trim();
     } else {
-      _toast('目前支持 TXT / MD / JSON / CSV / DOCX');
+      _toast('目前支持 TXT / MD / JSON / CSV / DOCX / PDF');
       return;
     }
     var content = text!;
