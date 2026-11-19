@@ -370,6 +370,7 @@ class _ChatRow extends StatelessWidget {
               child: Portrait(
                 initial: chat.character.initial,
                 colors: chat.character.colors,
+                avatarBase64: chat.character.avatarBase64,
                 radius: 16,
                 showInitial: true,
               ),

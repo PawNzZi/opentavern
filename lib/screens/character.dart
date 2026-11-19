@@ -53,6 +53,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
             child: Portrait(
               initial: c.initial,
               colors: c.colors,
+              avatarBase64: c.avatarBase64,
               radius: 0,
             ),
           ),

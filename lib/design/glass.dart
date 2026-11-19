@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -450,15 +452,28 @@ class Portrait extends StatelessWidget {
     required this.colors,
     this.radius = 24,
     this.showInitial = true,
+    this.avatarBase64,
   });
 
   final String initial;
   final List<Color> colors;
   final double radius;
   final bool showInitial;
+  final String? avatarBase64;
+
+  Uint8List? _avatarBytes() {
+    final raw = avatarBase64;
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return base64Decode(raw);
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final avatar = _avatarBytes();
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: LayoutBuilder(
@@ -478,7 +493,16 @@ class Portrait extends StatelessWidget {
                   ),
                 ),
               ),
-              Positioned(
+              if (avatar != null)
+                Positioned.fill(
+                  child: Image.memory(
+                    avatar,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                  ),
+                ),
+              if (avatar == null)
+                Positioned(
                 right: -w * .22,
                 top: -h * .10,
                 child: _Blob(
@@ -487,7 +511,8 @@ class Portrait extends StatelessWidget {
                   blur: 34,
                 ),
               ),
-              Positioned(
+              if (avatar == null)
+                Positioned(
                 left: -w * .30,
                 bottom: -h * .12,
                 child: _Blob(
@@ -496,7 +521,8 @@ class Portrait extends StatelessWidget {
                   blur: 40,
                 ),
               ),
-              Positioned(
+              if (avatar == null)
+                Positioned(
                 left: w * .22,
                 top: h * .30,
                 child: _Blob(
@@ -519,7 +545,7 @@ class Portrait extends StatelessWidget {
                   ),
                 ),
               ),
-              if (showInitial)
+              if (showInitial && avatar == null)
                 Center(
                   child: Text(
                     initial,

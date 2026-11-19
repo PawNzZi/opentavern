@@ -513,6 +513,7 @@ class _ChatTopBar extends StatelessWidget {
             child: Portrait(
               initial: character.initial,
               colors: character.colors,
+              avatarBase64: character.avatarBase64,
               radius: 12,
             ),
           ),
@@ -665,6 +666,7 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                 child: Portrait(
                   initial: widget.character.initial,
                   colors: widget.character.colors,
+                  avatarBase64: widget.character.avatarBase64,
                   radius: 10,
                 ),
               ),
@@ -1043,6 +1045,7 @@ class _TypingRow extends StatelessWidget {
           child: Portrait(
             initial: character.initial,
             colors: character.colors,
+            avatarBase64: character.avatarBase64,
             radius: 10,
           ),
         ),

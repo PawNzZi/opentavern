@@ -98,7 +98,9 @@ class ChatSession {
     List<ChatMessage>? messages,
     this.pinned = false,
     int? updatedAt,
+    Map<String, String>? variables,
   })  : messages = messages ?? [],
+        variables = variables ?? {},
         updatedAt = updatedAt ?? DateTime.now().millisecondsSinceEpoch;
 
   final String id;
@@ -107,6 +109,7 @@ class ChatSession {
   final List<ChatMessage> messages;
   bool pinned;
   int updatedAt;
+  final Map<String, String> variables;
 
   ChatMessage? get lastMessage {
     for (var i = messages.length - 1; i >= 0; i--) {
@@ -128,6 +131,7 @@ class ChatSession {
         'title': title,
         'pinned': pinned,
         'updatedAt': updatedAt,
+        'variables': variables,
         'messages': messages.map((m) => m.toJson()).toList(),
       };
 
@@ -138,6 +142,10 @@ class ChatSession {
       title: (json['title'] ?? '新对话').toString(),
       pinned: json['pinned'] == true,
       updatedAt: (json['updatedAt'] as num?)?.toInt(),
+      variables: (json['variables'] as Map?)?.map(
+            (k, v) => MapEntry(k.toString(), v.toString()),
+          ) ??
+          {},
       messages: (json['messages'] as List?)
               ?.whereType<Map>()
               .map((e) => ChatMessage.fromJson(Map<String, dynamic>.from(e)))

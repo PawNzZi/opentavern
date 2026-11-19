@@ -1,6 +1,7 @@
 import '../data/demo.dart';
 import 'regex.dart';
 import 'store.dart';
+import 'macros.dart';
 import 'models.dart';
 
 class BuiltPrompt {
@@ -36,16 +37,12 @@ class PromptBuilder {
     required ChatSession session,
     required AppSettings settings,
   }) {
-    String macro(String input) {
-      return input
-          .replaceAll('{{char}}', character.name)
-          .replaceAll('{{user}}', settings.userName)
-          .replaceAll('{{persona}}', settings.personaName)
-          .replaceAll('{{description}}', character.description)
-          .replaceAll('{{personality}}', character.personality)
-          .replaceAll('{{scenario}}', character.scenario)
-          .replaceAll('{{mes_example}}', character.exampleDialogue);
-    }
+    String macro(String input) => MacroEngine.expand(
+          input,
+          character: character,
+          settings: settings,
+          variables: session.variables,
+        );
 
     final recentText = session.messages
         .where((m) => !m.hidden && m.text.trim().isNotEmpty)

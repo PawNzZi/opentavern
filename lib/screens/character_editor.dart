@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/store.dart';
@@ -30,6 +33,7 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
   late final TextEditingController _postHistory;
   late final TextEditingController _tags;
   late String _lorebook;
+  String? _avatarBase64;
 
   DemoCharacter get _base => widget.character ?? demoCharacters.first;
 
@@ -51,6 +55,7 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
     );
     _tags = TextEditingController(text: c?.tags.join(', ') ?? '');
     _lorebook = c?.lorebook ?? '未绑定';
+    _avatarBase64 = c?.avatarBase64;
   }
 
   @override
@@ -71,6 +76,14 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _pickAvatar() async {
+    final file = await FilePickerPlatform.instance.pickFile();
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    setState(() => _avatarBase64 = base64Encode(bytes));
   }
 
   Future<void> _pickLorebook() async {
@@ -127,6 +140,7 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
           .where((e) => e.isNotEmpty)
           .toList(),
       lorebook: _lorebook,
+      avatarBase64: _avatarBase64,
     );
     await AppStore.instance.addCharacter(updated);
     if (!mounted) return;
@@ -161,6 +175,7 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
                 child: Portrait(
                   initial: c.initial,
                   colors: c.colors,
+                  avatarBase64: c.avatarBase64,
                   radius: 18,
                 ),
               ),
@@ -175,8 +190,14 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '导入 PNG 时会保留原始头像；手动创建的卡使用配色头像。',
+                      '导入 PNG 时会保留原始头像；也可以从文件选择新头像。',
                       style: appText(9.5, FontWeight.w400, p.textTertiary),
+                    ),
+                    const SizedBox(height: 8),
+                    GlassPill(
+                      label: '更换头像',
+                      height: 30,
+                      onTap: _pickAvatar,
                     ),
                   ],
                 ),

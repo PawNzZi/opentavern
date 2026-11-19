@@ -81,6 +81,7 @@ class DemoCharacter {
     String? systemPrompt,
     String? postHistoryInstructions,
     List<String>? alternateGreetings,
+    String? avatarBase64,
   }) {
     return DemoCharacter(
       name: name ?? this.name,
@@ -105,7 +106,7 @@ class DemoCharacter {
       systemPrompt: systemPrompt ?? this.systemPrompt,
       postHistoryInstructions: postHistoryInstructions ?? this.postHistoryInstructions,
       alternateGreetings: alternateGreetings ?? this.alternateGreetings,
-      avatarBase64: avatarBase64,
+      avatarBase64: avatarBase64 ?? this.avatarBase64,
       rawJson: rawJson,
       createdAt: createdAt,
     );
