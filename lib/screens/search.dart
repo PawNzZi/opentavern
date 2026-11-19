@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../core/models.dart';
+import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
+import '../design/routes.dart';
 import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
+import 'character.dart';
+import 'chat.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -23,31 +28,57 @@ class _SearchPageState extends State<SearchPage> {
     super.dispose();
   }
 
+  DemoCharacter? _characterFor(String name) {
+    for (final c in AppStore.instance.characters) {
+      if (c.name == name) return c;
+    }
+    return null;
+  }
+
+  void _openCharacter(DemoCharacter character) {
+    openGlassPage(context, CharacterScreen(character: character));
+  }
+
+  void _openSession(ChatSession session) {
+    final character = _characterFor(session.characterName);
+    if (character == null) return;
+    openGlassPage(
+      context,
+      ChatScreen(character: character, sessionId: session.id),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final q = _query.trim().toLowerCase();
-    final characters = demoCharacters
-        .where(
-          (c) =>
-              q.isEmpty ||
-              c.name.toLowerCase().contains(q) ||
-              c.title.toLowerCase().contains(q) ||
-              c.tags.any((t) => t.toLowerCase().contains(q)),
-        )
-        .toList();
-    final chats = demoChats
-        .where(
-          (c) =>
-              q.isEmpty ||
-              c.character.name.toLowerCase().contains(q) ||
-              c.snippet.toLowerCase().contains(q),
-        )
-        .toList();
-    final messages = <(String, String)>[
-      ('是啊。王都的雨，总在预言之后来。', '21:39'),
-      ('有些坏消息，只配在雨天说。', '21:40'),
-    ].where((m) => q.isEmpty || m.$1.toLowerCase().contains(q)).toList();
+    final characters = AppStore.instance.characters.where((c) {
+      if (q.isEmpty) return false;
+      return c.name.toLowerCase().contains(q) ||
+          c.title.toLowerCase().contains(q) ||
+          c.description.toLowerCase().contains(q) ||
+          c.tags.any((t) => t.toLowerCase().contains(q));
+    }).toList();
+
+    final sessions = AppStore.instance.sessions.where((s) {
+      if (q.isEmpty) return false;
+      if (s.title.toLowerCase().contains(q)) return true;
+      if (s.characterName.toLowerCase().contains(q)) return true;
+      return s.messages.any((m) => m.text.toLowerCase().contains(q));
+    }).toList();
+
+    final hits = <(ChatSession, ChatMessage)>[];
+    if (q.isNotEmpty) {
+      for (final session in AppStore.instance.sessions) {
+        for (final message in session.messages) {
+          if (message.text.toLowerCase().contains(q)) {
+            hits.add((session, message));
+            if (hits.length >= 12) break;
+          }
+        }
+        if (hits.length >= 12) break;
+      }
+    }
 
     return DetailPage(
       eyebrow: 'SEARCH',
@@ -60,25 +91,24 @@ class _SearchPageState extends State<SearchPage> {
           autofocus: true,
           hint: '搜索角色、对话或消息',
           onChanged: (v) => setState(() => _query = v),
-          trailing: Icon(Icons.mic_none_rounded, size: 17, color: p.textTertiary),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 34,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: const [
-              GlassPill(label: '全部', selected: true, height: 34),
-              SizedBox(width: 7),
-              GlassPill(label: '角色', height: 34),
-              SizedBox(width: 7),
-              GlassPill(label: '对话', height: 34),
-              SizedBox(width: 7),
-              GlassPill(label: '消息', height: 34),
-            ],
+          trailing: Icon(
+            Icons.mic_none_rounded,
+            size: 17,
+            color: p.textTertiary,
           ),
         ),
-        if (characters.isEmpty && chats.isEmpty && messages.isEmpty)
+        const SizedBox(height: 12),
+        if (q.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            child: Center(
+              child: Text(
+                '输入关键词开始搜索本地数据',
+                style: appText(13, FontWeight.w400, p.textTertiary),
+              ),
+            ),
+          )
+        else if (characters.isEmpty && sessions.isEmpty && hits.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 50),
             child: Center(
@@ -98,7 +128,10 @@ class _SearchPageState extends State<SearchPage> {
               child: Column(
                 children: [
                   for (var i = 0; i < characters.length; i++) ...[
-                    _CharacterResult(character: characters[i]),
+                    _CharacterResult(
+                      character: characters[i],
+                      onTap: () => _openCharacter(characters[i]),
+                    ),
                     if (i != characters.length - 1)
                       const Hairline(indent: 66),
                   ],
@@ -106,7 +139,7 @@ class _SearchPageState extends State<SearchPage> {
               ),
             ),
           ],
-          if (chats.isNotEmpty) ...[
+          if (sessions.isNotEmpty) ...[
             const SectionLabel('对话'),
             Glass(
               radius: 22,
@@ -114,52 +147,58 @@ class _SearchPageState extends State<SearchPage> {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(
                 children: [
-                  for (var i = 0; i < chats.length; i++) ...[
-                    _ChatResult(chat: chats[i]),
-                    if (i != chats.length - 1) const Hairline(indent: 66),
+                  for (var i = 0; i < sessions.length; i++) ...[
+                    SettingRow(
+                      icon: Icons.forum_outlined,
+                      title: sessions[i].title,
+                      subtitle:
+                          '${sessions[i].characterName} · ${sessions[i].messages.length} 条消息',
+                      iconColor: p.amber,
+                      onTap: () => _openSession(sessions[i]),
+                    ),
+                    if (i != sessions.length - 1)
+                      const Hairline(indent: 56),
                   ],
                 ],
               ),
             ),
           ],
-          if (messages.isNotEmpty) ...[
+          if (hits.isNotEmpty) ...[
             const SectionLabel('消息'),
             Glass(
               radius: 22,
               blur: 22,
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(
                 children: [
-                  for (var i = 0; i < messages.length; i++) ...[
-                    _MessageResult(
-                      name: 'Seraphina',
-                      text: messages[i].$1,
-                      time: messages[i].$2,
+                  for (var i = 0; i < hits.length; i++) ...[
+                    _MessageHit(
+                      session: hits[i].$1,
+                      message: hits[i].$2,
                       query: _query,
+                      onTap: () => _openSession(hits[i].$1),
                     ),
-                    if (i != messages.length - 1) ...[
-                      const SizedBox(height: 12),
-                      const Hairline(),
-                      const SizedBox(height: 12),
-                    ],
+                    if (i != hits.length - 1) const Hairline(indent: 56),
                   ],
                 ],
               ),
             ),
           ],
         ],
-        const SizedBox(height: 18),
+        const SizedBox(height: 20),
         Row(
           children: [
             Text(
               '最近搜索',
-              style: appText(11, FontWeight.w600, p.textTertiary, letterSpacing: 1.2),
+              style: appText(
+                11,
+                FontWeight.w600,
+                p.textTertiary,
+                letterSpacing: 1.2,
+              ),
             ),
             const Spacer(),
-            Text(
-              '清除',
-              style: appText(10.5, FontWeight.w400, p.amber),
-            ),
+            Text('清除', style: appText(10.5, FontWeight.w400, p.amber)),
           ],
         ),
         const SizedBox(height: 8),
@@ -179,15 +218,16 @@ class _SearchPageState extends State<SearchPage> {
 }
 
 class _CharacterResult extends StatelessWidget {
-  const _CharacterResult({required this.character});
+  const _CharacterResult({required this.character, required this.onTap});
 
   final DemoCharacter character;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     return Pressable(
-      onTap: () {},
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
         child: Row(
@@ -198,6 +238,7 @@ class _CharacterResult extends StatelessWidget {
               child: Portrait(
                 initial: character.initial,
                 colors: character.colors,
+                avatarBase64: character.avatarBase64,
                 radius: 13,
               ),
             ),
@@ -232,120 +273,62 @@ class _CharacterResult extends StatelessWidget {
   }
 }
 
-class _ChatResult extends StatelessWidget {
-  const _ChatResult({required this.chat});
+class _MessageHit extends StatelessWidget {
+  const _MessageHit({
+    required this.session,
+    required this.message,
+    required this.query,
+    required this.onTap,
+  });
 
-  final DemoChat chat;
+  final ChatSession session;
+  final ChatMessage message;
+  final String query;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 42,
-            height: 42,
-            child: Portrait(
-              initial: chat.character.initial,
-              colors: chat.character.colors,
-              radius: 13,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final text = message.text.replaceAll('\n', ' ');
+    final index = text.toLowerCase().indexOf(query.toLowerCase());
+    final start = index < 0 ? 0 : (index - 18).clamp(0, text.length);
+    final end = index < 0
+        ? text.length.clamp(0, 90)
+        : (index + query.length + 40).clamp(0, text.length);
+    final snippet =
+        '${start > 0 ? '…' : ''}${text.substring(start, end)}${end < text.length ? '…' : ''}';
+    return Pressable(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      chat.character.name,
-                      style: appText(
-                        13.5,
-                        FontWeight.w500,
-                        p.textPrimary,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      chat.time,
-                      style: appText(9.5, FontWeight.w400, p.textTertiary),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
                 Text(
-                  chat.snippet,
+                  session.characterName,
+                  style: appText(12, FontWeight.w600, p.textPrimary),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  session.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: appText(10, FontWeight.w400, p.textTertiary),
+                  style: appText(9.5, FontWeight.w400, p.textTertiary),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MessageResult extends StatelessWidget {
-  const _MessageResult({
-    required this.name,
-    required this.text,
-    required this.time,
-    required this.query,
-  });
-
-  final String name;
-  final String text;
-  final String time;
-  final String query;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    final index = text.indexOf(query);
-    final base = appText(12, FontWeight.w400, p.textSecondary, height: 1.5);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
+            const SizedBox(height: 4),
             Text(
-              name,
-              style: appText(11, FontWeight.w600, p.textPrimary),
-            ),
-            const SizedBox(width: 7),
-            Text(
-              time,
-              style: appText(9.5, FontWeight.w400, p.textTertiary),
+              snippet,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: appText(11.5, FontWeight.w400, p.textSecondary, height: 1.4),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        index == -1
-            ? Text(text, style: base)
-            : Text.rich(
-                TextSpan(
-                  style: base,
-                  children: [
-                    TextSpan(text: text.substring(0, index)),
-                    TextSpan(
-                      text: query,
-                      style: base.copyWith(
-                        color: p.onUserBubble,
-                        backgroundColor: p.amber,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    TextSpan(text: text.substring(index + query.length)),
-                  ],
-                ),
-              ),
-      ],
+      ),
     );
   }
 }
