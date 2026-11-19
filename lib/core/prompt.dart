@@ -1,4 +1,5 @@
 import '../data/demo.dart';
+import 'store.dart';
 import 'models.dart';
 
 class BuiltPrompt {
@@ -122,28 +123,59 @@ class PromptBuilder {
   }
 
   static String _activateLore(DemoCharacter character, String text) {
-    final raw = character.rawJson;
-    if (raw == null) return '';
-    final data = raw['data'] is Map ? raw['data'] as Map : raw;
-    final book = data['character_book'];
-    if (book is! Map) return '';
-    final entries = book['entries'];
-    if (entries is! List) return '';
     final lower = text.toLowerCase();
-    final selected = <String>[];
-    for (final entry in entries.whereType<Map>()) {
-      if (entry['enabled'] == false) continue;
-      final keys = entry['keys'] is List
-          ? (entry['keys'] as List).map((e) => e.toString()).toList()
-          : <String>[];
-      if (keys.isEmpty) continue;
-      final matched = keys.any(
-        (k) => k.trim().isNotEmpty && lower.contains(k.toLowerCase()),
-      );
-      if (!matched) continue;
-      final content = (entry['content'] ?? '').toString().trim();
-      if (content.isNotEmpty) selected.add(content);
+    final selected = <(int, String)>[];
+
+    void scanEntries(List<LoreEntry> entries) {
+      for (final entry in entries) {
+        if (!entry.enabled || entry.content.trim().isEmpty) continue;
+        final primary = entry.constant ||
+            entry.keys.any(
+              (k) => k.trim().isNotEmpty && lower.contains(k.toLowerCase()),
+            );
+        if (!primary) continue;
+        if (entry.selective && entry.secondaryKeys.isNotEmpty) {
+          final secondary = entry.secondaryKeys.any(
+            (k) => k.trim().isNotEmpty && lower.contains(k.toLowerCase()),
+          );
+          if (!secondary) continue;
+        }
+        selected.add((entry.order, entry.content.trim()));
+      }
     }
-    return selected.take(4).join('\n\n');
+
+    for (final book in AppStore.instance.lorebooks) {
+      if (!book.enabled) continue;
+      if (!book.isGlobal && book.linked != character.name) continue;
+      scanEntries(book.entries);
+    }
+
+    // Fallback for cards that have not been imported into the lorebook store.
+    final raw = character.rawJson;
+    if (selected.isEmpty && raw != null) {
+      final data = raw['data'] is Map ? raw['data'] as Map : raw;
+      final book = data['character_book'];
+      if (book is Map) {
+        final entries = book['entries'];
+        if (entries is List) {
+          for (final entry in entries.whereType<Map>()) {
+            if (entry['enabled'] == false) continue;
+            final keys = entry['keys'] is List
+                ? (entry['keys'] as List).map((e) => e.toString()).toList()
+                : <String>[];
+            if (keys.isEmpty) continue;
+            final matched = keys.any(
+              (k) => k.trim().isNotEmpty && lower.contains(k.toLowerCase()),
+            );
+            if (!matched) continue;
+            final content = (entry['content'] ?? '').toString().trim();
+            if (content.isNotEmpty) selected.add((100, content));
+          }
+        }
+      }
+    }
+
+    selected.sort((a, b) => b.$1.compareTo(a.$1));
+    return selected.map((e) => e.$2).take(6).join('\n\n');
   }
 }

@@ -17,6 +17,7 @@ class AppStore extends ChangeNotifier {
 
   final List<DemoCharacter> characters = [];
   final List<ChatSession> sessions = [];
+  final List<Lorebook> lorebooks = [];
   AppSettings settings = const AppSettings();
 
   Directory? _dir;
@@ -39,8 +40,13 @@ class AppStore extends ChangeNotifier {
     if (characters.isEmpty) {
       characters.addAll(demoCharacters);
       await _seedSessions();
+      _seedLorebooks();
       await saveCharacters();
       await saveSessions();
+      await saveLorebooks();
+    } else if (lorebooks.isEmpty) {
+      _seedLorebooks();
+      await saveLorebooks();
     }
     _ready = true;
     notifyListeners();
@@ -59,6 +65,12 @@ class AppStore extends ChangeNotifier {
     if (chats is List) {
       for (final item in chats.whereType<Map>()) {
         sessions.add(ChatSession.fromJson(Map<String, dynamic>.from(item)));
+      }
+    }
+    final lore = await _readJson('lorebooks.json');
+    if (lore is List) {
+      for (final item in lore.whereType<Map>()) {
+        lorebooks.add(Lorebook.fromJson(Map<String, dynamic>.from(item)));
       }
     }
     final cfg = await _readJson('settings.json');
@@ -95,6 +107,46 @@ class AppStore extends ChangeNotifier {
     }
   }
 
+  void _seedLorebooks() {
+    for (final book in demoLorebooks) {
+      lorebooks.add(
+        Lorebook(
+          id: 'seed-lore-${book.name}',
+          name: book.name,
+          isGlobal: book.isGlobal,
+          linked: book.linked,
+          entries: [
+            LoreEntry(
+              id: 'seed-entry-${book.name}',
+              name: book.name,
+              keys: [book.name.split(' ').first],
+              content: '${book.name} 的设定条目。命中关键词时会注入当前对话。',
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> addLorebook(Lorebook book) async {
+    final index = lorebooks.indexWhere((b) => b.id == book.id);
+    if (index >= 0) {
+      lorebooks[index] = book;
+    } else {
+      lorebooks.add(book);
+    }
+    await saveLorebooks();
+    notifyListeners();
+  }
+
+  Future<void> saveLorebooks() async {
+    await _writeJson(
+      'lorebooks.json',
+      lorebooks.map((b) => b.toJson()).toList(),
+    );
+    notifyListeners();
+  }
+
   ChatSession sessionFor(DemoCharacter character) {
     for (final session in sessions) {
       if (session.characterName == character.name) return session;
@@ -129,8 +181,13 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<DemoCharacter?> importCard(Uint8List bytes, String fileName) async {
-    final card = parseCharacterCard(bytes, fileName);
+    var card = parseCharacterCard(bytes, fileName);
     if (card == null) return null;
+    final embedded = parseCharacterBook(card.rawJson, linked: card.name);
+    if (embedded != null) {
+      await addLorebook(embedded);
+      card = card.copyWith(lorebook: embedded.name);
+    }
     await addCharacter(card);
     return card;
   }

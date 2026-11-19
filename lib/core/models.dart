@@ -289,3 +289,116 @@ class AppSettings {
 
   String toJsonString() => jsonEncode(toJson());
 }
+
+class LoreEntry {
+  LoreEntry({
+    required this.id,
+    this.name = '',
+    this.keys = const [],
+    this.secondaryKeys = const [],
+    this.content = '',
+    this.enabled = true,
+    this.constant = false,
+    this.selective = false,
+    this.order = 100,
+    this.position = 'before',
+    this.depth = 4,
+    this.role = 'system',
+    this.comment = '',
+  });
+
+  final String id;
+  String name;
+  List<String> keys;
+  List<String> secondaryKeys;
+  String content;
+  bool enabled;
+  bool constant;
+  bool selective;
+  int order;
+  String position;
+  int depth;
+  String role;
+  String comment;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'keys': keys,
+        'secondaryKeys': secondaryKeys,
+        'content': content,
+        'enabled': enabled,
+        'constant': constant,
+        'selective': selective,
+        'order': order,
+        'position': position,
+        'depth': depth,
+        'role': role,
+        'comment': comment,
+      };
+
+  factory LoreEntry.fromJson(Map<String, dynamic> json) {
+    return LoreEntry(
+      id: (json['id'] ?? 'l${DateTime.now().microsecondsSinceEpoch}').toString(),
+      name: (json['name'] ?? '').toString(),
+      keys: (json['keys'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      secondaryKeys: (json['secondaryKeys'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      content: (json['content'] ?? '').toString(),
+      enabled: json['enabled'] != false,
+      constant: json['constant'] == true,
+      selective: json['selective'] == true,
+      order: (json['order'] as num?)?.toInt() ?? 100,
+      position: (json['position'] ?? 'before').toString(),
+      depth: (json['depth'] as num?)?.toInt() ?? 4,
+      role: (json['role'] ?? 'system').toString(),
+      comment: (json['comment'] ?? '').toString(),
+    );
+  }
+}
+
+class Lorebook {
+  Lorebook({
+    required this.id,
+    required this.name,
+    List<LoreEntry>? entries,
+    this.enabled = true,
+    this.isGlobal = false,
+    this.linked,
+    int? updatedAt,
+  })  : entries = entries ?? [],
+        updatedAt = updatedAt ?? DateTime.now().millisecondsSinceEpoch;
+
+  final String id;
+  String name;
+  final List<LoreEntry> entries;
+  bool enabled;
+  bool isGlobal;
+  String? linked;
+  int updatedAt;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'enabled': enabled,
+        'isGlobal': isGlobal,
+        'linked': linked,
+        'updatedAt': updatedAt,
+        'entries': entries.map((e) => e.toJson()).toList(),
+      };
+
+  factory Lorebook.fromJson(Map<String, dynamic> json) {
+    return Lorebook(
+      id: (json['id'] ?? 'b${DateTime.now().microsecondsSinceEpoch}').toString(),
+      name: (json['name'] ?? '未命名世界书').toString(),
+      enabled: json['enabled'] != false,
+      isGlobal: json['isGlobal'] == true,
+      linked: json['linked']?.toString(),
+      updatedAt: (json['updatedAt'] as num?)?.toInt(),
+      entries: (json['entries'] as List?)
+              ?.whereType<Map>()
+              .map((e) => LoreEntry.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          [],
+    );
+  }
+}

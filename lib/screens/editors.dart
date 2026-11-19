@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -7,26 +8,60 @@ import '../design/settings_kit.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
 
-class PersonaEditorSheet extends StatelessWidget {
+class PersonaEditorSheet extends StatefulWidget {
   const PersonaEditorSheet({super.key, this.persona});
-
   final DemoPersona? persona;
+
+  @override
+  State<PersonaEditorSheet> createState() => _PersonaEditorSheetState();
+}
+
+class _PersonaEditorSheetState extends State<PersonaEditorSheet> {
+  late final TextEditingController _name;
+  late final TextEditingController _description;
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = AppStore.instance.settings;
+    _name = TextEditingController(text: widget.persona?.name ?? settings.personaName);
+    _description = TextEditingController(
+      text: widget.persona?.description ?? settings.personaDescription,
+    );
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _name.text.trim().isEmpty ? '旅人' : _name.text.trim();
+    final settings = AppStore.instance.settings.copyWith(
+      userName: name,
+      personaName: name,
+      personaDescription: _description.text.trim(),
+    );
+    AppStore.instance.settings = settings;
+    await AppStore.instance.saveSettings();
+    if (!mounted) return;
+    showTavernToast(context, '人格已保存');
+    Navigator.of(context).maybePop();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final item = persona ?? demoPersonas.first;
     return SheetStage(
       title: '编辑人格',
       subtitle: '决定 {{user}} 是谁',
-      heightFactor: .9,
+      heightFactor: .86,
       footer: GlassPrimaryButton(
         label: '保存人格',
         icon: Icons.check_rounded,
-        onTap: () {
-          showTavernToast(context, '人格已保存');
-          Navigator.of(context).maybePop();
-        },
+        onTap: _save,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -34,73 +69,33 @@ class PersonaEditorSheet extends StatelessWidget {
           Row(
             children: [
               SizedBox(
-                width: 66,
-                height: 66,
+                width: 64,
+                height: 64,
                 child: Portrait(
-                  initial: item.initial,
-                  colors: item.colors,
-                  radius: 20,
+                  initial: _name.text.isEmpty ? '旅' : _name.text.characters.first,
+                  colors: const [Color(0xFF8C4A3F), Color(0xFFD98E5F), Color(0xFF3B1E2A)],
+                  radius: 19,
                 ),
               ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '头像与名字',
-                      style: appText(14, FontWeight.w500, p.textPrimary),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '头像会出现在聊天与人格列表',
-                      style: appText(10, FontWeight.w400, p.textTertiary),
-                    ),
-                    const SizedBox(height: 7),
-                    const GlassPill(label: '更换头像', height: 30),
-                  ],
-                ),
+              const SizedBox(width: 12),
+              Text(
+                '这个身份会出现在 Prompt 的 {{user}} 中。',
+                style: appText(11, FontWeight.w400, p.textTertiary),
               ),
             ],
           ),
-          _EditorField(label: '名字', value: item.name),
-          _EditorField(
+          const SizedBox(height: 12),
+          _LiveField(label: '名字', controller: _name, hint: '旅人'),
+          _LiveField(
             label: '描述',
-            value: item.description,
-            maxLines: 4,
-          ),
-          SettingsGroup(
-            title: '行为',
-            children: [
-              SwitchLine(
-                title: '设为默认人格',
-                subtitle: '新聊天默认使用',
-                value: item.isDefault,
-              ),
-              Hairline(indent: 14),
-              SegmentLine(
-                title: '描述注入',
-                options: ['提示词内', '作者笔记上', '深度'],
-                index: 0,
-              ),
-              Hairline(indent: 14),
-              StepperRow(
-                title: '注入深度',
-                value: '4',
-              ),
-              Hairline(indent: 14),
-              SettingRow(
-                icon: Icons.auto_stories_rounded,
-                title: '人格世界书',
-                value: '未绑定',
-                iconColor: Color(0xFF8FD0BE),
-                onTap: null,
-              ),
-            ],
+            controller: _description,
+            hint: '一个在各地旅行的记录者，习惯先观察再开口。',
+            maxLines: 5,
           ),
           const SizedBox(height: 10),
-          const HintCard(
-            text: '人格描述会作为 {{persona}} 进入提示词；锁定到某个聊天后，该聊天不会跟随默认人格切换。',
+          Text(
+            '人格保存在本机设置中，所有聊天共用。',
+            style: appText(10.5, FontWeight.w400, p.textTertiary),
           ),
         ],
       ),
@@ -500,16 +495,45 @@ class PromptEditorSheet extends StatelessWidget {
   }
 }
 
-class AuthorNoteSheet extends StatelessWidget {
+class AuthorNoteSheet extends StatefulWidget {
   const AuthorNoteSheet({super.key});
+
+  @override
+  State<AuthorNoteSheet> createState() => _AuthorNoteSheetState();
+}
+
+class _AuthorNoteSheetState extends State<AuthorNoteSheet> {
+  late final TextEditingController _content;
+
+  @override
+  void initState() {
+    super.initState();
+    _content = TextEditingController(text: AppStore.instance.settings.authorNote);
+  }
+
+  @override
+  void dispose() {
+    _content.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    AppStore.instance.settings = AppStore.instance.settings.copyWith(
+      authorNote: _content.text.trim(),
+    );
+    await AppStore.instance.saveSettings();
+    if (!mounted) return;
+    showTavernToast(context, '作者笔记已更新');
+    Navigator.of(context).maybePop();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     return SheetStage(
       title: '作者笔记',
-      subtitle: '只对当前聊天生效',
-      heightFactor: .78,
+      subtitle: '会作为系统提示注入当前对话',
+      heightFactor: .76,
       leading: Container(
         width: 38,
         height: 38,
@@ -517,69 +541,26 @@ class AuthorNoteSheet extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           color: p.rose.withValues(alpha: .16),
         ),
-        child: Icon(
-          Icons.sticky_note_2_outlined,
-          size: 18,
-          color: p.rose,
-        ),
+        child: Icon(Icons.sticky_note_2_outlined, size: 18, color: p.rose),
       ),
       footer: GlassPrimaryButton(
         label: '保存笔记',
         icon: Icons.check_rounded,
-        onTap: () {
-          showTavernToast(context, '作者笔记已更新');
-          Navigator.of(context).maybePop();
-        },
+        onTap: _save,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _EditorField(
+          _LiveField(
             label: '内容',
-            value: '保持叙事节奏，多描写环境与身体语言，避免替用户做决定。',
-            maxLines: 5,
-          ),
-          const StepperRow(
-            title: '插入间隔',
-            subtitle: '每 N 条消息注入一次',
-            value: '3 条',
-          ),
-          const _Label('位置'),
-          Glass(
-            radius: 16,
-            blur: 18,
-            shadow: false,
-            padding: const EdgeInsets.all(4),
-            child: Row(
-              children: const [
-                _EditorSegment(label: '笔记上'),
-                _EditorSegment(label: '笔记下'),
-                _EditorSegment(label: '深度', selected: true),
-              ],
-            ),
-          ),
-          const StepperRow(
-            title: '深度',
-            value: '4',
-          ),
-          const _Label('角色'),
-          Glass(
-            radius: 16,
-            blur: 18,
-            shadow: false,
-            padding: const EdgeInsets.all(4),
-            child: Row(
-              children: const [
-                _EditorSegment(label: '系统', selected: true),
-                _EditorSegment(label: '用户'),
-                _EditorSegment(label: '角色'),
-              ],
-            ),
+            controller: _content,
+            hint: '保持叙事节奏，多描写环境与身体语言，避免替用户做决定。',
+            maxLines: 7,
           ),
           const SizedBox(height: 10),
-          const HintCard(
-            text: '作者笔记适合放「风格指令」，不要放世界观设定；设定请写进世界书。',
-            color: Color(0xFFEE9AA8),
+          Text(
+            '留空表示不使用作者笔记。',
+            style: appText(10.5, FontWeight.w400, p.textTertiary),
           ),
         ],
       ),
@@ -684,6 +665,53 @@ class _EditorSegment extends StatelessWidget {
             selected ? FontWeight.w600 : FontWeight.w400,
             selected ? p.amber : p.textSecondary,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveField extends StatelessWidget {
+  const _LiveField({
+    required this.label,
+    required this.controller,
+    required this.hint,
+    this.maxLines = 1,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String hint;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Glass(
+        radius: 18,
+        blur: 18,
+        shadow: false,
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: appText(10.5, FontWeight.w500, p.textTertiary)),
+            const SizedBox(height: 4),
+            TextField(
+              controller: controller,
+              maxLines: maxLines,
+              style: appText(14, FontWeight.w400, p.textPrimary, height: 1.45),
+              cursorColor: p.amber,
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                hintText: hint,
+                hintStyle: appText(12.5, FontWeight.w400, p.textTertiary),
+              ),
+            ),
+          ],
         ),
       ),
     );

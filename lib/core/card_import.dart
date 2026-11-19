@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../data/demo.dart';
+import 'models.dart';
 
 /// Parses a SillyTavern V2/V3 character card from a PNG (tEXt/iTXt `chara` or
 /// `ccv3` chunk) or a plain JSON file.
@@ -103,3 +104,58 @@ String? _pngCardJson(Uint8List b) {
 
 int _u32(Uint8List b, int o) =>
     (b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3];
+
+Lorebook? parseCharacterBook(Map<String, dynamic>? raw, {String? linked}) {
+  if (raw == null) return null;
+  final data = raw['data'] is Map ? raw['data'] as Map : raw;
+  final book = data['character_book'];
+  if (book is! Map) return null;
+  final entries = book['entries'];
+  if (entries is! List || entries.isEmpty) return null;
+  final result = <LoreEntry>[];
+  for (final entry in entries.whereType<Map>()) {
+    final keys = (entry['keys'] as List?)
+            ?.map((e) => e.toString())
+            .where((e) => e.trim().isNotEmpty)
+            .toList() ??
+        [];
+    final content = (entry['content'] ?? '').toString().trim();
+    if (keys.isEmpty || content.isEmpty) continue;
+    final ext = entry['extensions'] is Map
+        ? Map<String, dynamic>.from(entry['extensions'] as Map)
+        : const <String, dynamic>{};
+    result.add(
+      LoreEntry(
+        id: 'lore-${DateTime.now().microsecondsSinceEpoch}-${result.length}',
+        name: (entry['name'] ?? entry['comment'] ?? keys.first).toString(),
+        keys: keys,
+        secondaryKeys: (entry['secondary_keys'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
+        content: content,
+        enabled: entry['enabled'] != false,
+        constant: entry['constant'] == true,
+        selective: entry['selective'] == true,
+        order: (entry['insertion_order'] as num?)?.toInt() ??
+            (entry['order'] as num?)?.toInt() ??
+            100,
+        position: (entry['position'] == 'after_char' ||
+                entry['position'] == 1 ||
+                ext['position'] == 1)
+            ? 'after'
+            : 'before',
+        depth: (ext['depth'] as num?)?.toInt() ?? 4,
+        role: (ext['role'] ?? 'system').toString(),
+        comment: (entry['comment'] ?? '').toString(),
+      ),
+    );
+  }
+  if (result.isEmpty) return null;
+  return Lorebook(
+    id: 'book-${DateTime.now().microsecondsSinceEpoch}',
+    name: (book['name'] ?? linked ?? '角色世界书').toString(),
+    linked: linked,
+    entries: result,
+  );
+}
