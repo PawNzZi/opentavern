@@ -10,12 +10,36 @@ import '../design/routes.dart';
 import '../design/theme.dart';
 import 'editors.dart';
 
-class AutomationPage extends StatelessWidget {
+class AutomationPage extends StatefulWidget {
   const AutomationPage({super.key});
+
+  @override
+  State<AutomationPage> createState() => _AutomationPageState();
+}
+
+class _AutomationPageState extends State<AutomationPage> {
+  final _query = TextEditingController();
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final q = _query.text.trim().toLowerCase();
+    final macros = demoMacros.where((m) {
+      if (q.isEmpty) return true;
+      return m.name.toLowerCase().contains(q) ||
+          m.description.toLowerCase().contains(q) ||
+          m.args.toLowerCase().contains(q);
+    }).toList();
+    final localVars = <String>{};
+    for (final session in AppStore.instance.sessions) {
+      localVars.addAll(session.variables.keys);
+    }
     return DetailPage(
       eyebrow: 'AUTOMATION',
       title: '正则与宏',
@@ -61,17 +85,21 @@ class AutomationPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        const SearchField(hint: '搜索宏，例如 random、getvar'),
+        SearchField(
+          hint: '搜索宏，例如 random、getvar',
+          controller: _query,
+          onChanged: (_) => setState(() {}),
+        ),
         SettingsGroup(
           title: '宏浏览器',
           trailing: Text(
-            '13 / 120',
+            '${macros.length} 个',
             style: appText(11, FontWeight.w400, p.textTertiary),
           ),
           children: [
-            for (var i = 0; i < demoMacros.length; i++) ...[
-              _MacroRow(item: demoMacros[i]),
-              if (i != demoMacros.length - 1) const Hairline(indent: 12),
+            for (var i = 0; i < macros.length; i++) ...[
+              _MacroRow(item: macros[i]),
+              if (i != macros.length - 1) const Hairline(indent: 12),
             ],
           ],
         ),
@@ -81,7 +109,7 @@ class AutomationPage extends StatelessWidget {
             SettingRow(
               icon: Icons.data_object_rounded,
               title: '局部变量',
-              value: '12 个 · 当前聊天',
+              value: '${localVars.length} 个 · 全部聊天',
               iconColor: p.violet,
               onTap: () {},
             ),
@@ -89,7 +117,7 @@ class AutomationPage extends StatelessWidget {
             SettingRow(
               icon: Icons.public_rounded,
               title: '全局变量',
-              value: '6 个 · 跨聊天',
+              value: '未启用',
               iconColor: p.amber,
               onTap: () {},
             ),
@@ -97,36 +125,8 @@ class AutomationPage extends StatelessWidget {
             SettingRow(
               icon: Icons.delete_outline_rounded,
               title: '清理未使用变量',
-              value: '扫描',
+              value: '未启用',
               iconColor: p.rose,
-              onTap: () {},
-            ),
-          ],
-        ),
-        SettingsGroup(
-          title: '脚本',
-          children: [
-            SettingRow(
-              icon: Icons.code_rounded,
-              title: 'STscript 片段',
-              value: '3 个',
-              iconColor: p.sage,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.play_circle_outline_rounded,
-              title: '快捷回复脚本',
-              value: '5 个按钮',
-              iconColor: p.amber,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.bug_report_outlined,
-              title: '命令调试台',
-              value: '最近 12 条',
-              iconColor: p.violet,
               onTap: () {},
             ),
           ],

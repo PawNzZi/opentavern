@@ -36,7 +36,28 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
   late String _lorebook;
   String? _avatarBase64;
 
-  DemoCharacter get _base => widget.character ?? demoCharacters.first;
+  DemoCharacter get _base =>
+      widget.character ??
+      const DemoCharacter(
+        name: '',
+        initial: '?',
+        title: '',
+        tagline: '',
+        creator: '本地',
+        version: '1.0',
+        description: '',
+        greeting: '',
+        tags: [],
+        lorebook: '未绑定',
+        preset: '',
+        chats: 0,
+        tokens: '0',
+        colors: [
+          Color(0xFF8C4A3F),
+          Color(0xFFD98E5F),
+          Color(0xFF3B1E2A),
+        ],
+      );
 
   @override
   void initState() {
