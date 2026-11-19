@@ -104,149 +104,119 @@ class _PersonaEditorSheetState extends State<PersonaEditorSheet> {
   }
 }
 
-class RegexEditorSheet extends StatelessWidget {
+class RegexEditorSheet extends StatefulWidget {
   const RegexEditorSheet({super.key, this.script});
+  final RegexScript? script;
 
-  final DemoRegex? script;
+  @override
+  State<RegexEditorSheet> createState() => _RegexEditorSheetState();
+}
+
+class _RegexEditorSheetState extends State<RegexEditorSheet> {
+  late final TextEditingController _name;
+  late final TextEditingController _find;
+  late final TextEditingController _replace;
+  late String _placement;
+  late bool _enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.script;
+    _name = TextEditingController(text: s?.name ?? '');
+    _find = TextEditingController(text: s?.find ?? '');
+    _replace = TextEditingController(text: s?.replace ?? '');
+    _placement = s?.placement ?? 'both';
+    _enabled = s?.enabled ?? true;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _find.dispose();
+    _replace.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_find.text.trim().isEmpty) {
+      showTavernToast(context, '请填写匹配表达式');
+      return;
+    }
+    final script = widget.script ??
+        RegexScript(
+          id: 'regex-${DateTime.now().microsecondsSinceEpoch}',
+          name: '新正则',
+          find: '',
+          replace: '',
+        );
+    script
+      ..name = _name.text.trim().isEmpty ? '未命名正则' : _name.text.trim()
+      ..find = _find.text.trim()
+      ..replace = _replace.text
+      ..placement = _placement
+      ..enabled = _enabled;
+    if (widget.script == null) AppStore.instance.regexScripts.add(script);
+    await AppStore.instance.saveRegexes();
+    if (!mounted) return;
+    showTavernToast(context, '正则已保存');
+    Navigator.of(context).maybePop();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final item = script ?? demoRegexes.first;
     return SheetStage(
       title: '编辑正则',
-      subtitle: '确定性的文本改写',
-      heightFactor: .95,
+      subtitle: '确定性的文本替换',
+      heightFactor: .88,
       footer: GlassPrimaryButton(
         label: '保存正则',
         icon: Icons.check_rounded,
-        onTap: () {
-          showTavernToast(context, '正则已保存');
-          Navigator.of(context).maybePop();
-        },
+        onTap: _save,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _EditorField(label: '名称', value: item.name),
-          _EditorField(
-            label: '查找（支持 /pattern/flags）',
-            value: item.find,
-            mono: true,
+          _LiveField(label: '名称', controller: _name, hint: '去除多余空行'),
+          _LiveField(
+            label: '匹配表达式',
+            controller: _find,
+            hint: r'/\n{3,}/g',
           ),
-          _EditorField(
+          _LiveField(
             label: '替换为',
-            value: item.replace,
-            mono: true,
+            controller: _replace,
+            hint: r'\n\n',
           ),
-          const _Label('作用位置'),
-          Wrap(
-            spacing: 7,
-            runSpacing: 7,
-            children: const [
-              GlassPill(label: '用户输入', height: 32, selected: true),
-              GlassPill(label: 'AI 输出', height: 32, selected: true),
-              GlassPill(label: '斜杠命令', height: 32),
-              GlassPill(label: '世界书', height: 32),
-              GlassPill(label: '推理', height: 32),
-              GlassPill(label: '仅显示', height: 32),
-            ],
-          ),
-          const _Label('作用域'),
-          Glass(
-            radius: 16,
-            blur: 18,
-            shadow: false,
-            padding: const EdgeInsets.all(4),
-            child: Row(
-              children: const [
-                _EditorSegment(label: '全局', selected: true),
-                _EditorSegment(label: '角色'),
-                _EditorSegment(label: '预设'),
-              ],
-            ),
-          ),
+          const SizedBox(height: 10),
           SettingsGroup(
-            title: '选项',
-            children: const [
+            title: '作用域',
+            children: [
               SwitchLine(
                 title: '启用',
-                value: true,
+                value: _enabled,
+                onChanged: (v) => setState(() => _enabled = v),
               ),
-              Hairline(indent: 14),
-              SwitchLine(
-                title: '仅影响显示',
-                subtitle: '不改写发给模型的内容',
-                value: false,
-              ),
-              Hairline(indent: 14),
-              SwitchLine(
-                title: '仅影响 Prompt',
-                subtitle: '聊天里仍显示原文',
-                value: false,
-              ),
-              Hairline(indent: 14),
-              SwitchLine(
-                title: '编辑后重新执行',
-                value: true,
+              const Hairline(indent: 14),
+              SegmentLine(
+                title: '应用到',
+                options: const ['仅显示', '仅 Prompt', '两者'],
+                index: _placement == 'display'
+                    ? 0
+                    : _placement == 'prompt'
+                        ? 1
+                        : 2,
+                onChanged: (i) => setState(
+                  () => _placement = ['display', 'prompt', 'both'][i],
+                ),
               ),
             ],
           ),
-          const _Label('测试'),
-          Glass(
-            radius: 16,
-            blur: 18,
-            shadow: false,
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '输入示例',
-                  style: appText(9.5, FontWeight.w500, p.textTertiary),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '王都的雨下了三天。\n\n\n\n占星师没有出门。',
-                  style: appText(
-                    12,
-                    FontWeight.w400,
-                    p.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Hairline(),
-                const SizedBox(height: 8),
-                Text(
-                  '输出',
-                  style: appText(9.5, FontWeight.w500, p.textTertiary),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '王都的雨下了三天。\n\n占星师没有出门。',
-                  style: appText(
-                    12,
-                    FontWeight.w400,
-                    p.textPrimary,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: const [
-              GlassPill(
-                label: '运行测试',
-                icon: Icons.play_arrow_rounded,
-                height: 34,
-                selected: true,
-              ),
-              SizedBox(width: 8),
-              GlassPill(label: '从模板新建', height: 34),
-            ],
+          const SizedBox(height: 10),
+          Text(
+            '表达式支持 /pattern/flags 形式；无效正则会自动跳过。',
+            style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
           ),
         ],
       ),

@@ -20,6 +20,7 @@ class AppStore extends ChangeNotifier {
   final List<Lorebook> lorebooks = [];
   final List<QuickReplySet> quickReplySets = [];
   final List<PromptPreset> presets = [];
+  final List<RegexScript> regexScripts = [];
   String activePresetId = '';
   String activeQuickSetId = '';
   AppSettings settings = const AppSettings();
@@ -47,6 +48,7 @@ class AppStore extends ChangeNotifier {
       _seedLorebooks();
       _seedQuickReplies();
       _seedPresets();
+      _seedRegexes();
       await saveCharacters();
       await saveSessions();
       await saveLorebooks();
@@ -61,6 +63,10 @@ class AppStore extends ChangeNotifier {
     if (presets.isEmpty) {
       _seedPresets();
       await savePresets();
+    }
+    if (regexScripts.isEmpty) {
+      _seedRegexes();
+      await saveRegexes();
     }
     _ready = true;
     notifyListeners();
@@ -93,6 +99,14 @@ class AppStore extends ChangeNotifier {
       for (final item in (qr['sets'] as List? ?? []).whereType<Map>()) {
         quickReplySets.add(
           QuickReplySet.fromJson(Map<String, dynamic>.from(item)),
+        );
+      }
+    }
+    final rx = await _readJson('regex.json');
+    if (rx is List) {
+      for (final item in rx.whereType<Map>()) {
+        regexScripts.add(
+          RegexScript.fromJson(Map<String, dynamic>.from(item)),
         );
       }
     }
@@ -195,6 +209,35 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _seedRegexes() {
+    for (final item in demoRegexes) {
+      final placement = item.placement.contains('仅显示')
+          ? 'display'
+          : item.placement.contains('输入')
+              ? 'prompt'
+              : 'both';
+      regexScripts.add(
+        RegexScript(
+          id: 'seed-regex-${item.name}',
+          name: item.name,
+          find: item.find,
+          replace: item.replace,
+          enabled: item.enabled,
+          placement: placement,
+          scope: item.scope,
+        ),
+      );
+    }
+  }
+
+  Future<void> saveRegexes() async {
+    await _writeJson(
+      'regex.json',
+      regexScripts.map((r) => r.toJson()).toList(),
+    );
+    notifyListeners();
+  }
+
   PromptPreset? get activePreset {
     for (final preset in presets) {
       if (preset.id == activePresetId) return preset;
@@ -232,6 +275,7 @@ class AppStore extends ChangeNotifier {
     await _writeJson('presets.json', {
       'active': activePresetId,
       'presets': presets.map((p) => p.toJson()).toList(),
+      'regexes': regexScripts.map((r) => r.toJson()).toList(),
     });
     notifyListeners();
   }
@@ -419,6 +463,15 @@ class AppStore extends ChangeNotifier {
           );
         activeQuickSetId = (data['activeQuickSetId'] ?? '').toString();
       }
+      if (data['regexes'] is List) {
+        regexScripts
+          ..clear()
+          ..addAll(
+            (data['regexes'] as List)
+                .whereType<Map>()
+                .map((e) => RegexScript.fromJson(Map<String, dynamic>.from(e))),
+          );
+      }
       if (data['presets'] is List) {
         presets
           ..clear()
@@ -435,6 +488,7 @@ class AppStore extends ChangeNotifier {
       await saveLorebooks();
       await saveQuickReplies();
       await savePresets();
+      await saveRegexes();
       notifyListeners();
       return true;
     } catch (_) {

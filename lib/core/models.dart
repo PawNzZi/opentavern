@@ -546,3 +546,49 @@ class PromptPreset {
     );
   }
 }
+
+class RegexScript {
+  RegexScript({
+    required this.id,
+    required this.name,
+    required this.find,
+    required this.replace,
+    this.enabled = true,
+    this.placement = 'display',
+    this.scope = '全局',
+    this.caseSensitive = false,
+  });
+
+  final String id;
+  String name;
+  String find;
+  String replace;
+  bool enabled;
+  String placement;
+  String scope;
+  bool caseSensitive;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'find': find,
+        'replace': replace,
+        'enabled': enabled,
+        'placement': placement,
+        'scope': scope,
+        'caseSensitive': caseSensitive,
+      };
+
+  factory RegexScript.fromJson(Map<String, dynamic> json) {
+    return RegexScript(
+      id: (json['id'] ?? 'r${DateTime.now().microsecondsSinceEpoch}').toString(),
+      name: (json['name'] ?? '').toString(),
+      find: (json['find'] ?? '').toString(),
+      replace: (json['replace'] ?? '').toString(),
+      enabled: json['enabled'] != false,
+      placement: (json['placement'] ?? 'display').toString(),
+      scope: (json['scope'] ?? '全局').toString(),
+      caseSensitive: json['caseSensitive'] == true,
+    );
+  }
+}

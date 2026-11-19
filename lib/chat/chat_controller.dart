@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../core/llm.dart';
 import '../core/models.dart';
 import '../core/prompt.dart';
+import '../core/regex.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 
@@ -143,7 +144,12 @@ class ChatController extends ChangeNotifier {
     final message = streamingMessage;
     if (message != null) {
       final text = message.text.trim();
-      message.text = text.isEmpty ? '……' : text;
+      final cleaned = applyRegexScripts(
+        text.isEmpty ? '……' : text,
+        AppStore.instance.regexScripts,
+        stage: 'display',
+      );
+      message.text = cleaned;
       message.time = _time();
       if (_regenerating) {
         if (message.swipes.isEmpty ||

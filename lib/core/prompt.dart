@@ -1,4 +1,5 @@
 import '../data/demo.dart';
+import 'regex.dart';
 import 'store.dart';
 import 'models.dart';
 
@@ -120,14 +121,19 @@ class PromptBuilder {
       final m = session.messages[i];
       if (m.hidden || m.isSystem) continue;
       if (m.text.trim().isEmpty) continue;
-      final tokens = estimateTokens(m.text) + 4;
+      final content = applyRegexScripts(
+        m.text,
+        AppStore.instance.regexScripts,
+        stage: 'prompt',
+      );
+      final tokens = estimateTokens(content) + 4;
       if (used + tokens > maxPrompt) {
         dropped = i + 1;
         break;
       }
       history.add({
         'role': m.isUser ? 'user' : 'assistant',
-        'content': m.text,
+        'content': content,
       });
       used += tokens;
     }

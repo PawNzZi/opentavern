@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -25,6 +29,31 @@ class DataPage extends StatelessWidget {
       return;
     }
     final ok = await AppStore.instance.importBackup(data.text!);
+    if (!context.mounted) return;
+    showTavernToast(context, ok ? '备份已恢复' : '备份格式不正确');
+  }
+
+  Future<void> _exportFile(BuildContext context) async {
+    final bytes = Uint8List.fromList(
+      utf8.encode(AppStore.instance.exportBackup()),
+    );
+    final uri = await FilePickerPlatform.instance.saveFile(
+      fileName: 'opentavern-backup.json',
+      bytes: bytes,
+      mimeType: 'application/json',
+      dialogTitle: '导出 OpenTavern 备份',
+    );
+    if (!context.mounted) return;
+    showTavernToast(context, uri == null ? '已取消导出' : '备份已导出');
+  }
+
+  Future<void> _importFile(BuildContext context) async {
+    final file = await FilePickerPlatform.instance.pickFile();
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    final ok = await AppStore.instance.importBackup(
+      utf8.decode(bytes, allowMalformed: true),
+    );
     if (!context.mounted) return;
     showTavernToast(context, ok ? '备份已恢复' : '备份格式不正确');
   }
@@ -126,11 +155,29 @@ class DataPage extends StatelessWidget {
           title: '备份',
           children: [
             SettingRow(
-              icon: Icons.upload_file_rounded,
-              title: '导出完整备份',
-              subtitle: '复制为 JSON，包含角色、聊天、世界书、预设与设置',
+              icon: Icons.save_alt_rounded,
+              title: '导出备份到文件',
+              subtitle: '保存完整 JSON 到文件 App / iCloud Drive',
               value: '$kb KB',
               iconColor: p.amber,
+              onTap: () => _exportFile(context),
+            ),
+            const Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.upload_file_rounded,
+              title: '从文件恢复',
+              subtitle: '选择之前导出的 JSON 备份',
+              value: 'JSON',
+              iconColor: p.sage,
+              onTap: () => _importFile(context),
+            ),
+            const Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.content_copy_rounded,
+              title: '复制备份到剪贴板',
+              subtitle: '包含角色、聊天、世界书、预设与设置',
+              value: 'JSON',
+              iconColor: p.violet,
               onTap: () => _export(context),
             ),
             const Hairline(indent: 56),
@@ -139,7 +186,7 @@ class DataPage extends StatelessWidget {
               title: '从剪贴板恢复',
               subtitle: '会覆盖当前本地数据',
               value: 'JSON',
-              iconColor: p.sage,
+              iconColor: p.rose,
               onTap: () => _import(context),
             ),
           ],

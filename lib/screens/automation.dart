@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/models.dart';
+import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -19,36 +21,44 @@ class AutomationPage extends StatelessWidget {
       title: '正则与宏',
       subtitle: '确定性的文本改写，和不写代码的 Prompt 编程。',
       children: [
-        SettingsGroup(
-          title: '正则脚本',
-          trailing: Text(
-            '4 个 · 3 启用',
-            style: appText(11, FontWeight.w400, p.textTertiary),
-          ),
-          footnote: '按作用域与顺序执行；可以只改显示，或只改发给模型的内容。',
-          children: [
-            for (var i = 0; i < demoRegexes.length; i++) ...[
-              _RegexRow(
-                item: demoRegexes[i],
+        AnimatedBuilder(
+          animation: AppStore.instance,
+          builder: (context, _) => SettingsGroup(
+            title: '正则脚本',
+            trailing: Text(
+              '${AppStore.instance.regexScripts.length} 个 · ${AppStore.instance.regexScripts.where((r) => r.enabled).length} 启用',
+              style: appText(11, FontWeight.w400, p.textTertiary),
+            ),
+            footnote: '按作用域与顺序执行；可以只改显示，或只改发给模型的内容。',
+            children: [
+              for (var i = 0; i < AppStore.instance.regexScripts.length; i++) ...[
+                _RegexRow(
+                  item: AppStore.instance.regexScripts[i],
+                  onTap: () => openGlassPage(
+                    context,
+                    RegexEditorSheet(script: AppStore.instance.regexScripts[i]),
+                  ),
+                  onToggle: (v) async {
+                    AppStore.instance.regexScripts[i].enabled = v;
+                    await AppStore.instance.saveRegexes();
+                  },
+                ),
+                if (i != AppStore.instance.regexScripts.length - 1)
+                  const Hairline(indent: 12),
+              ],
+              const Hairline(indent: 12),
+              SettingRow(
+                icon: Icons.add_rounded,
+                title: '新建正则',
+                value: '从空白 / 模板',
+                iconColor: p.amber,
                 onTap: () => openGlassPage(
                   context,
-                  RegexEditorSheet(script: demoRegexes[i]),
+                  const RegexEditorSheet(),
                 ),
               ),
-              if (i != demoRegexes.length - 1) const Hairline(indent: 12),
             ],
-            const Hairline(indent: 12),
-            SettingRow(
-              icon: Icons.add_rounded,
-              title: '新建正则',
-              value: '从空白 / 模板',
-              iconColor: p.amber,
-              onTap: () => openGlassPage(
-                context,
-                const RegexEditorSheet(),
-              ),
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: 14),
         const SearchField(hint: '搜索宏，例如 random、getvar'),
@@ -132,22 +142,31 @@ class AutomationPage extends StatelessWidget {
 }
 
 class _RegexRow extends StatelessWidget {
-  const _RegexRow({required this.item, this.onTap});
+  const _RegexRow({required this.item, this.onTap, this.onToggle});
 
-  final DemoRegex item;
+  final RegexScript item;
   final VoidCallback? onTap;
+  final ValueChanged<bool>? onToggle;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return Opacity(
-      opacity: item.enabled ? 1 : .45,
-      child: Pressable(
-        onTap: onTap,
-        child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+    return Pressable(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 9, 12, 9),
         child: Row(
           children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: p.violet.withValues(alpha: .15),
+              ),
+              child: Icon(Icons.find_replace_rounded, size: 17, color: p.violet),
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,11 +178,7 @@ class _RegexRow extends StatelessWidget {
                           item.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: appText(
-                            13.5,
-                            FontWeight.w500,
-                            p.textPrimary,
-                          ),
+                          style: appText(13.5, FontWeight.w500, p.textPrimary),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -184,21 +199,20 @@ class _RegexRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    item.placement,
-                    style: appText(
-                      9,
-                      FontWeight.w500,
-                      p.amber.withValues(alpha: .8),
-                    ),
+                    item.placement == 'display'
+                        ? '仅显示'
+                        : item.placement == 'prompt'
+                            ? '仅 Prompt'
+                            : '显示与 Prompt',
+                    style: appText(9, FontWeight.w500, p.amber.withValues(alpha: .8)),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            TavernSwitch(value: item.enabled, onChanged: (_) {}),
+            TavernSwitch(value: item.enabled, onChanged: onToggle),
           ],
         ),
-      ),
       ),
     );
   }
