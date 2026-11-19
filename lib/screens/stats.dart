@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../data/demo.dart';
+import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
@@ -12,7 +12,28 @@ class StatsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    const week = [.42, .58, .36, .74, .92, .66, .8];
+    final store = AppStore.instance;
+    final sessions = store.sessions;
+    final messages = sessions.expand((s) => s.messages).toList();
+    final chars = messages.fold<int>(0, (sum, m) => sum + m.text.length);
+
+    final now = DateTime.now();
+    final week = List<int>.filled(7, 0);
+    for (final m in messages) {
+      final d = DateTime.fromMillisecondsSinceEpoch(m.createdAt);
+      final diff = now.difference(DateTime(d.year, d.month, d.day)).inDays;
+      if (diff >= 0 && diff < 7) week[6 - diff]++;
+    }
+    final maxWeek = week.fold<int>(1, (a, b) => b > a ? b : a);
+
+    final perCharacter = <String, int>{};
+    for (final session in sessions) {
+      perCharacter[session.characterName] =
+          (perCharacter[session.characterName] ?? 0) + session.messages.length;
+    }
+    final ranking = perCharacter.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
     const days = ['一', '二', '三', '四', '五', '六', '日'];
     return DetailPage(
       eyebrow: 'INSIGHTS',
@@ -25,10 +46,21 @@ class StatsPage extends StatelessWidget {
           blur: 24,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           child: Row(
-            children: const [
-              Expanded(child: MiniStat(value: '90', label: '段对话')),
-              Expanded(child: MiniStat(value: '1,102', label: '条消息')),
-              Expanded(child: MiniStat(value: '295k', label: '字')),
+            children: [
+              Expanded(
+                child: MiniStat(value: '${sessions.length}', label: '段对话'),
+              ),
+              Expanded(
+                child: MiniStat(value: '${messages.length}', label: '条消息'),
+              ),
+              Expanded(
+                child: MiniStat(
+                  value: chars > 1000
+                      ? '${(chars / 1000).toStringAsFixed(1)}k'
+                      : '$chars',
+                  label: '字',
+                ),
+              ),
             ],
           ),
         ),
@@ -50,7 +82,7 @@ class StatsPage extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             Container(
-                              height: 72 * week[i],
+                              height: 72 * (week[i] / maxWeek),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(7),
                                 gradient: LinearGradient(
@@ -85,13 +117,13 @@ class StatsPage extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    '本周 1,102 条',
+                    '本周 ${week.fold<int>(0, (a, b) => a + b)} 条',
                     style: appText(10.5, FontWeight.w500, p.textSecondary),
                   ),
                   const Spacer(),
                   Text(
-                    '较上周 +18%',
-                    style: appText(10.5, FontWeight.w600, p.sage),
+                    '${sessions.where((s) => s.pinned).length} 个置顶会话',
+                    style: appText(10.5, FontWeight.w500, p.textTertiary),
                   ),
                 ],
               ),
@@ -105,7 +137,15 @@ class StatsPage extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
           child: Column(
             children: [
-              for (final stat in demoStats) ...[
+              if (ranking.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    '还没有聊天数据',
+                    style: appText(12.5, FontWeight.w400, p.textTertiary),
+                  ),
+                ),
+              for (var i = 0; i < ranking.take(5).length; i++) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 9),
                   child: Row(
@@ -114,147 +154,63 @@ class StatsPage extends StatelessWidget {
                         width: 34,
                         height: 34,
                         child: Portrait(
-                          initial: stat.name.characters.first,
-                          colors: stat.colors,
+                          initial: ranking[i].key.isEmpty
+                              ? '?'
+                              : ranking[i].key.characters.first,
+                          colors: const [
+                            Color(0xFF8C4A3F),
+                            Color(0xFFD98E5F),
+                            Color(0xFF3B1E2A),
+                          ],
                           radius: 11,
                         ),
                       ),
-                      const SizedBox(width: 11),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Text(
-                                  stat.name,
-                                  style: appText(
-                                    13,
-                                    FontWeight.w500,
-                                    p.textPrimary,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  '${stat.messages} 条 · ${stat.words} 字',
-                                  style: appText(
-                                    9.5,
-                                    FontWeight.w400,
-                                    p.textTertiary,
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              ranking[i].key,
+                              style: appText(
+                                13.5,
+                                FontWeight.w500,
+                                p.textPrimary,
+                              ),
                             ),
-                            const SizedBox(height: 6),
-                            ProgressLine(
-                              value: stat.ratio,
-                              height: 4,
-                              color: stat.colors.last,
+                            const SizedBox(height: 3),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: LinearProgressIndicator(
+                                value: ranking[i].value / ranking.first.value,
+                                minHeight: 4,
+                                backgroundColor:
+                                    p.textTertiary.withValues(alpha: .12),
+                                valueColor: AlwaysStoppedAnimation(p.amber),
+                              ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '${ranking[i].value}',
+                        style: appText(11.5, FontWeight.w600, p.textSecondary),
+                      ),
                     ],
                   ),
                 ),
-                if (stat != demoStats.last) const Hairline(),
+                if (i != ranking.take(5).length - 1) const Hairline(indent: 44),
               ],
             ],
           ),
         ),
-        SettingsGroup(
-          title: '模型用量 · 本月',
-          children: [
-            _ModelUsage(
-              name: 'Claude Sonnet 4.5',
-              value: .52,
-              tokens: '128k',
-              color: p.amber,
-            ),
-            const Hairline(indent: 14),
-            _ModelUsage(
-              name: 'DeepSeek V4',
-              value: .28,
-              tokens: '69k',
-              color: p.violet,
-            ),
-            const Hairline(indent: 14),
-            _ModelUsage(
-              name: '本地 Ollama',
-              value: .20,
-              tokens: '49k',
-              color: p.sage,
-            ),
-          ],
-        ),
-        SettingsGroup(
-          title: '导出',
-          children: const [
-            SettingRow(
-              icon: Icons.table_chart_outlined,
-              title: '导出 CSV',
-              value: '按角色 / 按天',
-              iconColor: Color(0xFFF0B36A),
-              onTap: null,
-            ),
-            Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.restart_alt_rounded,
-              title: '重建统计',
-              subtitle: '从聊天文件重新计算',
-              value: '大约 2 秒',
-              iconColor: Color(0xFFEE9AA8),
-              onTap: null,
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        const HintCard(
-          text: '统计只在本机计算，不上传。重建统计不会修改聊天内容，只会重算消息数、字数与耗时。',
-          color: Color(0xFF8FD0BE),
+        const SizedBox(height: 12),
+        Text(
+          '统计来自本地会话；删除会话后数字会同步减少。',
+          style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
         ),
       ],
-    );
-  }
-}
-
-class _ModelUsage extends StatelessWidget {
-  const _ModelUsage({
-    required this.name,
-    required this.value,
-    required this.tokens,
-    required this.color,
-  });
-
-  final String name;
-  final double value;
-  final String tokens;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Text(
-                name,
-                style: appText(12.5, FontWeight.w500, p.textPrimary),
-              ),
-              const Spacer(),
-              Text(
-                tokens,
-                style: appText(10, FontWeight.w400, p.textTertiary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 7),
-          ProgressLine(value: value, height: 4, color: color),
-        ],
-      ),
     );
   }
 }

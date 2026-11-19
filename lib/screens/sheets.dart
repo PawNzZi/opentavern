@@ -248,19 +248,27 @@ class ImportSheetScreen extends StatelessWidget {
       subtitle: '支持 SillyTavern 角色卡、世界书与聊天记录',
       heightFactor: .72,
       footer: GlassPrimaryButton(
-        label: '选择角色卡文件',
+        label: '选择角色卡（可多选）',
         icon: Icons.folder_open_rounded,
         onTap: () async {
-          final file = await FilePickerPlatform.instance.pickFile();
-          if (file == null) return;
-          final bytes = await file.readAsBytes();
-          final card = await AppStore.instance.importCard(bytes, file.name);
-          if (!context.mounted) return;
-          if (card == null) {
-            showTavernToast(context, '不是有效的 SillyTavern 角色卡');
-            return;
+          final files = await FilePickerPlatform.instance.pickFiles();
+          if (files.isEmpty) return;
+          var imported = 0;
+          var failed = 0;
+          for (final file in files) {
+            final bytes = await file.readAsBytes();
+            final card = await AppStore.instance.importCard(bytes, file.name);
+            if (card == null) {
+              failed++;
+            } else {
+              imported++;
+            }
           }
-          showTavernToast(context, '已导入 ${card.name}');
+          if (!context.mounted) return;
+          showTavernToast(
+            context,
+            failed == 0 ? '已导入 $imported 个角色' : '导入 $imported 个，失败 $failed 个',
+          );
           Navigator.of(context).maybePop();
         },
       ),
