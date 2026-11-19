@@ -73,11 +73,45 @@ class DataPage extends StatelessWidget {
   }
 
   Future<void> _exportCharactersPngZip(BuildContext context) async {
+    final characters = AppStore.instance.characters.toList();
+    final progress = ValueNotifier<int>(0);
+    final dialog = showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('正在导出角色卡'),
+        content: ValueListenableBuilder<int>(
+          valueListenable: progress,
+          builder: (context, value, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LinearProgressIndicator(
+                value: characters.isEmpty ? 1 : value / characters.length,
+              ),
+              const SizedBox(height: 10),
+              Text('$value / ${characters.length}'),
+            ],
+          ),
+        ),
+      ),
+    );
+    await WidgetsBinding.instance.endOfFrame;
     final archive = Archive();
-    for (final character in AppStore.instance.characters) {
-      final bytes = await buildCharacterCardPng(character);
-      final safe = character.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      archive.addFile(ArchiveFile('$safe.png', bytes.length, bytes));
+    try {
+      for (var i = 0; i < characters.length; i++) {
+        final character = characters[i];
+        final bytes = await buildCharacterCardPng(character);
+        final safe = character.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+        archive.addFile(ArchiveFile('$safe.png', bytes.length, bytes));
+        progress.value = i + 1;
+      }
+    } finally {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      await dialog;
+      progress.dispose();
     }
     final zipped = ZipEncoder().encode(archive);
     if (zipped == null) return;

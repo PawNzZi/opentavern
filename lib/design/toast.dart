@@ -75,3 +75,35 @@ class _ToastViewState extends State<_ToastView>
     );
   }
 }
+
+Future<void> showImportFailures(
+  BuildContext context,
+  List<String> failures,
+) async {
+  if (failures.isEmpty) return;
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('导入失败'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final name in failures)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: SelectableText(name),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('关闭'),
+        ),
+      ],
+    ),
+  );
+}

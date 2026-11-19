@@ -268,10 +268,12 @@ class ImportSheetScreen extends StatelessWidget {
           final failed = failedNames.length;
           showTavernToast(
             context,
-            failed == 0
-                ? '已导入 $imported 个角色'
-                : '导入 $imported 个，失败 $failed 个：${failedNames.take(3).join('、')}',
+            failed == 0 ? '已导入 $imported 个角色' : '导入 $imported 个，失败 $failed 个',
           );
+          if (failedNames.isNotEmpty) {
+            await showImportFailures(context, failedNames);
+          }
+          if (!context.mounted) return;
           Navigator.of(context).maybePop();
         },
       ),

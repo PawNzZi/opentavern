@@ -70,8 +70,12 @@ class _LoreScreenState extends State<LoreScreen> {
         context,
         failed.isEmpty
             ? '已导入 $imported 本世界书'
-            : '导入 $imported 本，失败 ${failed.length} 个：${failed.take(3).join('、')}',
+            : '导入 $imported 本，失败 ${failed.length} 个',
       );
+      if (failed.isNotEmpty) {
+        await showImportFailures(context, failed);
+      }
+      if (!mounted) return;
       setState(() {});
       return;
     }
