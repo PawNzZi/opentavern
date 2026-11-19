@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
+final ValueNotifier<bool> glassScrolling = ValueNotifier<bool>(false);
+
 /// A frosted, rim-lit pane. The building block of the whole interface.
 ///
 /// The material is deliberately restrained: one blur, one gradient, one
@@ -48,6 +50,14 @@ class Glass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: glassScrolling,
+      builder: (context, scrolling, _) =>
+          _buildPane(context, blur > 0 && !scrolling),
+    );
+  }
+
+  Widget _buildPane(BuildContext context, bool allowBlur) {
     final p = AppPalette.of(context);
     final br = BorderRadius.circular(radius);
     final base = tint ?? Colors.white;
@@ -102,7 +112,7 @@ class Glass extends StatelessWidget {
       ),
     );
 
-    if (blur > 0) {
+    if (allowBlur) {
       pane = ClipRRect(
         borderRadius: br,
         child: BackdropFilter(

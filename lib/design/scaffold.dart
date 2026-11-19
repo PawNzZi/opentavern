@@ -1,7 +1,32 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'glass.dart';
 import 'theme.dart';
+
+Timer? _glassScrollTimer;
+
+void _pulseGlassScroll() {
+  glassScrolling.value = true;
+  _glassScrollTimer?.cancel();
+  _glassScrollTimer = Timer(const Duration(milliseconds: 180), () {
+    glassScrolling.value = false;
+  });
+}
+
+class TavernRootScope extends InheritedWidget {
+  const TavernRootScope({super.key, required this.enabled, required super.child});
+
+  final bool enabled;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<TavernRootScope>()?.enabled ??
+      false;
+
+  @override
+  bool updateShouldNotify(TavernRootScope oldWidget) => enabled != oldWidget.enabled;
+}
 
 class TavernScaffold extends StatelessWidget {
   const TavernScaffold({
@@ -20,44 +45,55 @@ class TavernScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: resizeToAvoidBottomInset,
-      body: AuroraBackground(
-        intensity: intensity,
-        child: Stack(
-          children: [
-            Positioned.fill(child: child),
-            if (bottomNavigation != null)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: 144,
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          p.canvasTop.withValues(alpha: 0),
-                          p.canvasTop.withValues(alpha: .92),
-                        ],
-                      ),
-                    ),
+    final isNested = TavernRootScope.of(context);
+    final content = bottomNavigation != null
+        ? TavernRootScope(enabled: true, child: child)
+        : child;
+    final body = Stack(
+      children: [
+        Positioned.fill(child: content),
+        if (bottomNavigation != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 144,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      p.canvasTop.withValues(alpha: 0),
+                      p.canvasTop.withValues(alpha: .92),
+                    ],
                   ),
                 ),
               ),
-            if (bottomNavigation != null)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: bottomNavigation!,
-              ),
-          ],
-        ),
+            ),
+          ),
+        if (bottomNavigation != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: bottomNavigation!,
+          ),
+      ],
+    );
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        _pulseGlassScroll();
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: resizeToAvoidBottomInset,
+        body: isNested
+            ? body
+            : AuroraBackground(intensity: intensity, child: body),
       ),
     );
   }

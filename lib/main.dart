@@ -336,23 +336,22 @@ class _RootShellState extends State<RootShell> {
           TabSpec(Icons.tune_rounded, '设置'),
         ],
       ),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 260),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, .02),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            ),
-          );
-        },
-        child: KeyedSubtree(key: ValueKey(_index), child: _body()),
+      child: IndexedStack(
+        index: _index,
+        children: [
+          LibraryScreen(
+            onOpenCharacter: (c) => _push(CharacterScreen(character: c)),
+            onOpenChat: (c) => _push(ChatScreen(character: c)),
+            onImport: () => _push(const ImportSheetScreen()),
+          ),
+          ChatsScreen(
+            onOpenChat: (c) => _push(ChatScreen(character: c)),
+            onSearch: () => _push(const SearchPage()),
+          ),
+          SettingsScreen(
+            onOpenConnect: () => _push(const ConnectSheetScreen()),
+          ),
+        ],
       ),
     );
   }
