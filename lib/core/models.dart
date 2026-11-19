@@ -466,3 +466,83 @@ class QuickReplySet {
     );
   }
 }
+
+class PromptEntry {
+  PromptEntry({
+    required this.id,
+    required this.name,
+    this.content = '',
+    this.role = 'system',
+    this.enabled = true,
+    this.order = 100,
+  });
+
+  final String id;
+  String name;
+  String content;
+  String role;
+  bool enabled;
+  int order;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'content': content,
+        'role': role,
+        'enabled': enabled,
+        'order': order,
+      };
+
+  factory PromptEntry.fromJson(Map<String, dynamic> json) {
+    return PromptEntry(
+      id: (json['id'] ?? 'p${DateTime.now().microsecondsSinceEpoch}').toString(),
+      name: (json['name'] ?? '').toString(),
+      content: (json['content'] ?? '').toString(),
+      role: (json['role'] ?? 'system').toString(),
+      enabled: json['enabled'] != false,
+      order: (json['order'] as num?)?.toInt() ?? 100,
+    );
+  }
+}
+
+class PromptPreset {
+  PromptPreset({
+    required this.id,
+    required this.name,
+    this.mainPrompt = '',
+    List<PromptEntry>? entries,
+    this.temperature = .85,
+    this.maxTokens = 512,
+  }) : entries = entries ?? [];
+
+  final String id;
+  String name;
+  String mainPrompt;
+  final List<PromptEntry> entries;
+  double temperature;
+  int maxTokens;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'mainPrompt': mainPrompt,
+        'temperature': temperature,
+        'maxTokens': maxTokens,
+        'entries': entries.map((e) => e.toJson()).toList(),
+      };
+
+  factory PromptPreset.fromJson(Map<String, dynamic> json) {
+    return PromptPreset(
+      id: (json['id'] ?? 'pp${DateTime.now().microsecondsSinceEpoch}').toString(),
+      name: (json['name'] ?? '默认预设').toString(),
+      mainPrompt: (json['mainPrompt'] ?? '').toString(),
+      temperature: (json['temperature'] as num?)?.toDouble() ?? .85,
+      maxTokens: (json['maxTokens'] as num?)?.toInt() ?? 512,
+      entries: (json['entries'] as List?)
+              ?.whereType<Map>()
+              .map((e) => PromptEntry.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          [],
+    );
+  }
+}

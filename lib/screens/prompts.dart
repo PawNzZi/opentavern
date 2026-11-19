@@ -1,245 +1,348 @@
 import 'package:flutter/material.dart';
 
-import '../data/demo.dart';
+import '../core/models.dart';
+import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
-import '../design/routes.dart';
 import '../design/theme.dart';
-import 'editors.dart';
+import '../design/toast.dart';
 
-class PromptManagerPage extends StatelessWidget {
-  const PromptManagerPage({super.key});
+class PromptManagerPage extends StatefulWidget {
+  const PromptManagerPage({super.key, this.preset});
+
+  final PromptPreset? preset;
+
+  @override
+  State<PromptManagerPage> createState() => _PromptManagerPageState();
+}
+
+class _PromptManagerPageState extends State<PromptManagerPage> {
+  PromptPreset get _preset =>
+      widget.preset ?? AppStore.instance.activePreset!;
+
+  @override
+  void initState() {
+    super.initState();
+    AppStore.instance.addListener(_sync);
+  }
+
+  @override
+  void dispose() {
+    AppStore.instance.removeListener(_sync);
+    super.dispose();
+  }
+
+  void _sync() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _add() async {
+    final entry = PromptEntry(
+      id: 'entry-${DateTime.now().microsecondsSinceEpoch}',
+      name: '新条目 ${_preset.entries.length + 1}',
+      content: '',
+      order: (_preset.entries.length + 1) * 10,
+    );
+    _preset.entries.add(entry);
+    await AppStore.instance.savePresets();
+    if (!mounted) return;
+    await openEntry(entry);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> openEntry(PromptEntry entry) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _PromptEntryPage(preset: _preset, entry: entry),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final total = demoPrompts.fold<int>(0, (sum, item) => sum + item.tokens);
+    final entries = [..._preset.entries]
+      ..sort((a, b) => a.order.compareTo(b.order));
     return DetailPage(
       eyebrow: 'PROMPT MANAGER',
       title: '提示词',
-      subtitle: '决定模型看到什么，以及按什么顺序看到。',
-      footer: const GlassPrimaryButton(
-        label: '保存顺序',
-        icon: Icons.check_rounded,
+      subtitle: _preset.name,
+      footer: GlassPrimaryButton(
+        label: '添加提示词条目',
+        icon: Icons.add_rounded,
+        onTap: _add,
       ),
       children: [
         const SizedBox(height: 16),
         Glass(
           radius: 24,
           blur: 24,
-          padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Text(
-                    '长夜 · 叙事',
-                    style: appText(15, FontWeight.w600, p.textPrimary),
-                  ),
-                  const SizedBox(width: 7),
-                  const TagBadge('Chat Completion'),
-                  const Spacer(),
-                  Text(
-                    '预算 8k',
-                    style: appText(10.5, FontWeight.w400, p.textTertiary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '$total',
-                    style: appText(
-                      30,
-                      FontWeight.w700,
-                      p.amber,
-                      letterSpacing: -1,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 5, left: 4),
-                    child: Text(
-                      '/ 8192 tokens',
-                      style: appText(11, FontWeight.w400, p.textTertiary),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${(total / 8192 * 100).toStringAsFixed(0)}%',
-                    style: appText(12, FontWeight.w600, p.textSecondary),
-                  ),
-                ],
+              Text('主提示词', style: appText(14, FontWeight.w600, p.textPrimary)),
+              const SizedBox(height: 6),
+              Text(
+                _preset.mainPrompt.trim().isEmpty
+                    ? '未设置，将使用设置中的全局主提示词。'
+                    : _preset.mainPrompt,
+                maxLines: 5,
+                overflow: TextOverflow.ellipsis,
+                style: appText(12, FontWeight.w400, p.textSecondary, height: 1.5),
               ),
               const SizedBox(height: 8),
-              ProgressLine(value: total / 8192),
+              Align(
+                alignment: Alignment.centerRight,
+                child: GlassPill(
+                  label: '编辑主提示词',
+                  height: 30,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => _MainPromptPage(preset: _preset),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 14),
-        ActionGrid(
-          items: [
-            ActionSpec(
-              icon: Icons.receipt_long_rounded,
-              label: '拆分',
-              color: p.amber,
-              onTap: () {},
-            ),
-            ActionSpec(
-              icon: Icons.code_rounded,
-              label: '原始',
-              color: p.sage,
-              onTap: () {},
-            ),
-            ActionSpec(
-              icon: Icons.difference_rounded,
-              label: '对比',
-              color: p.violet,
-              onTap: () {},
-            ),
-            ActionSpec(
-              icon: Icons.copy_rounded,
-              label: '复制',
-              color: p.rose,
-              onTap: () {},
-            ),
-          ],
-        ),
         SettingsGroup(
-          title: '提示词顺序',
-          footnote: '拖动左侧手柄调整顺序；开关只影响当前预设。灰色是运行时填充的占位条目。',
-          trailing: Text(
-            '12 条',
-            style: appText(11, FontWeight.w400, p.textTertiary),
-          ),
+          title: '附加提示词',
           children: [
-            for (final prompt in demoPrompts)
-              _PromptRow(
-                prompt: prompt,
-                onTap: () => openGlassPage(
-                  context,
-                  PromptEditorSheet(prompt: prompt),
-                ),
+            for (var i = 0; i < entries.length; i++) ...[
+              SettingRow(
+                icon: Icons.subject_rounded,
+                title: entries[i].name,
+                subtitle: '${entries[i].role} · order ${entries[i].order}',
+                value: entries[i].enabled ? '启用' : '关闭',
+                iconColor: entries[i].enabled ? p.amber : p.textTertiary,
+                onTap: () async {
+                  await openEntry(entries[i]);
+                  if (mounted) setState(() {});
+                },
               ),
-            const Hairline(indent: 52),
-            SettingRow(
-              icon: Icons.add_rounded,
-              title: '添加提示词',
-              value: '从模板 / 空白',
-              iconColor: p.amber,
-              onTap: () => openGlassPage(
-                context,
-                const PromptEditorSheet(),
-              ),
-            ),
+              if (i != entries.length - 1) const Hairline(indent: 56),
+            ],
           ],
         ),
-        const SizedBox(height: 18),
-        HintCard(
-          text: '提示词条目有稳定 ID（如 main、worldInfoBefore），角色覆盖与预设迁移都依赖它。重命名只改显示名，不要改 ID。',
-          color: p.sage,
+        const SizedBox(height: 12),
+        Text(
+          '启用的 system 条目会追加到系统提示；user/assistant 条目会作为额外上下文插入历史之前。',
+          style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
         ),
       ],
     );
   }
 }
 
-class _PromptRow extends StatelessWidget {
-  const _PromptRow({required this.prompt, this.onTap});
+class _MainPromptPage extends StatefulWidget {
+  const _MainPromptPage({required this.preset});
+  final PromptPreset preset;
 
-  final DemoPrompt prompt;
-  final VoidCallback? onTap;
+  @override
+  State<_MainPromptPage> createState() => _MainPromptPageState();
+}
+
+class _MainPromptPageState extends State<_MainPromptPage> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.preset.mainPrompt);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    widget.preset.mainPrompt = _controller.text.trim();
+    await AppStore.instance.savePresets();
+    if (!mounted) return;
+    showTavernToast(context, '主提示词已保存');
+    Navigator.of(context).maybePop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SheetStage(
+      title: '主提示词',
+      subtitle: widget.preset.name,
+      footer: GlassPrimaryButton(
+        label: '保存',
+        icon: Icons.check_rounded,
+        onTap: _save,
+      ),
+      child: TextField(
+        controller: _controller,
+        minLines: 8,
+        maxLines: 20,
+        style: appText(14, FontWeight.w400, AppPalette.of(context).textPrimary, height: 1.6),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          hintText: '你正在扮演 {{char}}…',
+        ),
+      ),
+    );
+  }
+}
+
+class _PromptEntryPage extends StatefulWidget {
+  const _PromptEntryPage({required this.preset, required this.entry});
+  final PromptPreset preset;
+  final PromptEntry entry;
+
+  @override
+  State<_PromptEntryPage> createState() => _PromptEntryPageState();
+}
+
+class _PromptEntryPageState extends State<_PromptEntryPage> {
+  late final TextEditingController _name;
+  late final TextEditingController _content;
+  late final TextEditingController _order;
+  late String _role;
+  late bool _enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.entry.name);
+    _content = TextEditingController(text: widget.entry.content);
+    _order = TextEditingController(text: '${widget.entry.order}');
+    _role = widget.entry.role;
+    _enabled = widget.entry.enabled;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _content.dispose();
+    _order.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final entry = widget.entry;
+    entry
+      ..name = _name.text.trim().isEmpty ? '未命名条目' : _name.text.trim()
+      ..content = _content.text.trim()
+      ..role = _role
+      ..enabled = _enabled
+      ..order = int.tryParse(_order.text.trim()) ?? entry.order;
+    if (widget.preset.entries.every((e) => e.id != entry.id)) {
+      widget.preset.entries.add(entry);
+    }
+    await AppStore.instance.savePresets();
+    if (!mounted) return;
+    showTavernToast(context, '提示词已保存');
+    Navigator.of(context).maybePop();
+  }
+
+  Future<void> _delete() async {
+    widget.preset.entries.removeWhere((e) => e.id == widget.entry.id);
+    await AppStore.instance.savePresets();
+    if (!mounted) return;
+    Navigator.of(context).maybePop();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final alpha = prompt.enabled ? 1.0 : .4;
-    return Opacity(
-      opacity: alpha,
-      child: Pressable(
-        onTap: onTap,
-        child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 10, 8),
-        child: Row(
-          children: [
-            Icon(
-              Icons.drag_indicator_rounded,
-              size: 16,
-              color: p.textTertiary,
-            ),
-            const SizedBox(width: 4),
-            SizedBox(
-              width: 28,
-              child: Text(
-                prompt.role,
-                style: appText(
-                  8.5,
-                  FontWeight.w700,
-                  prompt.role == 'SYS' ? p.amber : p.sage,
-                  letterSpacing: .4,
+    return SheetStage(
+      title: '编辑提示词',
+      subtitle: widget.preset.name,
+      heightFactor: .9,
+      footer: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GlassPrimaryButton(
+            label: '保存条目',
+            icon: Icons.check_rounded,
+            onTap: _save,
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _delete,
+            child: Text('删除条目', style: appText(12, FontWeight.w500, p.danger)),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PromptField(label: '名称', controller: _name),
+          _PromptField(label: '内容', controller: _content, maxLines: 8),
+          _PromptField(label: '顺序（数字越小越前）', controller: _order),
+          const SizedBox(height: 8),
+          SettingsGroup(
+            title: '行为',
+            children: [
+              SwitchLine(
+                title: '启用',
+                value: _enabled,
+                onChanged: (v) => setState(() => _enabled = v),
+              ),
+              const Hairline(indent: 14),
+              SegmentLine(
+                title: '角色',
+                options: const ['system', 'user', 'assistant'],
+                index: _role == 'user' ? 1 : (_role == 'assistant' ? 2 : 0),
+                onChanged: (i) => setState(
+                  () => _role = ['system', 'user', 'assistant'][i],
                 ),
               ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          prompt.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: appText(
-                            13,
-                            FontWeight.w500,
-                            p.textPrimary,
-                          ),
-                        ),
-                      ),
-                      if (prompt.marker) ...[
-                        const SizedBox(width: 5),
-                        Icon(
-                          Icons.bolt_rounded,
-                          size: 11,
-                          color: p.textTertiary,
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text(
-                        '${prompt.tokens} tokens',
-                        style: appText(9.5, FontWeight.w400, p.textTertiary),
-                      ),
-                      if (prompt.injection) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          '@D${prompt.depth}',
-                          style: appText(9.5, FontWeight.w600, p.violet),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PromptField extends StatelessWidget {
+  const _PromptField({
+    required this.label,
+    required this.controller,
+    this.maxLines = 1,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Glass(
+        radius: 18,
+        blur: 18,
+        shadow: false,
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: appText(10.5, FontWeight.w500, p.textTertiary)),
+            const SizedBox(height: 4),
+            TextField(
+              controller: controller,
+              maxLines: maxLines,
+              style: appText(14, FontWeight.w400, p.textPrimary, height: 1.45),
+              cursorColor: p.amber,
+              decoration: const InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
               ),
-            ),
-            TavernSwitch(value: prompt.enabled, onChanged: (_) {}),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 16,
-              color: p.textTertiary,
             ),
           ],
         ),
-      ),
       ),
     );
   }

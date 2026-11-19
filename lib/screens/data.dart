@@ -1,20 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
+import '../design/toast.dart';
 
 class DataPage extends StatelessWidget {
   const DataPage({super.key});
 
+  Future<void> _export(BuildContext context) async {
+    final data = AppStore.instance.exportBackup();
+    await Clipboard.setData(ClipboardData(text: data));
+    if (!context.mounted) return;
+    showTavernToast(context, '备份已复制到剪贴板');
+  }
+
+  Future<void> _import(BuildContext context) async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data == null || data.text == null || data.text!.trim().isEmpty) {
+      if (context.mounted) showTavernToast(context, '剪贴板里没有备份数据');
+      return;
+    }
+    final ok = await AppStore.instance.importBackup(data.text!);
+    if (!context.mounted) return;
+    showTavernToast(context, ok ? '备份已恢复' : '备份格式不正确');
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final store = AppStore.instance;
+    final backup = store.exportBackup();
+    final kb = (backup.length / 1024).toStringAsFixed(1);
     return DetailPage(
       eyebrow: 'DATA & BACKUP',
       title: '数据与备份',
-      subtitle: '你的数据只在这台设备上，也随时可以带走。',
+      subtitle: '所有数据都在本机；可完整导出与恢复。',
       children: [
         const SizedBox(height: 18),
         Glass(
@@ -27,12 +51,12 @@ class DataPage extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    '存储空间',
+                    '本地数据',
                     style: appText(14, FontWeight.w500, p.textPrimary),
                   ),
                   const Spacer(),
                   Text(
-                    '128 MB',
+                    '$kb KB',
                     style: appText(15, FontWeight.w700, p.textPrimary),
                   ),
                 ],
@@ -76,162 +100,68 @@ class DataPage extends StatelessWidget {
                 spacing: 16,
                 runSpacing: 6,
                 children: [
-                  _Legend(color: p.amber, label: '聊天 59 MB'),
-                  _Legend(color: p.violet, label: '角色 31 MB'),
-                  _Legend(color: p.sage, label: '图片 23 MB'),
-                  _Legend(color: p.rose, label: '其他 15 MB'),
+                  _Legend(
+                    color: p.amber,
+                    label: '角色 ${store.characters.length}',
+                  ),
+                  _Legend(
+                    color: p.violet,
+                    label: '会话 ${store.sessions.length}',
+                  ),
+                  _Legend(
+                    color: p.sage,
+                    label: '世界书 ${store.lorebooks.length}',
+                  ),
+                  _Legend(
+                    color: p.rose,
+                    label: '预设 ${store.presets.length}',
+                  ),
                 ],
               ),
             ],
           ),
         ),
+        const SizedBox(height: 14),
         SettingsGroup(
-          title: '导入',
+          title: '备份',
+          children: [
+            SettingRow(
+              icon: Icons.upload_file_rounded,
+              title: '导出完整备份',
+              subtitle: '复制为 JSON，包含角色、聊天、世界书、预设与设置',
+              value: '$kb KB',
+              iconColor: p.amber,
+              onTap: () => _export(context),
+            ),
+            const Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.download_rounded,
+              title: '从剪贴板恢复',
+              subtitle: '会覆盖当前本地数据',
+              value: 'JSON',
+              iconColor: p.sage,
+              onTap: () => _import(context),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        SettingsGroup(
+          title: '存储位置',
           children: const [
             SettingRow(
-              icon: Icons.person_add_alt_rounded,
-              title: '角色卡',
-              value: 'PNG · JSON · CHARX',
-              iconColor: Color(0xFFF0B36A),
-              onTap: null,
-            ),
-            Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.forum_outlined,
-              title: '聊天记录',
-              value: 'JSONL · TXT',
-              iconColor: Color(0xFF8FD0BE),
-              onTap: null,
-            ),
-            Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.auto_stories_rounded,
-              title: '世界书',
-              value: 'JSON · 角色卡内嵌',
+              icon: Icons.folder_outlined,
+              title: '应用文档目录 / tavern',
+              subtitle: 'characters.json · chats.json · settings.json',
+              value: '本机',
               iconColor: Color(0xFFA9A0E8),
               onTap: null,
             ),
-            Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.layers_outlined,
-              title: '预设 / 人格 / 主题',
-              value: 'JSON',
-              iconColor: Color(0xFFEE9AA8),
-              onTap: null,
-            ),
           ],
         ),
-        SettingsGroup(
-          title: '导出',
-          children: [
-            SettingRow(
-              icon: Icons.archive_outlined,
-              title: '全量备份',
-              value: 'ZIP · 可直接还原',
-              iconColor: p.amber,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.file_upload_outlined,
-              title: '导出全部聊天',
-              value: 'JSONL',
-              iconColor: p.sage,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.image_outlined,
-              title: '导出角色卡',
-              value: 'PNG（含元数据）',
-              iconColor: p.violet,
-              onTap: () {},
-            ),
-          ],
-        ),
-        SettingsGroup(
-          title: '自动备份',
-          footnote: '备份写在本地 backups/ 目录，不联网、不上传。',
-          children: const [
-            SwitchLine(
-              title: '自动备份聊天',
-              subtitle: '每次保存前保留一个版本',
-              value: true,
-            ),
-            SwitchLine(
-              title: '备份设置变更',
-              subtitle: '保留最近 20 次设置快照',
-              value: true,
-            ),
-            StepperRow(
-              title: '保留份数',
-              subtitle: '超出后自动删除最旧',
-              value: '50',
-            ),
-            SettingRow(
-              icon: Icons.schedule_rounded,
-              title: '上次备份',
-              value: '今天 21:40 · 128 MB',
-              iconColor: Color(0xFF8FD0BE),
-              onTap: null,
-              chevron: false,
-            ),
-          ],
-        ),
-        SettingsGroup(
-          title: '维护',
-          children: [
-            SettingRow(
-              icon: Icons.cleaning_services_outlined,
-              title: '数据体检',
-              subtitle: '查找孤立文件、重复图片、空目录',
-              value: '扫描',
-              iconColor: p.amber,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.compress_rounded,
-              title: '压缩缩略图',
-              value: '可释放 18 MB',
-              iconColor: p.sage,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.restore_rounded,
-              title: '从备份还原',
-              value: '3 个可用',
-              iconColor: p.violet,
-              onTap: () {},
-            ),
-          ],
-        ),
-        SettingsGroup(
-          title: '危险操作',
-          children: [
-            SettingRow(
-              icon: Icons.delete_forever_rounded,
-              title: '清空所有聊天',
-              value: '不可撤销',
-              iconColor: p.danger,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.restart_alt_rounded,
-              title: '恢复出厂设置',
-              value: '删除全部本地数据',
-              iconColor: p.danger,
-              onTap: () {},
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        HintCard(
-          text: '删除前至少做一次全量备份。备份文件包含角色卡、聊天、世界书、预设与设置，但不包含 API 密钥。',
-          color: p.danger,
-          icon: Icons.warning_amber_rounded,
+        const SizedBox(height: 14),
+        Text(
+          '备份是明文 JSON，只应在自己的设备之间传递。',
+          style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
         ),
       ],
     );
@@ -240,7 +170,6 @@ class DataPage extends StatelessWidget {
 
 class _Legend extends StatelessWidget {
   const _Legend({required this.color, required this.label});
-
   final Color color;
   final String label;
 
@@ -256,10 +185,7 @@ class _Legend extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 5),
-        Text(
-          label,
-          style: appText(9.5, FontWeight.w400, p.textTertiary),
-        ),
+        Text(label, style: appText(10, FontWeight.w400, p.textTertiary)),
       ],
     );
   }

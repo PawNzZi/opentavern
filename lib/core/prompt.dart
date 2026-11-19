@@ -56,9 +56,12 @@ class PromptBuilder {
     final lore = _activateLore(character, recentText);
 
     final system = StringBuffer();
+    final preset = AppStore.instance.activePreset;
     final main = character.systemPrompt.trim().isNotEmpty
         ? character.systemPrompt
-        : settings.mainPrompt;
+        : (preset?.mainPrompt.trim().isNotEmpty == true
+            ? preset!.mainPrompt
+            : settings.mainPrompt);
     if (main.trim().isNotEmpty) {
       system.writeln(macro(main).trim());
     }
@@ -88,6 +91,24 @@ class PromptBuilder {
       system.writeln('\n[作者笔记]\n${macro(settings.authorNote).trim()}');
     }
 
+    final extra = <Map<String, String>>[];
+    if (preset != null) {
+      final enabled = preset.entries.where((e) => e.enabled).toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
+      for (final entry in enabled) {
+        final content = macro(entry.content).trim();
+        if (content.isEmpty) continue;
+        if (entry.role == 'system') {
+          system.writeln('\n[${entry.name}]\n$content');
+        } else {
+          extra.add({
+            'role': entry.role == 'assistant' ? 'assistant' : 'user',
+            'content': content,
+          });
+        }
+      }
+    }
+
     final maxPrompt =
         settings.maxContext - settings.api.maxTokens - settings.tokenPadding;
     final systemTokens = estimateTokens(system.toString());
@@ -115,6 +136,7 @@ class PromptBuilder {
     return BuiltPrompt(
       messages: [
         {'role': 'system', 'content': system.toString().trim()},
+        ...extra,
         ...history,
       ],
       approxTokens: used,

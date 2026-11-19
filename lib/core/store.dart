@@ -19,6 +19,8 @@ class AppStore extends ChangeNotifier {
   final List<ChatSession> sessions = [];
   final List<Lorebook> lorebooks = [];
   final List<QuickReplySet> quickReplySets = [];
+  final List<PromptPreset> presets = [];
+  String activePresetId = '';
   String activeQuickSetId = '';
   AppSettings settings = const AppSettings();
 
@@ -44,6 +46,7 @@ class AppStore extends ChangeNotifier {
       await _seedSessions();
       _seedLorebooks();
       _seedQuickReplies();
+      _seedPresets();
       await saveCharacters();
       await saveSessions();
       await saveLorebooks();
@@ -54,6 +57,10 @@ class AppStore extends ChangeNotifier {
     if (quickReplySets.isEmpty) {
       _seedQuickReplies();
       await saveQuickReplies();
+    }
+    if (presets.isEmpty) {
+      _seedPresets();
+      await savePresets();
     }
     _ready = true;
     notifyListeners();
@@ -86,6 +93,15 @@ class AppStore extends ChangeNotifier {
       for (final item in (qr['sets'] as List? ?? []).whereType<Map>()) {
         quickReplySets.add(
           QuickReplySet.fromJson(Map<String, dynamic>.from(item)),
+        );
+      }
+    }
+    final pp = await _readJson('presets.json');
+    if (pp is Map) {
+      activePresetId = (pp['active'] ?? '').toString();
+      for (final item in (pp['presets'] as List? ?? []).whereType<Map>()) {
+        presets.add(
+          PromptPreset.fromJson(Map<String, dynamic>.from(item)),
         );
       }
     }
@@ -164,6 +180,60 @@ class AppStore extends ChangeNotifier {
     if (quickReplySets.isNotEmpty) {
       activeQuickSetId = quickReplySets.first.id;
     }
+  }
+
+  Future<void> addPreset(PromptPreset preset) async {
+    presets.add(preset);
+    activePresetId = preset.id;
+    await savePresets();
+    notifyListeners();
+  }
+
+  Future<void> setActivePreset(String id) async {
+    activePresetId = id;
+    await savePresets();
+    notifyListeners();
+  }
+
+  PromptPreset? get activePreset {
+    for (final preset in presets) {
+      if (preset.id == activePresetId) return preset;
+    }
+    return presets.isEmpty ? null : presets.first;
+  }
+
+  void _seedPresets() {
+    final preset = PromptPreset(
+      id: 'preset-default',
+      name: '长夜 · 叙事',
+      mainPrompt: settings.mainPrompt,
+      entries: [
+        PromptEntry(
+          id: 'entry-jailbreak',
+          name: 'Jailbreak',
+          role: 'system',
+          content: '保持角色口吻，不要替 {{user}} 行动，不要跳出角色。',
+          order: 10,
+        ),
+        PromptEntry(
+          id: 'entry-style',
+          name: '文风要求',
+          role: 'system',
+          content: '多写具体动作、环境与感官细节；避免空泛总结。',
+          order: 20,
+        ),
+      ],
+    );
+    presets.add(preset);
+    activePresetId = preset.id;
+  }
+
+  Future<void> savePresets() async {
+    await _writeJson('presets.json', {
+      'active': activePresetId,
+      'presets': presets.map((p) => p.toJson()).toList(),
+    });
+    notifyListeners();
   }
 
   QuickReplySet? get activeQuickSet {
@@ -287,6 +357,89 @@ class AppStore extends ChangeNotifier {
   Future<void> deleteSession(String id) async {
     sessions.removeWhere((s) => s.id == id);
     await saveSessions();
+  }
+
+  String exportBackup() {
+    return jsonEncode({
+      'version': 1,
+      'exportedAt': DateTime.now().toIso8601String(),
+      'characters': characters.map((c) => c.toJson()).toList(),
+      'sessions': sessions.map((s) => s.toJson()).toList(),
+      'settings': settings.toJson(),
+      'lorebooks': lorebooks.map((b) => b.toJson()).toList(),
+      'quickReplySets': quickReplySets.map((q) => q.toJson()).toList(),
+      'activeQuickSetId': activeQuickSetId,
+      'presets': presets.map((p) => p.toJson()).toList(),
+      'activePresetId': activePresetId,
+    });
+  }
+
+  Future<bool> importBackup(String raw) async {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return false;
+      final data = Map<String, dynamic>.from(decoded);
+      if (data['characters'] is List) {
+        characters
+          ..clear()
+          ..addAll(
+            (data['characters'] as List)
+                .whereType<Map>()
+                .map((e) => DemoCharacter.fromJson(Map<String, dynamic>.from(e))),
+          );
+      }
+      if (data['sessions'] is List) {
+        sessions
+          ..clear()
+          ..addAll(
+            (data['sessions'] as List)
+                .whereType<Map>()
+                .map((e) => ChatSession.fromJson(Map<String, dynamic>.from(e))),
+          );
+      }
+      if (data['settings'] is Map) {
+        settings = AppSettings.fromJson(Map<String, dynamic>.from(data['settings'] as Map));
+      }
+      if (data['lorebooks'] is List) {
+        lorebooks
+          ..clear()
+          ..addAll(
+            (data['lorebooks'] as List)
+                .whereType<Map>()
+                .map((e) => Lorebook.fromJson(Map<String, dynamic>.from(e))),
+          );
+      }
+      if (data['quickReplySets'] is List) {
+        quickReplySets
+          ..clear()
+          ..addAll(
+            (data['quickReplySets'] as List)
+                .whereType<Map>()
+                .map((e) => QuickReplySet.fromJson(Map<String, dynamic>.from(e))),
+          );
+        activeQuickSetId = (data['activeQuickSetId'] ?? '').toString();
+      }
+      if (data['presets'] is List) {
+        presets
+          ..clear()
+          ..addAll(
+            (data['presets'] as List)
+                .whereType<Map>()
+                .map((e) => PromptPreset.fromJson(Map<String, dynamic>.from(e))),
+          );
+        activePresetId = (data['activePresetId'] ?? '').toString();
+      }
+      await saveCharacters();
+      await saveSessions();
+      await saveSettings();
+      await saveLorebooks();
+      await saveQuickReplies();
+      await savePresets();
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> addCharacter(DemoCharacter character) async {
