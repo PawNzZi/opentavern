@@ -126,6 +126,9 @@ class DemoCharacter {
         'talkativeness': 0.5,
         'fav': favorite,
         'tags': tags,
+        'assets': const <Map<String, dynamic>>[],
+        'group_only_greetings': const <String>[],
+        'creation_date': DateTime.now().millisecondsSinceEpoch,
         'data': {
           'name': name,
           'description': description,
@@ -140,6 +143,13 @@ class DemoCharacter {
           'tags': tags,
           'creator': creator,
           'character_version': version,
+          'nickname': name,
+          'creator_notes_multilingual': const <String, dynamic>{},
+          'source': const <String>[],
+          'group_only_greetings': const <String>[],
+          'assets': const <Map<String, dynamic>>[],
+          'creation_date': DateTime.now().millisecondsSinceEpoch,
+          'modification_date': DateTime.now().millisecondsSinceEpoch,
           'extensions': {
             'talkativeness': 0.5,
             'fav': favorite,

@@ -271,6 +271,10 @@ class ImportSheetScreen extends StatelessWidget {
             failed == 0 ? '已导入 $imported 个角色' : '导入 $imported 个，失败 $failed 个',
           );
           if (failedNames.isNotEmpty) {
+            await AppStore.instance.logImportFailures(
+              failedNames,
+              source: '角色卡批量导入',
+            );
             await showImportFailures(context, failedNames);
           }
           if (!context.mounted) return;

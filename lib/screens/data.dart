@@ -50,6 +50,37 @@ class DataPage extends StatelessWidget {
     showTavernToast(context, uri == null ? '已取消导出' : '备份已导出');
   }
 
+  Future<void> _showImportLog(BuildContext context) async {
+    final log = await AppStore.instance.readImportFailures();
+    if (!context.mounted) return;
+    if (log.trim().isEmpty) {
+      showTavernToast(context, '还没有导入失败记录');
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('导入失败日志'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 320,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              log,
+              style: const TextStyle(fontSize: 11, height: 1.5),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _exportWorldsZip(BuildContext context) async {
     final archive = Archive();
     for (final book in AppStore.instance.lorebooks) {
@@ -311,6 +342,15 @@ class DataPage extends StatelessWidget {
               value: 'JSON',
               iconColor: p.violet,
               onTap: () => _export(context),
+            ),
+            const Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.bug_report_outlined,
+              title: '查看导入失败日志',
+              subtitle: '记录批量导入失败的文件名',
+              value: 'LOG',
+              iconColor: p.textSecondary,
+              onTap: () => _showImportLog(context),
             ),
             const Hairline(indent: 56),
             SettingRow(

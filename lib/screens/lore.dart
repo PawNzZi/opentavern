@@ -73,6 +73,10 @@ class _LoreScreenState extends State<LoreScreen> {
             : '导入 $imported 本，失败 ${failed.length} 个',
       );
       if (failed.isNotEmpty) {
+        await AppStore.instance.logImportFailures(
+          failed,
+          source: '世界书 ZIP 导入',
+        );
         await showImportFailures(context, failed);
       }
       if (!mounted) return;

@@ -602,6 +602,26 @@ class AppStore extends ChangeNotifier {
     }
   }
 
+  Future<void> logImportFailures(
+    List<String> failures, {
+    String source = 'import',
+  }) async {
+    if (_dir == null || failures.isEmpty) return;
+    final file = File('${_dir!.path}/import_failures.log');
+    final stamp = DateTime.now().toIso8601String();
+    await file.writeAsString(
+      '$stamp [$source]\n${failures.join('\n')}\n\n',
+      mode: FileMode.append,
+    );
+  }
+
+  Future<String> readImportFailures() async {
+    if (_dir == null) return '';
+    final file = File('${_dir!.path}/import_failures.log');
+    if (!await file.exists()) return '';
+    return file.readAsString();
+  }
+
   Future<void> _writeJson(String name, Object value) async {
     if (_dir == null) return;
     final file = File('${_dir!.path}/$name');
