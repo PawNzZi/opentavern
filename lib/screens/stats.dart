@@ -15,19 +15,25 @@ class StatsPage extends StatefulWidget {
 
 class _StatsPageState extends State<StatsPage> {
   String? _selected;
+  int? _days = 7;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final store = AppStore.instance;
-    final allSessions = store.sessions;
+    final now = DateTime.now();
+    final cutoff = _days == null
+        ? 0
+        : now.subtract(Duration(days: _days!)).millisecondsSinceEpoch;
+    final allSessions = store.sessions
+        .where((s) => s.updatedAt >= cutoff)
+        .toList();
     final sessions = _selected == null
         ? allSessions
         : allSessions.where((s) => s.characterName == _selected).toList();
     final messages = sessions.expand((s) => s.messages).toList();
     final chars = messages.fold<int>(0, (sum, m) => sum + m.text.length);
 
-    final now = DateTime.now();
     final week = List<int>.filled(7, 0);
     for (final m in messages) {
       final d = DateTime.fromMillisecondsSinceEpoch(m.createdAt);
@@ -51,9 +57,36 @@ class _StatsPageState extends State<StatsPage> {
     return DetailPage(
       eyebrow: 'INSIGHTS',
       title: '统计',
-      subtitle: _selected == null ? '你写了多少，角色回了多少。' : '只看 $_selected。',
+      subtitle: _selected == null
+          ? '你写了多少，角色回了多少。'
+          : '只看 $_selected。',
       children: [
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            GlassPill(
+              label: '7 天',
+              height: 30,
+              selected: _days == 7,
+              onTap: () => setState(() => _days = 7),
+            ),
+            const SizedBox(width: 7),
+            GlassPill(
+              label: '30 天',
+              height: 30,
+              selected: _days == 30,
+              onTap: () => setState(() => _days = 30),
+            ),
+            const SizedBox(width: 7),
+            GlassPill(
+              label: '全部',
+              height: 30,
+              selected: _days == null,
+              onTap: () => setState(() => _days = null),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         Glass(
           radius: 24,
           blur: 24,

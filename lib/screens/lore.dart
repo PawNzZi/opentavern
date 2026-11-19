@@ -49,6 +49,7 @@ class _LoreScreenState extends State<LoreScreen> {
     if (file.name.toLowerCase().endsWith('.zip')) {
       final archive = ZipDecoder().decodeBytes(bytes);
       var imported = 0;
+      final failed = <String>[];
       for (final entry in archive.files) {
         if (!entry.isFile || !entry.name.toLowerCase().endsWith('.json')) {
           continue;
@@ -58,10 +59,19 @@ class _LoreScreenState extends State<LoreScreen> {
           Uint8List.fromList(data),
           entry.name.split('/').last,
         );
-        if (book != null) imported++;
+        if (book != null) {
+          imported++;
+        } else {
+          failed.add(entry.name);
+        }
       }
       if (!mounted) return;
-      showTavernToast(context, '已导入 $imported 本世界书');
+      showTavernToast(
+        context,
+        failed.isEmpty
+            ? '已导入 $imported 本世界书'
+            : '导入 $imported 本，失败 ${failed.length} 个：${failed.take(3).join('、')}',
+      );
       setState(() {});
       return;
     }

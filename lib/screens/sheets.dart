@@ -254,20 +254,23 @@ class ImportSheetScreen extends StatelessWidget {
           final files = await FilePickerPlatform.instance.pickFiles();
           if (files.isEmpty) return;
           var imported = 0;
-          var failed = 0;
+          final failedNames = <String>[];
           for (final file in files) {
             final bytes = await file.readAsBytes();
             final card = await AppStore.instance.importCard(bytes, file.name);
             if (card == null) {
-              failed++;
+              failedNames.add(file.name);
             } else {
               imported++;
             }
           }
           if (!context.mounted) return;
+          final failed = failedNames.length;
           showTavernToast(
             context,
-            failed == 0 ? '已导入 $imported 个角色' : '导入 $imported 个，失败 $failed 个',
+            failed == 0
+                ? '已导入 $imported 个角色'
+                : '导入 $imported 个，失败 $failed 个：${failedNames.take(3).join('、')}',
           );
           Navigator.of(context).maybePop();
         },
