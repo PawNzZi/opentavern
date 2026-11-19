@@ -402,3 +402,67 @@ class Lorebook {
     );
   }
 }
+
+class QuickReply {
+  QuickReply({
+    required this.id,
+    required this.label,
+    this.message = '',
+    this.enabled = true,
+  });
+
+  final String id;
+  String label;
+  String message;
+  bool enabled;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'label': label,
+        'message': message,
+        'enabled': enabled,
+      };
+
+  factory QuickReply.fromJson(Map<String, dynamic> json) {
+    return QuickReply(
+      id: (json['id'] ?? 'q${DateTime.now().microsecondsSinceEpoch}').toString(),
+      label: (json['label'] ?? '').toString(),
+      message: (json['message'] ?? '').toString(),
+      enabled: json['enabled'] != false,
+    );
+  }
+}
+
+class QuickReplySet {
+  QuickReplySet({
+    required this.id,
+    required this.name,
+    List<QuickReply>? replies,
+    this.enabled = true,
+  }) : replies = replies ?? [];
+
+  final String id;
+  String name;
+  final List<QuickReply> replies;
+  bool enabled;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'enabled': enabled,
+        'replies': replies.map((e) => e.toJson()).toList(),
+      };
+
+  factory QuickReplySet.fromJson(Map<String, dynamic> json) {
+    return QuickReplySet(
+      id: (json['id'] ?? 'qs${DateTime.now().microsecondsSinceEpoch}').toString(),
+      name: (json['name'] ?? '快捷回复').toString(),
+      enabled: json['enabled'] != false,
+      replies: (json['replies'] as List?)
+              ?.whereType<Map>()
+              .map((e) => QuickReply.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          [],
+    );
+  }
+}

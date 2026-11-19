@@ -18,6 +18,8 @@ class AppStore extends ChangeNotifier {
   final List<DemoCharacter> characters = [];
   final List<ChatSession> sessions = [];
   final List<Lorebook> lorebooks = [];
+  final List<QuickReplySet> quickReplySets = [];
+  String activeQuickSetId = '';
   AppSettings settings = const AppSettings();
 
   Directory? _dir;
@@ -41,12 +43,17 @@ class AppStore extends ChangeNotifier {
       characters.addAll(demoCharacters);
       await _seedSessions();
       _seedLorebooks();
+      _seedQuickReplies();
       await saveCharacters();
       await saveSessions();
       await saveLorebooks();
     } else if (lorebooks.isEmpty) {
       _seedLorebooks();
       await saveLorebooks();
+    }
+    if (quickReplySets.isEmpty) {
+      _seedQuickReplies();
+      await saveQuickReplies();
     }
     _ready = true;
     notifyListeners();
@@ -71,6 +78,15 @@ class AppStore extends ChangeNotifier {
     if (lore is List) {
       for (final item in lore.whereType<Map>()) {
         lorebooks.add(Lorebook.fromJson(Map<String, dynamic>.from(item)));
+      }
+    }
+    final qr = await _readJson('quickreplies.json');
+    if (qr is Map) {
+      activeQuickSetId = (qr['active'] ?? '').toString();
+      for (final item in (qr['sets'] as List? ?? []).whereType<Map>()) {
+        quickReplySets.add(
+          QuickReplySet.fromJson(Map<String, dynamic>.from(item)),
+        );
       }
     }
     final cfg = await _readJson('settings.json');
@@ -126,6 +142,43 @@ class AppStore extends ChangeNotifier {
         ),
       );
     }
+  }
+
+  void _seedQuickReplies() {
+    for (final set in demoQuickSets) {
+      quickReplySets.add(
+        QuickReplySet(
+          id: 'seed-qr-${set.name}',
+          name: set.name,
+          replies: [
+            for (final label in set.buttons)
+              QuickReply(
+                id: 'seed-qr-${set.name}-$label',
+                label: label,
+                message: label,
+              ),
+          ],
+        ),
+      );
+    }
+    if (quickReplySets.isNotEmpty) {
+      activeQuickSetId = quickReplySets.first.id;
+    }
+  }
+
+  QuickReplySet? get activeQuickSet {
+    for (final set in quickReplySets) {
+      if (set.id == activeQuickSetId) return set;
+    }
+    return quickReplySets.isEmpty ? null : quickReplySets.first;
+  }
+
+  Future<void> saveQuickReplies() async {
+    await _writeJson('quickreplies.json', {
+      'active': activeQuickSetId,
+      'sets': quickReplySets.map((s) => s.toJson()).toList(),
+    });
+    notifyListeners();
   }
 
   Future<void> addLorebook(Lorebook book) async {

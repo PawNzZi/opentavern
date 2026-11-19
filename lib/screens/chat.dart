@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../chat/chat_controller.dart';
+import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -300,6 +301,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return AnimatedBuilder(
       animation: _chat,
       builder: (context, _) {
+        final quick = AppStore.instance.activeQuickSet;
         final typing = _chat.isGenerating &&
             (_chat.streamingMessage?.text.isEmpty ?? false);
         final items = <Widget>[];
@@ -384,6 +386,29 @@ class _ChatScreenState extends State<ChatScreen> {
                         children: items,
                       ),
                     ),
+                    if (quick != null && quick.replies.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: SizedBox(
+                          height: 34,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: quick.replies.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 7),
+                            itemBuilder: (context, i) {
+                              final reply = quick.replies[i];
+                              return GlassPill(
+                                label: reply.label,
+                                height: 32,
+                                onTap: () {
+                                  _input.text = reply.message;
+                                  setState(() => _hasText = true);
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                     _Composer(
                       character: c,
                       controller: _input,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/models.dart';
+import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -14,6 +16,7 @@ class InteractionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final quick = AppStore.instance.activeQuickSet;
     return DetailPage(
       eyebrow: 'IDENTITY & COMMANDS',
       title: '交互',
@@ -85,10 +88,10 @@ class InteractionPage extends StatelessWidget {
                     style: appText(15, FontWeight.w600, p.textPrimary),
                   ),
                   const SizedBox(width: 7),
-                  const TagBadge('日常对话'),
+                  TagBadge(quick?.name ?? '快捷回复'),
                   const Spacer(),
                   Text(
-                    '4 个按钮',
+                    '${quick?.replies.length ?? 0} 个按钮',
                     style: appText(10.5, FontWeight.w400, p.textTertiary),
                   ),
                 ],
@@ -97,11 +100,9 @@ class InteractionPage extends StatelessWidget {
               Wrap(
                 spacing: 7,
                 runSpacing: 7,
-                children: const [
-                  GlassPill(label: '继续', height: 32),
-                  GlassPill(label: '换个说法', height: 32),
-                  GlassPill(label: '描写环境', height: 32),
-                  GlassPill(label: '推进剧情', height: 32),
+                children: [
+                  for (final reply in quick?.replies ?? const <QuickReply>[])
+                    GlassPill(label: reply.label, height: 32),
                 ],
               ),
               const SizedBox(height: 12),
@@ -113,7 +114,7 @@ class InteractionPage extends StatelessWidget {
                     height: 32,
                     onTap: () => openGlassPage(
                       context,
-                      QuickReplyEditorSheet(quickSet: demoQuickSets.first),
+                      QuickReplyEditorSheet(quickSet: quick),
                     ),
                   ),
                   const SizedBox(width: 8),

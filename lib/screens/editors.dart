@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/models.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
@@ -253,134 +254,159 @@ class RegexEditorSheet extends StatelessWidget {
   }
 }
 
-class QuickReplyEditorSheet extends StatelessWidget {
+class QuickReplyEditorSheet extends StatefulWidget {
   const QuickReplyEditorSheet({super.key, this.quickSet});
+  final QuickReplySet? quickSet;
 
-  final DemoQuickSet? quickSet;
+  @override
+  State<QuickReplyEditorSheet> createState() => _QuickReplyEditorSheetState();
+}
+
+class _QuickReplyEditorSheetState extends State<QuickReplyEditorSheet> {
+  late final TextEditingController _name;
+  late final List<TextEditingController> _labels;
+  late final List<TextEditingController> _messages;
+
+  QuickReplySet get _set =>
+      widget.quickSet ?? AppStore.instance.activeQuickSet!;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: _set.name);
+    _labels = [for (final r in _set.replies) TextEditingController(text: r.label)];
+    _messages = [for (final r in _set.replies) TextEditingController(text: r.message)];
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    for (final c in _labels) c.dispose();
+    for (final c in _messages) c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    _set.name = _name.text.trim().isEmpty ? '快捷回复' : _name.text.trim();
+    final next = <QuickReply>[];
+    for (var i = 0; i < _labels.length; i++) {
+      final label = _labels[i].text.trim();
+      if (label.isEmpty) continue;
+      next.add(
+        QuickReply(
+          id: i < _set.replies.length
+              ? _set.replies[i].id
+              : 'q${DateTime.now().microsecondsSinceEpoch}-$i',
+          label: label,
+          message: _messages[i].text.trim().isEmpty
+              ? label
+              : _messages[i].text.trim(),
+          enabled: true,
+        ),
+      );
+    }
+    _set.replies
+      ..clear()
+      ..addAll(next);
+    await AppStore.instance.saveQuickReplies();
+    if (!mounted) return;
+    showTavernToast(context, '快捷回复已保存');
+    Navigator.of(context).maybePop();
+  }
+
+  void _add() {
+    setState(() {
+      _labels.add(TextEditingController());
+      _messages.add(TextEditingController());
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final item = quickSet ?? demoQuickSets.first;
     return SheetStage(
       title: '编辑快捷回复',
-      subtitle: '${item.buttons.length} 个按钮',
-      heightFactor: .9,
+      subtitle: '按钮会显示在聊天输入框上方',
+      heightFactor: .94,
       footer: GlassPrimaryButton(
         label: '保存集合',
         icon: Icons.check_rounded,
-        onTap: () {
-          showTavernToast(context, '快捷回复已保存');
-          Navigator.of(context).maybePop();
-        },
+        onTap: _save,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _EditorField(label: '集合名称', value: item.name),
-          _EditorField(
-            label: '说明',
-            value: item.description,
-          ),
-          const _Label('按钮'),
-          Glass(
-            radius: 22,
-            blur: 22,
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Column(
-              children: [
-                for (var i = 0; i < item.buttons.length; i++) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 9, 10, 9),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.drag_indicator_rounded,
-                          size: 16,
-                          color: p.textTertiary,
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(9),
-                            color: p.amber.withValues(alpha: .14),
-                          ),
-                          child: Icon(
-                            Icons.bolt_rounded,
-                            size: 15,
-                            color: p.amber,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.buttons[i],
-                                style: appText(
-                                  13,
-                                  FontWeight.w500,
-                                  p.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '/send ${item.buttons[i]}',
-                                style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 9.5,
-                                  color: p.textTertiary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.edit_outlined,
-                          size: 15,
-                          color: p.textSecondary,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (i != item.buttons.length - 1) const Hairline(indent: 52),
-                ],
-                const Hairline(indent: 52),
-                SettingRow(
-                  icon: Icons.add_rounded,
-                  title: '添加按钮',
-                  value: '标签 + 命令',
-                  iconColor: p.amber,
-                  onTap: null,
-                ),
-              ],
-            ),
-          ),
-          SettingsGroup(
-            title: '显示与行为',
-            children: const [
-              SwitchLine(
-                title: '显示在输入框上方',
-                value: true,
-              ),
-              Hairline(indent: 14),
-              SwitchLine(
-                title: '显示在上下文菜单',
-                value: false,
-              ),
-              Hairline(indent: 14),
-              SwitchLine(
-                title: '打开聊天时自动执行',
-                value: false,
+          _LiveField(label: '集合名称', controller: _name, hint: '日常对话'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text('按钮', style: appText(10.5, FontWeight.w500, p.textTertiary)),
+              const Spacer(),
+              GlassPill(
+                label: '添加',
+                icon: Icons.add_rounded,
+                height: 30,
+                onTap: _add,
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
+          for (var i = 0; i < _labels.length; i++) ...[
+            Glass(
+              radius: 18,
+              blur: 18,
+              shadow: false,
+              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _labels[i],
+                          style: appText(13.5, FontWeight.w500, p.textPrimary),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            hintText: '按钮标签',
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: p.textTertiary,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _labels.removeAt(i).dispose();
+                            _messages.removeAt(i).dispose();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  TextField(
+                    controller: _messages[i],
+                    style: appText(11, FontWeight.w400, p.textTertiary),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      hintText: '发送的内容，留空则使用标签',
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 6),
           const HintCard(
-            text: '按钮内容支持斜杠命令、STscript 与 {{宏}}。按住拖动可以排序。',
+            text: '快捷回复只保存在本机；输入框上方会显示当前集合的按钮。',
           ),
         ],
       ),
