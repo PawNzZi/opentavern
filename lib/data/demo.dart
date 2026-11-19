@@ -273,6 +273,7 @@ class DemoChat {
     this.unread = 0,
     this.pinned = false,
     this.sessionId,
+    this.title = '',
   });
 
   final DemoCharacter character;
@@ -281,6 +282,7 @@ class DemoChat {
   final int unread;
   final bool pinned;
   final String? sessionId;
+  final String title;
 }
 
 class DemoLorebook {

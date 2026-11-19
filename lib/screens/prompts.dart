@@ -51,6 +51,20 @@ class _PromptManagerPageState extends State<PromptManagerPage> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _move(int index, int delta) async {
+    final entries = [..._preset.entries]
+      ..sort((a, b) => a.order.compareTo(b.order));
+    final target = index + delta;
+    if (target < 0 || target >= entries.length) return;
+    final a = entries[index];
+    final b = entries[target];
+    final order = a.order;
+    a.order = b.order;
+    b.order = order;
+    await AppStore.instance.savePresets();
+    if (mounted) setState(() {});
+  }
+
   Future<void> openEntry(PromptEntry entry) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -123,6 +137,26 @@ class _PromptManagerPageState extends State<PromptManagerPage> {
                   await openEntry(entries[i]);
                   if (mounted) setState(() {});
                 },
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GlassCircleButton(
+                      icon: Icons.keyboard_arrow_up_rounded,
+                      size: 28,
+                      iconSize: 15,
+                      blur: 0,
+                      onTap: () => _move(i, -1),
+                    ),
+                    const SizedBox(width: 2),
+                    GlassCircleButton(
+                      icon: Icons.keyboard_arrow_down_rounded,
+                      size: 28,
+                      iconSize: 15,
+                      blur: 0,
+                      onTap: () => _move(i, 1),
+                    ),
+                  ],
+                ),
               ),
               if (i != entries.length - 1) const Hairline(indent: 56),
             ],

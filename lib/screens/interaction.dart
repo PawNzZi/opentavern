@@ -133,22 +133,69 @@ class InteractionPage extends StatelessWidget {
             ],
           ),
         ),
-        SettingsGroup(
-          title: '快捷回复集合',
-          children: [
-            for (var i = 0; i < demoQuickSets.length; i++) ...[
-              _QuickSetRow(set: demoQuickSets[i]),
-              if (i != demoQuickSets.length - 1) const Hairline(indent: 56),
+        AnimatedBuilder(
+          animation: AppStore.instance,
+          builder: (context, _) => SettingsGroup(
+            title: '快捷回复集合',
+            children: [
+              for (var i = 0; i < AppStore.instance.quickReplySets.length; i++) ...[
+                SettingRow(
+                  icon: Icons.bolt_rounded,
+                  title: AppStore.instance.quickReplySets[i].name,
+                  subtitle:
+                      '${AppStore.instance.quickReplySets[i].replies.length} 个按钮',
+                  value:
+                      AppStore.instance.quickReplySets[i].id ==
+                              AppStore.instance.activeQuickSetId
+                          ? '当前'
+                          : '',
+                  iconColor: p.amber,
+                  onTap: () async {
+                    AppStore.instance.activeQuickSetId =
+                        AppStore.instance.quickReplySets[i].id;
+                    await AppStore.instance.saveQuickReplies();
+                  },
+                  trailing: GlassCircleButton(
+                    icon: Icons.edit_outlined,
+                    size: 30,
+                    iconSize: 14,
+                    blur: 0,
+                    onTap: () => openGlassPage(
+                      context,
+                      QuickReplyEditorSheet(
+                        quickSet: AppStore.instance.quickReplySets[i],
+                      ),
+                    ),
+                  ),
+                ),
+                if (i != AppStore.instance.quickReplySets.length - 1)
+                  const Hairline(indent: 56),
+              ],
+              const Hairline(indent: 56),
+              SettingRow(
+                icon: Icons.add_rounded,
+                title: '新建集合',
+                value: '空白集合',
+                iconColor: p.amber,
+                onTap: () async {
+                  final set = QuickReplySet(
+                    id: 'qr-${DateTime.now().microsecondsSinceEpoch}',
+                    name: '新集合 ${AppStore.instance.quickReplySets.length + 1}',
+                    replies: [
+                      QuickReply(
+                        id: 'qr-${DateTime.now().microsecondsSinceEpoch}-1',
+                        label: '继续',
+                        message: '继续',
+                      ),
+                    ],
+                  );
+                  AppStore.instance.quickReplySets.add(set);
+                  AppStore.instance.activeQuickSetId = set.id;
+                  await AppStore.instance.saveQuickReplies();
+                },
+              ),
             ],
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.add_rounded,
-              title: '新建集合',
-              value: '从空白 / 模板',
-              iconColor: p.amber,
-              onTap: () {},
-            ),
-          ],
+          ),
         ),
         SettingsGroup(
           title: '命令与脚本',

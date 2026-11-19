@@ -28,6 +28,8 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
   late final TextEditingController _examples;
   late final TextEditingController _system;
   late final TextEditingController _postHistory;
+  late final TextEditingController _tags;
+  late String _lorebook;
 
   DemoCharacter get _base => widget.character ?? demoCharacters.first;
 
@@ -47,6 +49,8 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
     _postHistory = TextEditingController(
       text: c?.postHistoryInstructions ?? '',
     );
+    _tags = TextEditingController(text: c?.tags.join(', ') ?? '');
+    _lorebook = c?.lorebook ?? '未绑定';
   }
 
   @override
@@ -62,10 +66,44 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
       _examples,
       _system,
       _postHistory,
+      _tags,
     ]) {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _pickLorebook() async {
+    final names = <String>['未绑定', ...AppStore.instance.lorebooks.map((b) => b.name)];
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          child: Glass(
+            radius: 26,
+            blur: 30,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < names.length; i++) ...[
+                  SettingRow(
+                    icon: Icons.auto_stories_rounded,
+                    title: names[i],
+                    iconColor: AppPalette.of(ctx).amber,
+                    onTap: () => Navigator.pop(ctx, names[i]),
+                  ),
+                  if (i != names.length - 1) const Hairline(indent: 56),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (picked != null && mounted) setState(() => _lorebook = picked);
   }
 
   Future<void> _save() async {
@@ -83,6 +121,12 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
       exampleDialogue: _examples.text.trim(),
       systemPrompt: _system.text.trim(),
       postHistoryInstructions: _postHistory.text.trim(),
+      tags: _tags.text
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList(),
+      lorebook: _lorebook,
     );
     await AppStore.instance.addCharacter(updated);
     if (!mounted) return;
@@ -143,6 +187,14 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
         _EditField(label: '名字', controller: _name),
         _EditField(label: '作者', controller: _creator),
         _EditField(label: '版本', controller: _version),
+        _EditField(label: '标签（逗号分隔）', controller: _tags),
+        SettingRow(
+          icon: Icons.auto_stories_outlined,
+          title: '绑定世界书',
+          value: _lorebook,
+          iconColor: p.amber,
+          onTap: _pickLorebook,
+        ),
         const SectionLabel('人设'),
         _EditField(
           label: '描述（Description）',

@@ -46,6 +46,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         time: _timeLabel(session.updatedAt),
         pinned: session.pinned,
         sessionId: session.id,
+        title: session.title,
       ));
     }
     return result;
@@ -382,7 +383,7 @@ class _ChatRow extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          chat.character.name,
+                          chat.title.isEmpty ? chat.character.name : chat.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: appText(15, FontWeight.w600, p.textPrimary),

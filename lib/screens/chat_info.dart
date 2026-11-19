@@ -19,6 +19,36 @@ class ChatInfoSheet extends StatelessWidget {
   final ChatSession session;
   final DemoCharacter character;
 
+  Future<void> _rename(BuildContext context) async {
+    final controller = TextEditingController(text: session.title);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重命名聊天'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '聊天标题'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null || name.trim().isEmpty) return;
+    session.title = name.trim();
+    await AppStore.instance.saveSessions();
+    if (context.mounted) showTavernToast(context, '标题已更新');
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
@@ -86,9 +116,9 @@ class ChatInfoSheet extends StatelessWidget {
               SettingRow(
                 icon: Icons.title_rounded,
                 title: '聊天标题',
-                value: '王都的雨夜',
+                value: session.title,
                 iconColor: p.amber,
-                onTap: () {},
+                onTap: () => _rename(context),
               ),
               const Hairline(indent: 56),
               SettingRow(
