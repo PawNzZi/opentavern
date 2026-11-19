@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../data/demo.dart';
@@ -276,6 +280,23 @@ class _CharacterScreenState extends State<CharacterScreen> {
     );
   }
 
+  Future<void> _exportCharacter(
+    BuildContext context,
+    DemoCharacter character,
+  ) async {
+    final bytes = Uint8List.fromList(
+      utf8.encode(jsonEncode(character.toCardJson())),
+    );
+    final uri = await FilePickerPlatform.instance.saveFile(
+      fileName: '${character.name}.json',
+      bytes: bytes,
+      mimeType: 'application/json',
+      dialogTitle: '导出角色卡 JSON',
+    );
+    if (!context.mounted) return;
+    showTavernToast(context, uri == null ? '已取消导出' : '角色卡已导出');
+  }
+
   void _showMore(BuildContext context) {
     final p = AppPalette.of(context);
     showModalBottomSheet<void>(
@@ -321,7 +342,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   iconColor: p.violet,
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    showTavernToast(context, '已导出 PNG');
+                    _exportCharacter(context, widget.character);
                   },
                 ),
                 const Hairline(indent: 56),
@@ -544,7 +565,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   title: '导出角色卡',
                   value: 'PNG / JSON',
                   iconColor: p.violet,
-                  onTap: () {},
+                  onTap: () => _exportCharacter(context, c),
                 ),
                 const Hairline(indent: 56),
                 SettingRow(

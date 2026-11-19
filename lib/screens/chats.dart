@@ -26,6 +26,7 @@ class ChatsScreen extends StatefulWidget {
 
 class _ChatsScreenState extends State<ChatsScreen> {
   late List<DemoChat> _chats = _fromStore();
+  final _query = TextEditingController();
 
   List<DemoChat> _fromStore() {
     final result = <DemoChat>[];
@@ -75,6 +76,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   void dispose() {
     AppStore.instance.removeListener(_sync);
+    _query.dispose();
     super.dispose();
   }
 
@@ -106,8 +108,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final pinned = _chats.where((c) => c.pinned).toList();
-    final recent = _chats.where((c) => !c.pinned).toList();
+    final q = _query.text.trim().toLowerCase();
+    final visible = _chats.where((c) {
+      if (q.isEmpty) return true;
+      return c.title.toLowerCase().contains(q) ||
+          c.character.name.toLowerCase().contains(q) ||
+          c.snippet.toLowerCase().contains(q);
+    }).toList();
+    final pinned = visible.where((c) => c.pinned).toList();
+    final recent = visible.where((c) => !c.pinned).toList();
 
     return SafeArea(
       bottom: false,
@@ -118,7 +127,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           PageHeader(
             eyebrow: 'YOUR STORIES',
             title: '对话',
-            subtitle: '${_chats.length} 段故事，等你回来。',
+            subtitle: '${visible.length} 段故事，等你回来。',
             trailing: GlassCircleButton(
               icon: Icons.search_rounded,
               size: 46,
@@ -128,7 +137,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           const SizedBox(height: 20),
           SearchField(
             hint: '搜索对话或角色',
-            onTap: () => openGlassPage(context, const SearchPage()),
+            controller: _query,
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 6),
           if (pinned.isNotEmpty) ...[

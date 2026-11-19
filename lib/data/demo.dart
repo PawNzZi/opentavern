@@ -112,6 +112,42 @@ class DemoCharacter {
     );
   }
 
+  Map<String, dynamic> toCardJson() => {
+        'spec': 'chara_card_v2',
+        'spec_version': '2.0',
+        'name': name,
+        'description': description,
+        'personality': personality,
+        'scenario': scenario,
+        'first_mes': greeting,
+        'mes_example': exampleDialogue,
+        'creatorcomment': tagline,
+        'avatar': 'none',
+        'talkativeness': 0.5,
+        'fav': favorite,
+        'tags': tags,
+        'data': {
+          'name': name,
+          'description': description,
+          'personality': personality,
+          'scenario': scenario,
+          'first_mes': greeting,
+          'mes_example': exampleDialogue,
+          'creator_notes': title,
+          'system_prompt': systemPrompt,
+          'post_history_instructions': postHistoryInstructions,
+          'alternate_greetings': alternateGreetings,
+          'tags': tags,
+          'creator': creator,
+          'character_version': version,
+          'extensions': {
+            'talkativeness': 0.5,
+            'fav': favorite,
+            'world': lorebook == '未绑定' ? '' : lorebook,
+          },
+        },
+      };
+
   Map<String, dynamic> toJson() => {
         'name': name,
         'initial': initial,
