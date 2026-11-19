@@ -11,6 +11,8 @@ class MacroEngine {
     required DemoCharacter character,
     required AppSettings settings,
     Map<String, String>? variables,
+    String? userInput,
+    String? lastMessage,
     Random? random,
   }) {
     final rng = random ?? Random();
@@ -62,6 +64,11 @@ class MacroEngine {
             return character.scenario;
           case 'mes_example':
             return character.exampleDialogue;
+          case 'input':
+            return userInput ?? '';
+          case 'lastmessage':
+          case 'last_message':
+            return lastMessage ?? '';
           case 'time':
             final now = DateTime.now();
             return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
@@ -69,7 +76,7 @@ class MacroEngine {
             final now = DateTime.now();
             return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
           case 'weekday':
-            const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+            const days = ['鍛ㄤ竴', '鍛ㄤ簩', '鍛ㄤ笁', '鍛ㄥ洓', '鍛ㄤ簲', '鍛ㄥ叚', '鍛ㄦ棩'];
             return days[DateTime.now().weekday - 1];
           case 'newline':
             return '\n';
@@ -104,3 +111,4 @@ class MacroEngine {
     return text;
   }
 }
+

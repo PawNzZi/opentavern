@@ -1,4 +1,4 @@
-import '../data/demo.dart';
+﻿import '../data/demo.dart';
 import 'regex.dart';
 import 'store.dart';
 import 'macros.dart';
@@ -37,11 +37,22 @@ class PromptBuilder {
     required ChatSession session,
     required AppSettings settings,
   }) {
+    String lastUser = '';
+    String lastAny = '';
+    for (final m in session.messages.reversed) {
+      if (lastAny.isEmpty && m.text.trim().isNotEmpty) lastAny = m.text;
+      if (lastUser.isEmpty && m.isUser && m.text.trim().isNotEmpty) {
+        lastUser = m.text;
+      }
+      if (lastAny.isNotEmpty && lastUser.isNotEmpty) break;
+    }
     String macro(String input) => MacroEngine.expand(
           input,
           character: character,
           settings: settings,
           variables: session.variables,
+          userInput: lastUser,
+          lastMessage: lastAny,
         );
 
     final recentText = session.messages
@@ -63,33 +74,33 @@ class PromptBuilder {
     if (main.trim().isNotEmpty) {
       system.writeln(macro(main).trim());
     }
-    system.writeln('\n[角色]\n名字：${character.name}');
+    system.writeln('\n[瑙掕壊]\n鍚嶅瓧锛?{character.name}');
     if (character.description.trim().isNotEmpty) {
-      system.writeln('设定：${macro(character.description).trim()}');
+      system.writeln('璁惧畾锛?{macro(character.description).trim()}');
     }
     if (character.personality.trim().isNotEmpty) {
-      system.writeln('性格：${macro(character.personality).trim()}');
+      system.writeln('鎬ф牸锛?{macro(character.personality).trim()}');
     }
     if (character.scenario.trim().isNotEmpty) {
-      system.writeln('场景：${macro(character.scenario).trim()}');
+      system.writeln('鍦烘櫙锛?{macro(character.scenario).trim()}');
     }
     if (session.summary.trim().isNotEmpty) {
-      system.writeln('\n[前情提要]\n${session.summary.trim()}');
+      system.writeln('\n[鍓嶆儏鎻愯]\n${session.summary.trim()}');
     }
-    if (lore.isNotEmpty) system.writeln('\n[世界设定]\n$lore');
+    if (lore.isNotEmpty) system.writeln('\n[涓栫晫璁惧畾]\n$lore');
     if (settings.personaDescription.trim().isNotEmpty) {
       system.writeln(
-        '\n[用户]\n名字：${settings.userName}\n'
+        '\n[鐢ㄦ埛]\n鍚嶅瓧锛?{settings.userName}\n'
         '${macro(settings.personaDescription).trim()}',
       );
     }
     if (character.exampleDialogue.trim().isNotEmpty) {
       system.writeln(
-        '\n[对话示例]\n${macro(character.exampleDialogue).trim()}',
+        '\n[瀵硅瘽绀轰緥]\n${macro(character.exampleDialogue).trim()}',
       );
     }
     if (settings.authorNote.trim().isNotEmpty) {
-      system.writeln('\n[作者笔记]\n${macro(settings.authorNote).trim()}');
+      system.writeln('\n[浣滆€呯瑪璁癩\n${macro(settings.authorNote).trim()}');
     }
 
     final extra = <Map<String, String>>[];
@@ -207,3 +218,4 @@ class PromptBuilder {
     return selected.map((e) => e.$2).take(6).join('\n\n');
   }
 }
+

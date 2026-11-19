@@ -18,10 +18,16 @@ import 'stats.dart';
 import '../design/toast.dart';
 
 class ChatInfoSheet extends StatelessWidget {
-  const ChatInfoSheet({super.key, required this.session, required this.character});
+  const ChatInfoSheet({
+    super.key,
+    required this.session,
+    required this.character,
+    this.onSummarize,
+  });
 
   final ChatSession session;
   final DemoCharacter character;
+  final Future<void> Function()? onSummarize;
 
   Future<void> _export(BuildContext context) async {
     final data = AppStore.instance.exportChatJsonl(session);
@@ -149,9 +155,22 @@ class ChatInfoSheet extends StatelessWidget {
               SettingRow(
                 icon: Icons.auto_awesome_rounded,
                 title: '记忆与总结',
-                value: '已总结 12 段',
+                value: session.summary.isEmpty ? '未生成' : '已生成',
                 iconColor: p.violet,
-                onTap: () => showTavernToast(context, '已总结 12 段'),
+                onTap: () async {
+                  if (onSummarize == null) {
+                    showTavernToast(context, session.summary);
+                    return;
+                  }
+                  showTavernToast(context, '正在生成摘要…');
+                  await onSummarize!();
+                  if (context.mounted) {
+                    showTavernToast(
+                      context,
+                      session.summary.isEmpty ? '摘要生成失败' : '摘要已更新',
+                    );
+                  }
+                },
               ),
               const Hairline(indent: 56),
               SettingRow(

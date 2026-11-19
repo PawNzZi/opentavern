@@ -95,6 +95,7 @@ class _ChatScreenState extends State<ChatScreen> {
         pageBuilder: (_, animation, __) => ChatInfoSheet(
           session: _chat.session,
           character: widget.character,
+          onSummarize: _chat.summarizeNow,
         ),
         transitionsBuilder: (_, animation, __, child) {
           final curved = CurvedAnimation(
