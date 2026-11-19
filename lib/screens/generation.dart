@@ -1,23 +1,59 @@
 import 'package:flutter/material.dart';
 
+import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
+import '../design/toast.dart';
 
-class GenerationPage extends StatelessWidget {
+class GenerationPage extends StatefulWidget {
   const GenerationPage({super.key});
+
+  @override
+  State<GenerationPage> createState() => _GenerationPageState();
+}
+
+class _GenerationPageState extends State<GenerationPage> {
+  late double _temperature;
+  late double _maxTokens;
+  late bool _streaming;
+
+  @override
+  void initState() {
+    super.initState();
+    final api = AppStore.instance.settings.api;
+    _temperature = api.temperature;
+    _maxTokens = api.maxTokens.toDouble();
+    _streaming = api.streaming;
+  }
+
+  Future<void> _save() async {
+    final settings = AppStore.instance.settings;
+    AppStore.instance.settings = settings.copyWith(
+      api: settings.api.copyWith(
+        temperature: _temperature,
+        maxTokens: _maxTokens.round(),
+        streaming: _streaming,
+      ),
+    );
+    await AppStore.instance.saveSettings();
+    if (!mounted) return;
+    showTavernToast(context, '生成参数已保存');
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final preset = AppStore.instance.activePreset;
     return DetailPage(
       eyebrow: 'GENERATION',
       title: '生成参数',
       subtitle: '控制模型怎么写，而不是写什么。',
-      footer: const GlassPrimaryButton(
-        label: '保存为当前预设',
+      footer: GlassPrimaryButton(
+        label: '保存生成参数',
         icon: Icons.check_rounded,
+        onTap: _save,
       ),
       children: [
         const SizedBox(height: 18),
@@ -43,9 +79,12 @@ class GenerationPage extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          '长夜 · 叙事',
-                          style: appText(15, FontWeight.w600, p.textPrimary),
+                        Flexible(
+                          child: Text(
+                            preset?.name ?? '默认预设',
+                            overflow: TextOverflow.ellipsis,
+                            style: appText(15, FontWeight.w600, p.textPrimary),
+                          ),
                         ),
                         const SizedBox(width: 7),
                         const TagBadge('当前'),
@@ -53,175 +92,73 @@ class GenerationPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Chat Completion · 12 条提示词',
+                      '${AppStore.instance.settings.api.model} · ${AppStore.instance.settings.api.provider}',
                       style: appText(10.5, FontWeight.w400, p.textTertiary),
                     ),
                   ],
                 ),
-              ),
-              Text(
-                '另存为',
-                style: appText(12, FontWeight.w500, p.amber),
               ),
             ],
           ),
         ),
         SettingsGroup(
           title: '采样',
-          footnote: '温度越高越发散；top_p 与 top_k 限制候选范围。',
-          children: const [
+          footnote: '温度越高越发散。Top P / Top K / 频率惩罚尚未接入 API 请求。',
+          children: [
             SliderLine(
               title: '温度',
-              value: .85,
+              value: _temperature,
               min: 0,
               max: 2,
-              display: '0.85',
+              display: _temperature.toStringAsFixed(2),
+              onChanged: (v) => setState(() => _temperature = v),
             ),
             SliderLine(
-              title: 'Top P',
-              value: .95,
-              min: 0,
-              max: 1,
-              display: '0.95',
-            ),
-            SliderLine(
-              title: 'Top K',
-              value: 40,
-              min: 0,
-              max: 100,
-              divisions: 100,
-              display: '40',
-            ),
-            SliderLine(
-              title: '频率惩罚',
-              value: .1,
-              min: -2,
-              max: 2,
-              display: '0.10',
-            ),
-            SliderLine(
-              title: '存在惩罚',
-              value: .1,
-              min: -2,
-              max: 2,
-              display: '0.10',
-            ),
-            SliderLine(
-              title: '重复惩罚',
-              value: 1.05,
-              min: 1,
-              max: 1.5,
-              display: '1.05',
+              title: '最大回复长度',
+              value: _maxTokens,
+              min: 128,
+              max: 4096,
+              divisions: 31,
+              display: '${_maxTokens.round()} tokens',
+              onChanged: (v) => setState(() => _maxTokens = v),
             ),
           ],
         ),
         SettingsGroup(
-          title: '长度',
-          children: const [
-            StepperRow(
-              title: '上下文长度',
-              subtitle: '模型一次能看到的 token 数',
-              value: '128k',
-            ),
-            StepperRow(
-              title: '回复长度',
-              subtitle: '预留给模型输出的 token',
-              value: '4096',
-            ),
-            StepperRow(
-              title: 'Tokenizer',
-              subtitle: '用于预算与计数',
-              value: 'Claude',
-            ),
-          ],
-        ),
-        SettingsGroup(
-          title: '随机与停止',
+          title: '流式',
           children: [
-            const FieldBlock(
-              label: '种子',
-              value: '随机（每次不同）',
-              trailing: Icon(
-                Icons.casino_outlined,
-                size: 16,
-                color: Colors.white54,
-              ),
-            ),
-            const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+              child: Row(
                 children: [
-                  Text(
-                    '停止字符串',
-                    style: appText(13.5, FontWeight.w500, p.textPrimary),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '流式输出',
+                          style: appText(13.5, FontWeight.w500, p.textPrimary),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '逐字显示回复，可随时停止',
+                          style: appText(10.5, FontWeight.w400, p.textTertiary),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 7,
-                    runSpacing: 7,
-                    children: const [
-                      GlassPill(label: '\\nUser:', height: 30),
-                      GlassPill(label: '\\nSeraphina:', height: 30),
-                      GlassPill(label: '+ 添加', height: 30),
-                    ],
+                  TavernSwitch(
+                    value: _streaming,
+                    onChanged: (v) => setState(() => _streaming = v),
                   ),
                 ],
               ),
             ),
-            const SwitchLine(
-              title: '流式输出',
-              subtitle: '逐字显示，可随时停止',
-              value: true,
-            ),
-            const SwitchLine(
-              title: '自动继续',
-              subtitle: '回复被截断时自动续写',
-              value: false,
-            ),
           ],
         ),
-        SettingsGroup(
-          title: '高级',
-          footnote: '这些选项会影响可复现性与费用，不确定时保持默认。',
-          children: [
-            SettingRow(
-              icon: Icons.tune_rounded,
-              title: 'Logit Bias',
-              value: '2 组',
-              iconColor: p.violet,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.speed_rounded,
-              title: 'CFG Scale',
-              value: '关闭',
-              iconColor: p.rose,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.analytics_outlined,
-              title: 'Logprobs',
-              value: '关闭',
-              iconColor: p.sage,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.shuffle_rounded,
-              title: '采样器顺序',
-              value: '默认',
-              iconColor: p.amber,
-              onTap: () {},
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
         const HintCard(
-          text: '修改后不会立刻覆盖预设。点底部「保存为当前预设」，或另存为新预设，才能在不同角色间复用。',
+          text: '生成的温度与最大长度会立即用于下一次请求；预设里的提示词内容不受影响。',
+          color: Color(0xFFD9B48A),
         ),
       ],
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
 import '../design/theme.dart';
@@ -28,6 +29,8 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final api = AppStore.instance.settings.api;
+    final preset = AppStore.instance.activePreset;
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -116,7 +119,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.bolt_rounded,
                   title: 'API 连接',
-                  value: 'Claude 4.5',
+                  value: api.model.trim().isEmpty ? '未配置' : api.model,
                   iconColor: p.amber,
                   onTap: onOpenConnect,
                   trailing: Container(
@@ -124,7 +127,7 @@ class SettingsScreen extends StatelessWidget {
                     height: 6,
                     margin: const EdgeInsets.only(right: 2),
                     decoration: BoxDecoration(
-                      color: p.sage,
+                      color: api.apiKey.trim().isEmpty ? p.textTertiary : p.sage,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -133,7 +136,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.tune_rounded,
                   title: '生成参数',
-                  value: '温度 0.85',
+                  value: '温度 ${api.temperature.toStringAsFixed(2)}',
                   iconColor: p.violet,
                   onTap: () => _open(context, const GenerationPage()),
                 ),
@@ -141,7 +144,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.layers_outlined,
                   title: '预设',
-                  value: '长夜 · 叙事',
+                  value: preset?.name ?? '默认',
                   iconColor: p.rose,
                   onTap: () => _open(context, const PresetsPage()),
                 ),
