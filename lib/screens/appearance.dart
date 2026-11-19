@@ -46,6 +46,7 @@ class AppearancePage extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 14),
         Glass(
           radius: 24,
           blur: 24,

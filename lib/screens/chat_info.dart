@@ -21,7 +21,7 @@ class ChatInfoSheet extends StatelessWidget {
     return SheetStage(
       title: '聊天信息',
       subtitle: 'Seraphina · 王都的雨夜',
-      heightFactor: .9,
+      heightFactor: .95,
       leading: SizedBox(
         width: 40,
         height: 40,
@@ -30,10 +30,6 @@ class ChatInfoSheet extends StatelessWidget {
           colors: c.colors,
           radius: 12,
         ),
-      ),
-      footer: GlassPrimaryButton(
-        label: '完成',
-        onTap: () => Navigator.of(context).maybePop(),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

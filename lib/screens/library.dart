@@ -7,7 +7,7 @@ import '../design/routes.dart';
 import '../design/theme.dart';
 import 'search.dart';
 
-class LibraryScreen extends StatelessWidget {
+class LibraryScreen extends StatefulWidget {
   const LibraryScreen({
     super.key,
     required this.onOpenCharacter,
@@ -20,8 +20,29 @@ class LibraryScreen extends StatelessWidget {
   final VoidCallback onImport;
 
   @override
+  State<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends State<LibraryScreen> {
+  static const _tags = ['全部', '最近', '收藏', '奇幻', '科幻', '治愈'];
+  String _tag = '全部';
+
+  List<DemoCharacter> get _filtered {
+    switch (_tag) {
+      case '全部':
+      case '最近':
+        return demoCharacters;
+      case '收藏':
+        return demoCharacters.where((c) => c.favorite).toList();
+      default:
+        return demoCharacters.where((c) => c.tags.contains(_tag)).toList();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final characters = _filtered;
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -35,7 +56,7 @@ class LibraryScreen extends StatelessWidget {
             trailing: GlassCircleButton(
               icon: Icons.add_rounded,
               size: 46,
-              onTap: onImport,
+              onTap: widget.onImport,
             ),
           ),
           const SizedBox(height: 20),
@@ -46,54 +67,62 @@ class LibraryScreen extends StatelessWidget {
           const SizedBox(height: 14),
           SizedBox(
             height: 38,
-            child: ListView(
+            child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
-              children: const [
-                GlassPill(label: '全部', selected: true),
-                SizedBox(width: 8),
-                GlassPill(label: '最近'),
-                SizedBox(width: 8),
-                GlassPill(label: '收藏'),
-                SizedBox(width: 8),
-                GlassPill(label: '奇幻'),
-                SizedBox(width: 8),
-                GlassPill(label: '科幻'),
-                SizedBox(width: 8),
-                GlassPill(label: '治愈'),
-              ],
+              itemCount: _tags.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final tag = _tags[i];
+                return GlassPill(
+                  label: tag,
+                  selected: _tag == tag,
+                  onTap: () => setState(() => _tag = tag),
+                );
+              },
             ),
           ),
           const SizedBox(height: 22),
           _ContinueCard(
             character: demoCharacters.first,
-            onTap: () => onOpenChat(demoCharacters.first),
+            onTap: () => widget.onOpenChat(demoCharacters.first),
           ),
           SectionLabel(
             '角色',
             trailing: Text(
-              '6 位 · 管理',
+              '${characters.length} 位 · 管理',
               style: appText(12.5, FontWeight.w500, p.textTertiary),
             ),
           ),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: demoCharacters.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 14,
-              childAspectRatio: .72,
+          if (characters.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 30),
+              child: Center(
+                child: Text(
+                  '没有“$_tag”标签的角色',
+                  style: appText(13, FontWeight.w400, p.textTertiary),
+                ),
+              ),
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: characters.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 14,
+                childAspectRatio: .72,
+              ),
+              itemBuilder: (context, i) {
+                final c = characters[i];
+                return _CharacterTile(
+                  character: c,
+                  onTap: () => widget.onOpenCharacter(c),
+                );
+              },
             ),
-            itemBuilder: (context, i) {
-              final c = demoCharacters[i];
-              return _CharacterTile(
-                character: c,
-                onTap: () => onOpenCharacter(c),
-              );
-            },
-          ),
         ],
       ),
     );

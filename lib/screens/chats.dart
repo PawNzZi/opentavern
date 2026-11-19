@@ -5,9 +5,10 @@ import '../design/glass.dart';
 import '../design/scaffold.dart';
 import '../design/routes.dart';
 import '../design/theme.dart';
+import '../design/toast.dart';
 import 'search.dart';
 
-class ChatsScreen extends StatelessWidget {
+class ChatsScreen extends StatefulWidget {
   const ChatsScreen({
     super.key,
     required this.onOpenChat,
@@ -18,10 +19,40 @@ class ChatsScreen extends StatelessWidget {
   final VoidCallback onSearch;
 
   @override
+  State<ChatsScreen> createState() => _ChatsScreenState();
+}
+
+class _ChatsScreenState extends State<ChatsScreen> {
+  late List<DemoChat> _chats = List.of(demoChats);
+
+  void _togglePin(DemoChat chat) {
+    setState(() {
+      final i = _chats.indexWhere((c) => c.character.name == chat.character.name);
+      if (i < 0) return;
+      _chats[i] = DemoChat(
+        character: _chats[i].character,
+        snippet: _chats[i].snippet,
+        time: _chats[i].time,
+        unread: _chats[i].unread,
+        pinned: !_chats[i].pinned,
+      );
+      _chats.sort((a, b) => (b.pinned ? 1 : 0).compareTo(a.pinned ? 1 : 0));
+    });
+    showTavernToast(context, chat.pinned ? '已取消置顶' : '已置顶对话');
+  }
+
+  void _delete(DemoChat chat) {
+    setState(() {
+      _chats.removeWhere((c) => c.character.name == chat.character.name);
+    });
+    showTavernToast(context, '已删除对话');
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final pinned = demoChats.where((c) => c.pinned).toList();
-    final recent = demoChats.where((c) => !c.pinned).toList();
+    final pinned = _chats.where((c) => c.pinned).toList();
+    final recent = _chats.where((c) => !c.pinned).toList();
 
     return SafeArea(
       bottom: false,
@@ -32,11 +63,11 @@ class ChatsScreen extends StatelessWidget {
           PageHeader(
             eyebrow: 'YOUR STORIES',
             title: '对话',
-            subtitle: '6 段故事，等你回来。',
+            subtitle: '${_chats.length} 段故事，等你回来。',
             trailing: GlassCircleButton(
               icon: Icons.search_rounded,
               size: 46,
-              onTap: onSearch,
+              onTap: widget.onSearch,
             ),
           ),
           const SizedBox(height: 20),
@@ -53,7 +84,9 @@ class ChatsScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: _ChatGroup(
                 chats: pinned,
-                onOpenChat: onOpenChat,
+                onOpenChat: widget.onOpenChat,
+                onPin: _togglePin,
+                onDelete: _delete,
               ),
             ),
           ],
@@ -62,7 +95,12 @@ class ChatsScreen extends StatelessWidget {
             radius: 26,
             blur: 26,
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: _ChatGroup(chats: recent, onOpenChat: onOpenChat),
+            child: _ChatGroup(
+              chats: recent,
+              onOpenChat: widget.onOpenChat,
+              onPin: _togglePin,
+              onDelete: _delete,
+            ),
           ),
           const SizedBox(height: 18),
           Center(
@@ -89,23 +127,169 @@ class ChatsScreen extends StatelessWidget {
 }
 
 class _ChatGroup extends StatelessWidget {
-  const _ChatGroup({required this.chats, required this.onOpenChat});
+  const _ChatGroup({
+    required this.chats,
+    required this.onOpenChat,
+    required this.onPin,
+    required this.onDelete,
+  });
 
   final List<DemoChat> chats;
   final ValueChanged<DemoCharacter> onOpenChat;
+  final ValueChanged<DemoChat> onPin;
+  final ValueChanged<DemoChat> onDelete;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         for (var i = 0; i < chats.length; i++) ...[
-          _ChatRow(
+          _SwipeChatRow(
+            key: ValueKey(chats[i].character.name),
             chat: chats[i],
             onTap: () => onOpenChat(chats[i].character),
+            onPin: () => onPin(chats[i]),
+            onDelete: () => onDelete(chats[i]),
           ),
           if (i != chats.length - 1) const Hairline(indent: 76),
         ],
       ],
+    );
+  }
+}
+
+class _SwipeChatRow extends StatefulWidget {
+  const _SwipeChatRow({
+    super.key,
+    required this.chat,
+    required this.onTap,
+    required this.onPin,
+    required this.onDelete,
+  });
+
+  final DemoChat chat;
+  final VoidCallback onTap;
+  final VoidCallback onPin;
+  final VoidCallback onDelete;
+
+  @override
+  State<_SwipeChatRow> createState() => _SwipeChatRowState();
+}
+
+class _SwipeChatRowState extends State<_SwipeChatRow> {
+  static const _max = 144.0;
+  double _offset = 0;
+
+  void _update(DragUpdateDetails details) {
+    setState(() {
+      _offset = (_offset - details.delta.dx).clamp(0.0, _max);
+    });
+  }
+
+  void _end(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final open = _offset > 44 || velocity < -300;
+    setState(() => _offset = open ? _max : 0);
+  }
+
+  void _run(VoidCallback action) {
+    setState(() => _offset = 0);
+    action();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: _offset == 0,
+              child: Opacity(
+                opacity: _offset == 0 ? 0 : 1,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SwipeAction(
+                      icon: widget.chat.pinned
+                          ? Icons.push_pin_outlined
+                          : Icons.push_pin_rounded,
+                      label: widget.chat.pinned ? '取消' : '置顶',
+                      color: p.amber,
+                      onTap: () => _run(widget.onPin),
+                    ),
+                    _SwipeAction(
+                      icon: Icons.delete_outline_rounded,
+                      label: '删除',
+                      color: p.danger,
+                      onTap: () => _run(widget.onDelete),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(-_offset, 0),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragUpdate: _update,
+              onHorizontalDragEnd: _end,
+              child: _ChatRow(
+                chat: widget.chat,
+                onTap: () {
+                  if (_offset > 0) {
+                    setState(() => _offset = 0);
+                  } else {
+                    widget.onTap();
+                  }
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwipeAction extends StatelessWidget {
+  const _SwipeAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 72,
+        color: color.withValues(alpha: .18),
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: appText(10.5, FontWeight.w600, color),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

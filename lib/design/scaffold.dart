@@ -172,20 +172,27 @@ class SearchField extends StatelessWidget {
     required this.hint,
     this.trailing,
     this.onTap,
+    this.controller,
+    this.onChanged,
+    this.autofocus = false,
   });
 
   final String hint;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final TextEditingController? controller;
+  final ValueChanged<String>? onChanged;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final editable = controller != null;
     return Glass(
       radius: 26,
       blur: 20,
       shadow: false,
-      onTap: onTap,
+      onTap: editable ? null : onTap,
       child: SizedBox(
         height: 52,
         child: Row(
@@ -194,10 +201,29 @@ class SearchField extends StatelessWidget {
             Icon(Icons.search_rounded, size: 19, color: p.textTertiary),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                hint,
-                style: appText(14.5, FontWeight.w400, p.textTertiary),
-              ),
+              child: editable
+                  ? TextField(
+                      controller: controller,
+                      autofocus: autofocus,
+                      onChanged: onChanged,
+                      cursorColor: p.amber,
+                      textInputAction: TextInputAction.search,
+                      style: appText(14.5, FontWeight.w400, p.textPrimary),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: hint,
+                        hintStyle: appText(
+                          14.5,
+                          FontWeight.w400,
+                          p.textTertiary,
+                        ),
+                      ),
+                    )
+                  : Text(
+                      hint,
+                      style: appText(14.5, FontWeight.w400, p.textTertiary),
+                    ),
             ),
             if (trailing != null) trailing!,
             const SizedBox(width: 14),
@@ -492,7 +518,12 @@ class _SheetStageState extends State<SheetStage>
                       const SizedBox(height: 16),
                       Expanded(
                         child: SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(22, 0, 22, 20),
+                          padding: EdgeInsets.fromLTRB(
+                            22,
+                            0,
+                            22,
+                            widget.footer != null ? 96 : 20,
+                          ),
                           child: widget.child,
                         ),
                       ),
@@ -505,6 +536,7 @@ class _SheetStageState extends State<SheetStage>
                             12 + MediaQuery.paddingOf(context).bottom,
                           ),
                           decoration: BoxDecoration(
+                            color: p.canvasTop.withValues(alpha: .97),
                             border: Border(
                               top: BorderSide(color: p.divider, width: .6),
                             ),

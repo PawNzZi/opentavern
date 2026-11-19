@@ -6,21 +6,61 @@ import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
 
-class SearchPage extends StatelessWidget {
+class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
+
+  @override
+  State<SearchPage> createState() => _SearchPageState();
+}
+
+class _SearchPageState extends State<SearchPage> {
+  final _controller = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final q = _query.trim().toLowerCase();
+    final characters = demoCharacters
+        .where(
+          (c) =>
+              q.isEmpty ||
+              c.name.toLowerCase().contains(q) ||
+              c.title.toLowerCase().contains(q) ||
+              c.tags.any((t) => t.toLowerCase().contains(q)),
+        )
+        .toList();
+    final chats = demoChats
+        .where(
+          (c) =>
+              q.isEmpty ||
+              c.character.name.toLowerCase().contains(q) ||
+              c.snippet.toLowerCase().contains(q),
+        )
+        .toList();
+    final messages = <(String, String)>[
+      ('是啊。王都的雨，总在预言之后来。', '21:39'),
+      ('有些坏消息，只配在雨天说。', '21:40'),
+    ].where((m) => q.isEmpty || m.$1.toLowerCase().contains(q)).toList();
+
     return DetailPage(
       eyebrow: 'SEARCH',
       title: '搜索',
       subtitle: '角色、对话与消息，一次找全。',
       children: [
         const SizedBox(height: 16),
-        const SearchField(
-          hint: '搜索“雨”',
-          trailing: Icon(Icons.mic_none_rounded, size: 17),
+        SearchField(
+          controller: _controller,
+          autofocus: true,
+          hint: '搜索角色、对话或消息',
+          onChanged: (v) => setState(() => _query = v),
+          trailing: Icon(Icons.mic_none_rounded, size: 17, color: p.textTertiary),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -38,59 +78,76 @@ class SearchPage extends StatelessWidget {
             ],
           ),
         ),
-        const SectionLabel('角色'),
-        Glass(
-          radius: 22,
-          blur: 22,
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            children: [
-              for (var i = 0; i < 2; i++) ...[
-                _CharacterResult(character: demoCharacters[i]),
-                if (i != 1) const Hairline(indent: 66),
-              ],
-            ],
-          ),
-        ),
-        const SectionLabel('对话'),
-        Glass(
-          radius: 22,
-          blur: 22,
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            children: [
-              for (var i = 0; i < 2; i++) ...[
-                _ChatResult(chat: demoChats[i]),
-                if (i != 1) const Hairline(indent: 66),
-              ],
-            ],
-          ),
-        ),
-        const SectionLabel('消息'),
-        Glass(
-          radius: 22,
-          blur: 22,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Column(
-            children: [
-              _MessageResult(
-                name: 'Seraphina',
-                text: '是啊。王都的雨，总在预言之后来。',
-                time: '21:39',
-                query: '雨',
+        if (characters.isEmpty && chats.isEmpty && messages.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 50),
+            child: Center(
+              child: Text(
+                '没有找到“$_query”',
+                style: appText(13.5, FontWeight.w400, p.textTertiary),
               ),
-              const SizedBox(height: 12),
-              const Hairline(),
-              const SizedBox(height: 12),
-              _MessageResult(
-                name: 'Seraphina',
-                text: '有些坏消息，只配在雨天说。',
-                time: '21:40',
-                query: '雨',
+            ),
+          )
+        else ...[
+          if (characters.isNotEmpty) ...[
+            const SectionLabel('角色'),
+            Glass(
+              radius: 22,
+              blur: 22,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                children: [
+                  for (var i = 0; i < characters.length; i++) ...[
+                    _CharacterResult(character: characters[i]),
+                    if (i != characters.length - 1)
+                      const Hairline(indent: 66),
+                  ],
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          ],
+          if (chats.isNotEmpty) ...[
+            const SectionLabel('对话'),
+            Glass(
+              radius: 22,
+              blur: 22,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                children: [
+                  for (var i = 0; i < chats.length; i++) ...[
+                    _ChatResult(chat: chats[i]),
+                    if (i != chats.length - 1) const Hairline(indent: 66),
+                  ],
+                ],
+              ),
+            ),
+          ],
+          if (messages.isNotEmpty) ...[
+            const SectionLabel('消息'),
+            Glass(
+              radius: 22,
+              blur: 22,
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              child: Column(
+                children: [
+                  for (var i = 0; i < messages.length; i++) ...[
+                    _MessageResult(
+                      name: 'Seraphina',
+                      text: messages[i].$1,
+                      time: messages[i].$2,
+                      query: _query,
+                    ),
+                    if (i != messages.length - 1) ...[
+                      const SizedBox(height: 12),
+                      const Hairline(),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
         const SizedBox(height: 18),
         Row(
           children: [
@@ -113,7 +170,7 @@ class SearchPage extends StatelessWidget {
             GlassPill(label: '王都', height: 30),
             GlassPill(label: '星图', height: 30),
             GlassPill(label: '坏消息', height: 30),
-            GlassPill(label: '沈砚', height: 30),
+            GlassPill(label: '沉砚', height: 30),
           ],
         ),
       ],
