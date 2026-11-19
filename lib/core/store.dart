@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../data/demo.dart';
 import 'card_import.dart';
+import 'lore_io.dart';
 import 'models.dart';
 
 /// Small local-first persistence layer. Everything lives in one folder under
@@ -545,6 +546,19 @@ class AppStore extends ChangeNotifier {
     await saveCharacters();
     notifyListeners();
   }
+
+  Future<Lorebook?> importLorebook(
+    Uint8List bytes,
+    String fileName,
+  ) async {
+    final book = parseWorldInfo(bytes, fileName);
+    if (book == null) return null;
+    await addLorebook(book);
+    return book;
+  }
+
+  String exportLorebookJson(Lorebook book) =>
+      const JsonEncoder.withIndent('  ').convert(lorebookToWorldJson(book));
 
   Future<DemoCharacter?> importCard(Uint8List bytes, String fileName) async {
     var card = parseCharacterCard(bytes, fileName);

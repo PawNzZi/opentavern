@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
@@ -35,6 +39,19 @@ class _LoreScreenState extends State<LoreScreen> {
 
   void _sync() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _importBook() async {
+    final file = await FilePickerPlatform.instance.pickFile();
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    final book = await AppStore.instance.importLorebook(bytes, file.name);
+    if (!mounted) return;
+    showTavernToast(
+      context,
+      book == null ? '不是有效的世界书 JSON' : '已导入 ${book.name}',
+    );
+    if (book != null) setState(() {});
   }
 
   Future<void> _newBook() async {
@@ -134,6 +151,13 @@ class _LoreScreenState extends State<LoreScreen> {
                 ),
                 const Spacer(),
                 GlassCircleButton(
+                  icon: Icons.file_download_outlined,
+                  size: 40,
+                  iconSize: 17,
+                  onTap: _importBook,
+                ),
+                const SizedBox(width: 8),
+                GlassCircleButton(
                   icon: Icons.add_rounded,
                   size: 40,
                   onTap: _newBook,
@@ -229,6 +253,18 @@ class _LorebookPageState extends State<LorebookPage> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _exportBook() async {
+    final data = AppStore.instance.exportLorebookJson(widget.book);
+    final uri = await FilePickerPlatform.instance.saveFile(
+      fileName: '${widget.book.name}.json',
+      bytes: Uint8List.fromList(utf8.encode(data)),
+      mimeType: 'application/json',
+      dialogTitle: '导出世界书 JSON',
+    );
+    if (!mounted) return;
+    showTavernToast(context, uri == null ? '已取消导出' : '世界书已导出');
+  }
+
   Future<void> _deleteEntry(LoreEntry entry) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -273,6 +309,13 @@ class _LorebookPageState extends State<LorebookPage> {
                   onTap: () => Navigator.maybePop(context),
                 ),
                 const Spacer(),
+                GlassCircleButton(
+                  icon: Icons.ios_share_rounded,
+                  size: 40,
+                  iconSize: 17,
+                  onTap: _exportBook,
+                ),
+                const SizedBox(width: 8),
                 GlassCircleButton(
                   icon: Icons.add_rounded,
                   size: 40,
