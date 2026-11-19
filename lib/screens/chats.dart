@@ -17,7 +17,7 @@ class ChatsScreen extends StatefulWidget {
     required this.onSearch,
   });
 
-  final ValueChanged<DemoCharacter> onOpenChat;
+  final ValueChanged<DemoChat> onOpenChat;
   final VoidCallback onSearch;
 
   @override
@@ -45,6 +45,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         snippet: session.snippet,
         time: _timeLabel(session.updatedAt),
         pinned: session.pinned,
+        sessionId: session.id,
       ));
     }
     return result;
@@ -77,9 +78,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   void _togglePin(DemoChat chat) {
-    final session = AppStore.instance.sessions.firstWhere(
-      (s) => s.characterName == chat.character.name,
-    );
+    final session = chat.sessionId != null
+        ? AppStore.instance.sessionById(chat.sessionId)!
+        : AppStore.instance.sessions.firstWhere(
+            (s) => s.characterName == chat.character.name,
+          );
     session.pinned = !session.pinned;
     AppStore.instance.saveSessions();
     setState(() => _chats = _fromStore());
@@ -87,9 +90,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   void _delete(DemoChat chat) {
-    AppStore.instance.sessions.removeWhere(
-      (s) => s.characterName == chat.character.name,
-    );
+    if (chat.sessionId != null) {
+      AppStore.instance.sessions.removeWhere((s) => s.id == chat.sessionId);
+    } else {
+      AppStore.instance.sessions.removeWhere(
+        (s) => s.characterName == chat.character.name,
+      );
+    }
     AppStore.instance.saveSessions();
     setState(() => _chats = _fromStore());
     showTavernToast(context, '已删除对话');
@@ -182,7 +189,7 @@ class _ChatGroup extends StatelessWidget {
   });
 
   final List<DemoChat> chats;
-  final ValueChanged<DemoCharacter> onOpenChat;
+  final ValueChanged<DemoChat> onOpenChat;
   final ValueChanged<DemoChat> onPin;
   final ValueChanged<DemoChat> onDelete;
 
@@ -194,7 +201,7 @@ class _ChatGroup extends StatelessWidget {
           _SwipeChatRow(
             key: ValueKey(chats[i].character.name),
             chat: chats[i],
-            onTap: () => onOpenChat(chats[i].character),
+            onTap: () => onOpenChat(chats[i]),
             onPin: () => onPin(chats[i]),
             onDelete: () => onDelete(chats[i]),
           ),

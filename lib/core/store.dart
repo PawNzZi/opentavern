@@ -200,10 +200,23 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  ChatSession sessionFor(DemoCharacter character) {
+  ChatSession? sessionById(String? id) {
+    if (id == null) return null;
     for (final session in sessions) {
-      if (session.characterName == character.name) return session;
+      if (session.id == id) return session;
     }
+    return null;
+  }
+
+  ChatSession sessionFor(DemoCharacter character) {
+    ChatSession? latest;
+    for (final session in sessions) {
+      if (session.characterName != character.name) continue;
+      if (latest == null || session.updatedAt > latest.updatedAt) {
+        latest = session;
+      }
+    }
+    if (latest != null) return latest;
     final session = ChatSession(
       id: 'chat-${DateTime.now().microsecondsSinceEpoch}',
       characterName: character.name,
@@ -220,6 +233,60 @@ class AppStore extends ChangeNotifier {
     sessions.add(session);
     saveSessions();
     return session;
+  }
+
+  ChatSession createSession(
+    DemoCharacter character, {
+    String? title,
+    List<ChatMessage>? messages,
+  }) {
+    final session = ChatSession(
+      id: 'chat-${DateTime.now().microsecondsSinceEpoch}',
+      characterName: character.name,
+      title: title ?? '${character.name} · 新对话',
+      messages: messages ??
+          [
+            if (character.greeting.trim().isNotEmpty)
+              ChatMessage(
+                id: 'greet-${DateTime.now().microsecondsSinceEpoch}',
+                text: character.greeting,
+                time: _timeLabel(),
+              ),
+          ],
+    );
+    sessions.add(session);
+    saveSessions();
+    return session;
+  }
+
+  ChatSession branchSession(
+    ChatSession source, {
+    required int throughIndex,
+    String? title,
+  }) {
+    final cut = source.messages.isEmpty
+        ? -1
+        : throughIndex.clamp(0, source.messages.length - 1);
+    final copied = cut < 0
+        ? <ChatMessage>[]
+        : source.messages
+            .take(cut + 1)
+            .map((m) => m.copyWith())
+            .toList();
+    final session = ChatSession(
+      id: 'branch-${DateTime.now().microsecondsSinceEpoch}',
+      characterName: source.characterName,
+      title: title ?? '${source.title} · 分支',
+      messages: copied,
+    );
+    sessions.add(session);
+    saveSessions();
+    return session;
+  }
+
+  Future<void> deleteSession(String id) async {
+    sessions.removeWhere((s) => s.id == id);
+    await saveSessions();
   }
 
   Future<void> addCharacter(DemoCharacter character) async {

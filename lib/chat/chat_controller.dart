@@ -12,8 +12,8 @@ export '../core/models.dart' show ChatMessage;
 
 /// Real chat state machine backed by the local store and a direct model API.
 class ChatController extends ChangeNotifier {
-  ChatController({required this.character}) {
-    _session = AppStore.instance.sessionFor(character);
+  ChatController({required this.character, ChatSession? session}) {
+    _session = session ?? AppStore.instance.sessionFor(character);
     if (_session.messages.isEmpty && character.greeting.trim().isNotEmpty) {
       _session.messages.add(
         ChatMessage(
@@ -253,6 +253,12 @@ class ChatController extends ChangeNotifier {
     message.bookmarked = !message.bookmarked;
     notifyListeners();
     _save();
+  }
+
+  ChatSession? branchAt(ChatMessage message) {
+    final index = messages.indexOf(message);
+    if (index < 0) return null;
+    return AppStore.instance.branchSession(_session, throughIndex: index);
   }
 
   ChatMessage? _lastAssistant() {

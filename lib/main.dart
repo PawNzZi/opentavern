@@ -133,7 +133,13 @@ class TavernApp extends StatelessWidget {
           showMessageMenu: true,
         );
       case 'chatinfo':
-        return const ChatInfoSheet();
+        final infoCharacter = AppStore.instance.characters.isEmpty
+            ? demoCharacters.first
+            : AppStore.instance.characters.first;
+        return ChatInfoSheet(
+          session: AppStore.instance.sessionFor(infoCharacter),
+          character: infoCharacter,
+        );
       case 'character':
         return CharacterScreen(
           character: demoCharacters.first,
@@ -306,7 +312,12 @@ class _RootShellState extends State<RootShell> {
     switch (_index) {
       case 1:
         return ChatsScreen(
-          onOpenChat: (c) => _push(ChatScreen(character: c)),
+          onOpenChat: (chat) => _push(
+            ChatScreen(
+              character: chat.character,
+              sessionId: chat.sessionId,
+            ),
+          ),
           onSearch: () => _push(const SearchPage()),
         );
       case 2:
@@ -348,7 +359,12 @@ class _RootShellState extends State<RootShell> {
             onImport: () => _push(const ImportSheetScreen()),
           ),
           ChatsScreen(
-            onOpenChat: (c) => _push(ChatScreen(character: c)),
+            onOpenChat: (chat) => _push(
+              ChatScreen(
+                character: chat.character,
+                sessionId: chat.sessionId,
+              ),
+            ),
             onSearch: () => _push(const SearchPage()),
           ),
           SettingsScreen(

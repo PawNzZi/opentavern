@@ -148,7 +148,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => ChatScreen(character: c),
+                          builder: (_) => ChatScreen(character: c, newSession: true),
                         ),
                       );
                     },

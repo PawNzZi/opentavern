@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/models.dart';
+import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -12,15 +14,18 @@ import 'stats.dart';
 import '../design/toast.dart';
 
 class ChatInfoSheet extends StatelessWidget {
-  const ChatInfoSheet({super.key});
+  const ChatInfoSheet({super.key, required this.session, required this.character});
+
+  final ChatSession session;
+  final DemoCharacter character;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final c = demoCharacters.first;
+    final c = character;
     return SheetStage(
       title: '聊天信息',
-      subtitle: 'Seraphina · 王都的雨夜',
+      subtitle: '${c.name} · ${session.title}',
       heightFactor: .95,
       leading: SizedBox(
         width: 40,
@@ -40,13 +45,26 @@ class ChatInfoSheet extends StatelessWidget {
                 icon: Icons.call_split_rounded,
                 label: '分支',
                 color: p.amber,
-                onTap: () => showTavernToast(context, '已从当前聊天创建分支'),
+                onTap: () {
+                  AppStore.instance.branchSession(
+                    session,
+                    throughIndex: session.messages.length - 1,
+                  );
+                  showTavernToast(context, '已创建分支');
+                },
               ),
               ActionSpec(
                 icon: Icons.bookmark_add_outlined,
                 label: '检查点',
                 color: p.sage,
-                onTap: () => showTavernToast(context, '已创建检查点'),
+                onTap: () {
+                  AppStore.instance.branchSession(
+                    session,
+                    throughIndex: session.messages.length - 1,
+                    title: '${session.title} · 检查点',
+                  );
+                  showTavernToast(context, '已创建检查点');
+                },
               ),
               ActionSpec(
                 icon: Icons.ios_share_rounded,

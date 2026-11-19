@@ -19,12 +19,16 @@ class ChatScreen extends StatefulWidget {
     this.standalone = true,
     this.showMessageMenu = false,
     this.autoDemo = false,
+    this.sessionId,
+    this.newSession = false,
   });
 
   final DemoCharacter character;
   final bool standalone;
   final bool showMessageMenu;
   final bool autoDemo;
+  final String? sessionId;
+  final bool newSession;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -39,7 +43,12 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _chat = ChatController(character: widget.character);
+    final session = widget.sessionId != null
+        ? AppStore.instance.sessionById(widget.sessionId)
+        : widget.newSession
+            ? AppStore.instance.createSession(widget.character)
+            : null;
+    _chat = ChatController(character: widget.character, session: session);
     _chat.addListener(_onChatChanged);
     if (widget.autoDemo) {
       Timer(const Duration(milliseconds: 900), () {
@@ -83,7 +92,10 @@ class _ChatScreenState extends State<ChatScreen> {
     Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 320),
-        pageBuilder: (_, animation, __) => const ChatInfoSheet(),
+        pageBuilder: (_, animation, __) => ChatInfoSheet(
+          session: _chat.session,
+          character: widget.character,
+        ),
         transitionsBuilder: (_, animation, __, child) {
           final curved = CurvedAnimation(
             parent: animation,
@@ -212,7 +224,8 @@ class _ChatScreenState extends State<ChatScreen> {
         _chat.toggleBookmark(message);
         _toast(message.bookmarked ? '已添加书签' : '已移除书签');
       case '分支':
-        _toast('已从这条消息创建分支');
+        final branch = _chat.branchAt(message);
+        _toast(branch == null ? '无法创建分支' : '已创建分支：${branch.title}');
       case '朗读':
         _toast('正在朗读…');
       case '翻译':

@@ -272,6 +272,7 @@ class DemoChat {
     required this.time,
     this.unread = 0,
     this.pinned = false,
+    this.sessionId,
   });
 
   final DemoCharacter character;
@@ -279,6 +280,7 @@ class DemoChat {
   final String time;
   final int unread;
   final bool pinned;
+  final String? sessionId;
 }
 
 class DemoLorebook {
