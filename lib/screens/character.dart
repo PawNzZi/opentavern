@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../core/png_card_export.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/routes.dart';
@@ -280,7 +282,113 @@ class _CharacterScreenState extends State<CharacterScreen> {
     );
   }
 
-  Future<void> _exportCharacter(
+  Future<Uint8List> _characterPng(DemoCharacter character) async {
+    final avatar = character.avatarBase64;
+    if (avatar != null && avatar.isNotEmpty) {
+      try {
+        final codec = await ui.instantiateImageCodec(
+          base64Decode(avatar),
+          targetWidth: 512,
+          allowUpscaling: false,
+        );
+        final frame = await codec.getNextFrame();
+        final data = await frame.image.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
+        frame.image.dispose();
+        codec.dispose();
+        if (data != null) return data.buffer.asUint8List();
+      } catch (_) {}
+    }
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const size = 512.0;
+    final colors = character.colors.length >= 2
+        ? [character.colors.first, character.colors.last]
+        : [const Color(0xFF8C4A3F), const Color(0xFFD98E5F)];
+    final paint = ui.Paint()
+      ..shader = ui.Gradient.linear(
+        Offset.zero,
+        const Offset(size, size),
+        colors,
+      );
+    canvas.drawRect(const Rect.fromLTWH(0, 0, size, size), paint);
+    canvas.drawCircle(
+      const Offset(390, 110),
+      100,
+      ui.Paint()..color = Colors.white.withValues(alpha: .16),
+    );
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(512, 512);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    picture.dispose();
+    return data!.buffer.asUint8List();
+  }
+
+  Future<void> _exportCharacterPng(
+    BuildContext context,
+    DemoCharacter character,
+  ) async {
+    final png = await _characterPng(character);
+    final bytes = embedCardInPng(png, character.toCardJson());
+    final uri = await FilePickerPlatform.instance.saveFile(
+      fileName: '${character.name}.png',
+      bytes: bytes,
+      mimeType: 'image/png',
+      dialogTitle: '导出角色卡 PNG',
+    );
+    if (!context.mounted) return;
+    showTavernToast(context, uri == null ? '已取消导出' : 'PNG 角色卡已导出');
+  }
+
+  Future<void> _exportCharacterMenu(
+    BuildContext context,
+    DemoCharacter character,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          child: Glass(
+            radius: 26,
+            blur: 30,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SettingRow(
+                  icon: Icons.image_outlined,
+                  title: 'PNG 角色卡',
+                  subtitle: '写入 chara / ccv3 元数据，可直接分享',
+                  iconColor: AppPalette.of(ctx).amber,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _exportCharacterPng(context, character);
+                  },
+                ),
+                const Hairline(indent: 56),
+                SettingRow(
+                  icon: Icons.data_object_rounded,
+                  title: 'JSON 数据',
+                  subtitle: '仅导出角色卡字段',
+                  iconColor: AppPalette.of(ctx).sage,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _exportCharacterJson(context, character);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportCharacterJson(
     BuildContext context,
     DemoCharacter character,
   ) async {
@@ -342,7 +450,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   iconColor: p.violet,
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    _exportCharacter(context, widget.character);
+                    _exportCharacterMenu(context, widget.character);
                   },
                 ),
                 const Hairline(indent: 56),
@@ -565,7 +673,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   title: '导出角色卡',
                   value: 'PNG / JSON',
                   iconColor: p.violet,
-                  onTap: () => _exportCharacter(context, c),
+                  onTap: () => _exportCharacterMenu(context, c),
                 ),
                 const Hairline(indent: 56),
                 SettingRow(
