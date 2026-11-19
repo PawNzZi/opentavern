@@ -1,4 +1,4 @@
-﻿name: tavern_app
+name: tavern_app
 description: "A local-first SillyTavern client for iOS."
 publish_to: 'none'
 version: 1.0.0+1
@@ -13,6 +13,8 @@ dependencies:
   http: ^1.2.2
   path_provider: ^2.1.5
   file_picker: ^13.3.3
+  archive: ^3.6.1
+  xml: ^6.6.1
 
 dev_dependencies:
   flutter_test:
@@ -25,4 +27,5 @@ flutter:
     - family: Inter
       fonts:
         - asset: assets/fonts/InterVariable.ttf
+
 

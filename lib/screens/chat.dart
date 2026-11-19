@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../chat/chat_controller.dart';
+import '../core/docx_text.dart';
 import '../core/models.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
@@ -132,12 +133,21 @@ class _ChatScreenState extends State<ChatScreen> {
     final name = file.name;
     final ext = name.split('.').last.toLowerCase();
     const textExts = {'txt', 'md', 'markdown', 'json', 'csv', 'yaml', 'yml', 'log'};
-    if (!textExts.contains(ext)) {
-      _toast('目前只支持 TXT / MD / JSON / CSV 等文本文件');
+    String? text;
+    if (ext == 'docx') {
+      text = extractDocxText(bytes);
+      if (text == null) {
+        _toast('无法读取 DOCX 文本');
+        return;
+      }
+    } else if (textExts.contains(ext)) {
+      text = utf8.decode(bytes, allowMalformed: true).trim();
+    } else {
+      _toast('目前支持 TXT / MD / JSON / CSV / DOCX');
       return;
     }
-    var text = utf8.decode(bytes, allowMalformed: true).trim();
-    if (text.length > 20000) text = text.substring(0, 20000);
+    var content = text!;
+    if (content.length > 20000) content = content.substring(0, 20000);
     if (!mounted) return;
     setState(() {
       _hasText = true;
@@ -146,7 +156,7 @@ class _ChatScreenState extends State<ChatScreen> {
           id: 'att-${DateTime.now().microsecondsSinceEpoch}',
           name: name,
           mime: 'text/plain',
-          text: text,
+          text: content,
         ),
       );
     });
@@ -342,6 +352,44 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _askAfterEdit(ChatMessage message) async {
+    final index = _chat.messages.indexOf(message);
+    final later = _chat.messages.length - index - 1;
+    if (later <= 0) return;
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('编辑后如何处理后续消息？'),
+        content: Text('这条消息之后还有 $later 条消息。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'keep'),
+            child: const Text('保留'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'delete'),
+            child: const Text('删除后续'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'branch'),
+            child: const Text('另存分支'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    switch (action) {
+      case 'delete':
+        _chat.deleteAfter(message);
+        _toast('已删除后续消息');
+      case 'branch':
+        final branch = _chat.branchAt(message);
+        _toast(branch == null ? '无法创建分支' : '已保存分支：${branch.title}');
+      default:
+        break;
+    }
+  }
+
   void _editMessage(ChatMessage message) {
     final controller = TextEditingController(text: message.text);
     showModalBottomSheet<void>(
@@ -399,9 +447,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       label: '保存修改',
                       height: 48,
                       onTap: () {
+                        final wasLast = _chat.messages.isNotEmpty &&
+                            _chat.messages.last.id == message.id;
                         _chat.edit(message, controller.text);
                         Navigator.of(context).pop();
                         _toast('已保存');
+                        if (!wasLast) _askAfterEdit(message);
                       },
                     ),
                   ],
