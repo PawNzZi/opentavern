@@ -264,7 +264,10 @@ class SettingRow extends StatelessWidget {
 
 /// Bottom sheet used for connection, import and lore editing. Rendered as a
 /// real screen in the prototype so it can be screenshotted on its own.
-class SheetStage extends StatelessWidget {
+/// Bottom sheet used by editors, chat info and import flows. It is a real
+/// screen so it can be previewed standalone, but it behaves like a sheet:
+/// tap the dimmed backdrop or swipe the header down to dismiss.
+class SheetStage extends StatefulWidget {
   const SheetStage({
     super.key,
     required this.title,
@@ -273,6 +276,7 @@ class SheetStage extends StatelessWidget {
     this.footer,
     this.heightFactor = .84,
     this.leading,
+    this.showClose = true,
   });
 
   final String title;
@@ -281,27 +285,88 @@ class SheetStage extends StatelessWidget {
   final Widget? footer;
   final double heightFactor;
   final Widget? leading;
+  final bool showClose;
+
+  @override
+  State<SheetStage> createState() => _SheetStageState();
+}
+
+class _SheetStageState extends State<SheetStage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _entry = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+  )..forward();
+
+  double _drag = 0;
+
+  @override
+  void dispose() {
+    _entry.dispose();
+    super.dispose();
+  }
+
+  void _dismiss() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() => _drag = 0);
+    }
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    setState(() {
+      _drag = (_drag + details.delta.dy).clamp(0.0, 360.0);
+    });
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (_drag > 90 || velocity > 500) {
+      _dismiss();
+    } else {
+      setState(() => _drag = 0);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final h = MediaQuery.sizeOf(context).height;
+    final radius = BorderRadius.circular(36);
+
     return TavernScaffold(
       intensity: 1.1,
       child: Stack(
         children: [
-          // Dimmed context behind the sheet.
           Positioned.fill(
-            child: ColoredBox(
-              color: Colors.black.withValues(alpha: p.isDark ? .38 : .18),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _dismiss,
+              child: ColoredBox(
+                color: Colors.black.withValues(alpha: p.isDark ? .38 : .18),
+              ),
             ),
           ),
-          Positioned(
-            left: 8,
-            right: 8,
-            bottom: 0,
+          AnimatedBuilder(
+            animation: _entry,
+            builder: (context, child) {
+              final enter = (1 - _entry.value) * 48;
+              return Positioned(
+                left: 8,
+                right: 8,
+                bottom: 0,
+                child: Transform.translate(
+                  offset: Offset(0, _drag + enter),
+                  child: Opacity(
+                    opacity: _entry.value.clamp(0.0, 1.0),
+                    child: child,
+                  ),
+                ),
+              );
+            },
             child: Container(
-              height: h * heightFactor,
+              height: h * widget.heightFactor,
               decoration: BoxDecoration(
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(36),
@@ -320,52 +385,68 @@ class SheetStage extends StatelessWidget {
                 fill: 1.6,
                 padding: EdgeInsets.zero,
                 child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(36),
-                  ),
+                  borderRadius: radius,
                   child: Column(
                     children: [
-                      const SizedBox(height: 10),
-                      Container(
-                        width: 38,
-                        height: 4.5,
-                        decoration: BoxDecoration(
-                          color: p.textTertiary.withValues(alpha: .7),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
-                        child: Row(
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onVerticalDragUpdate: _onDragUpdate,
+                        onVerticalDragEnd: _onDragEnd,
+                        child: Column(
                           children: [
-                            if (leading != null) ...[
-                              leading!,
-                              const SizedBox(width: 12),
-                            ],
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            const SizedBox(height: 10),
+                            Container(
+                              width: 38,
+                              height: 4.5,
+                              decoration: BoxDecoration(
+                                color: p.textTertiary.withValues(alpha: .7),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(22, 18, 16, 0),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    title,
-                                    style: appText(
-                                      22,
-                                      FontWeight.w700,
-                                      p.textPrimary,
-                                      letterSpacing: -.6,
+                                  if (widget.leading != null) ...[
+                                    widget.leading!,
+                                    const SizedBox(width: 12),
+                                  ],
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          widget.title,
+                                          style: appText(
+                                            22,
+                                            FontWeight.w700,
+                                            p.textPrimary,
+                                            letterSpacing: -.6,
+                                          ),
+                                        ),
+                                        if (widget.subtitle != null) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            widget.subtitle!,
+                                            style: appText(
+                                              12.5,
+                                              FontWeight.w400,
+                                              p.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ),
-                                  if (subtitle != null) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      subtitle!,
-                                      style: appText(
-                                        12.5,
-                                        FontWeight.w400,
-                                        p.textSecondary,
-                                      ),
+                                  if (widget.showClose)
+                                    GlassCircleButton(
+                                      icon: Icons.close_rounded,
+                                      size: 38,
+                                      iconSize: 16,
+                                      blur: 0,
+                                      onTap: _dismiss,
                                     ),
-                                  ],
                                 ],
                               ),
                             ),
@@ -376,10 +457,10 @@ class SheetStage extends StatelessWidget {
                       Expanded(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.fromLTRB(22, 0, 22, 20),
-                          child: child,
+                          child: widget.child,
                         ),
                       ),
-                      if (footer != null)
+                      if (widget.footer != null)
                         Container(
                           padding: EdgeInsets.fromLTRB(
                             22,
@@ -392,7 +473,7 @@ class SheetStage extends StatelessWidget {
                               top: BorderSide(color: p.divider, width: .6),
                             ),
                           ),
-                          child: footer,
+                          child: widget.footer,
                         ),
                     ],
                   ),

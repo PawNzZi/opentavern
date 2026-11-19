@@ -170,7 +170,13 @@ class _ChatScreenState extends State<ChatScreen> {
       barrierLabel: 'message-menu',
       barrierColor: Colors.black.withValues(alpha: .38),
       transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (_, animation, __) => const SizedBox.shrink(),
+      pageBuilder: (dialogContext, animation, __) => _MessageMenu(
+        message: message,
+        onAction: (action) {
+          Navigator.of(dialogContext).pop();
+          _handleMenuAction(action, message);
+        },
+      ),
       transitionBuilder: (context, animation, __, child) {
         final curved = CurvedAnimation(
           parent: animation,
@@ -180,13 +186,7 @@ class _ChatScreenState extends State<ChatScreen> {
           opacity: curved,
           child: ScaleTransition(
             scale: Tween<double>(begin: .96, end: 1).animate(curved),
-            child: _MessageMenu(
-              message: message,
-              onAction: (action) {
-                Navigator.of(context).pop();
-                _handleMenuAction(action, message);
-              },
-            ),
+            child: child,
           ),
         );
       },
@@ -313,7 +313,10 @@ class _ChatScreenState extends State<ChatScreen> {
             _MessageEntrance(
               key: ValueKey(message.id),
               child: message.isUser
-                  ? _UserMessage(message: message)
+                  ? _UserMessage(
+                      message: message,
+                      onLongPress: () => _showMessageMenu(message),
+                    )
                   : _CharacterMessage(
                       message: message,
                       character: c,
@@ -455,8 +458,8 @@ class _ChatTopBar extends StatelessWidget {
         children: [
           GlassCircleButton(
             icon: Icons.arrow_back_ios_new_rounded,
-            size: 34,
-            iconSize: 14,
+            size: 38,
+            iconSize: 15,
             blur: 0,
             onTap: () => Navigator.maybePop(context),
           ),
@@ -528,7 +531,7 @@ class _ChatTopBar extends StatelessWidget {
           const SizedBox(width: 6),
           GlassCircleButton(
             icon: Icons.more_horiz_rounded,
-            size: 34,
+            size: 38,
             blur: 0,
             onTap: onMore,
           ),
@@ -840,21 +843,21 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                   GlassPill(
                     label: '继续',
                     icon: Icons.play_arrow_rounded,
-                    height: 31,
+                    height: 34,
                     onTap: widget.onContinue,
                   ),
                   const SizedBox(width: 6),
                   GlassPill(
                     label: '重写',
                     icon: Icons.refresh_rounded,
-                    height: 31,
+                    height: 34,
                     onTap: widget.onRegenerate,
                   ),
                   const SizedBox(width: 6),
                   GlassCircleButton(
                     icon: Icons.more_horiz_rounded,
-                    size: 31,
-                    iconSize: 15,
+                    size: 36,
+                    iconSize: 16,
                     blur: 0,
                     onTap: widget.onLongPress,
                   ),
@@ -869,14 +872,18 @@ class _CharacterMessageState extends State<_CharacterMessage> {
 }
 
 class _UserMessage extends StatelessWidget {
-  const _UserMessage({required this.message});
+  const _UserMessage({required this.message, this.onLongPress});
 
   final ChatMessage message;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return Column(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPress: onLongPress,
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         ConstrainedBox(
@@ -926,6 +933,7 @@ class _UserMessage extends StatelessWidget {
           ],
         ),
       ],
+      ),
     );
   }
 }

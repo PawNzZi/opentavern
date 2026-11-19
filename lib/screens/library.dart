@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
+import '../design/routes.dart';
 import '../design/theme.dart';
+import 'search.dart';
 
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({
@@ -37,7 +39,10 @@ class LibraryScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          const SearchField(hint: '搜索角色或标签'),
+          SearchField(
+            hint: '搜索角色或标签',
+            onTap: () => openGlassPage(context, const SearchPage()),
+          ),
           const SizedBox(height: 14),
           SizedBox(
             height: 38,

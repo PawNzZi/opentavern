@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../data/demo.dart';
 import '../design/glass.dart';
+import '../design/routes.dart';
 import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
+import '../design/toast.dart';
 import 'character_editor.dart';
 import 'chat.dart';
 
@@ -213,13 +215,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     },
                   ),
                   const SizedBox(height: 6),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: KeyedSubtree(
-                      key: ValueKey(_tab),
-                      child: _tabContent(context, c, width),
-                    ),
-                  ),
+                  _tabContent(context, c, width),
                   const SizedBox(height: 28),
                   Center(
                     child: Text(
@@ -262,19 +258,85 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     iconSize: 18,
                     iconColor: p.amber,
                     tint: p.amber,
-                    onTap: () {},
+                    onTap: () => showTavernToast(context, '已收藏 ${c.name}'),
                   ),
                   const SizedBox(width: 8),
                   GlassCircleButton(
                     icon: Icons.more_horiz_rounded,
                     size: 40,
-                    onTap: () {},
+                    onTap: () => _showMore(context),
                   ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showMore(BuildContext context) {
+    final p = AppPalette.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: .35),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          child: Glass(
+            radius: 26,
+            blur: 34,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SettingRow(
+                  icon: Icons.edit_outlined,
+                  title: '编辑角色',
+                  iconColor: p.amber,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    openGlassPage(
+                      context,
+                      CharacterEditorPage(character: widget.character),
+                    );
+                  },
+                ),
+                const Hairline(indent: 56),
+                SettingRow(
+                  icon: Icons.copy_rounded,
+                  title: '复制角色',
+                  iconColor: p.sage,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    showTavernToast(sheetContext, '已复制角色');
+                  },
+                ),
+                const Hairline(indent: 56),
+                SettingRow(
+                  icon: Icons.ios_share_rounded,
+                  title: '导出角色卡',
+                  iconColor: p.violet,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    showTavernToast(sheetContext, '已导出 PNG');
+                  },
+                ),
+                const Hairline(indent: 56),
+                SettingRow(
+                  icon: Icons.delete_outline_rounded,
+                  title: '删除角色',
+                  iconColor: p.danger,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    showTavernToast(sheetContext, '删除需要二次确认');
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

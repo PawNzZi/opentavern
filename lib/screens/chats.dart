@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
+import '../design/routes.dart';
 import '../design/theme.dart';
+import 'search.dart';
 
 class ChatsScreen extends StatelessWidget {
   const ChatsScreen({
@@ -38,7 +40,10 @@ class ChatsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          const SearchField(hint: '搜索对话或角色'),
+          SearchField(
+            hint: '搜索对话或角色',
+            onTap: () => openGlassPage(context, const SearchPage()),
+          ),
           const SizedBox(height: 6),
           if (pinned.isNotEmpty) ...[
             const SectionLabel('置顶'),

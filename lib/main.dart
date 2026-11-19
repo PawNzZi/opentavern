@@ -304,7 +304,7 @@ class _RootShellState extends State<RootShell> {
       case 1:
         return ChatsScreen(
           onOpenChat: (c) => _push(ChatScreen(character: c)),
-          onSearch: () {},
+          onSearch: () => _push(const SearchPage()),
         );
       case 2:
         return SettingsScreen(

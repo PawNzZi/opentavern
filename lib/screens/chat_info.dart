@@ -7,6 +7,9 @@ import '../design/settings_kit.dart';
 import '../design/routes.dart';
 import '../design/theme.dart';
 import 'editors.dart';
+import 'search.dart';
+import 'stats.dart';
+import '../design/toast.dart';
 
 class ChatInfoSheet extends StatelessWidget {
   const ChatInfoSheet({super.key});
@@ -28,7 +31,10 @@ class ChatInfoSheet extends StatelessWidget {
           radius: 12,
         ),
       ),
-      footer: const GlassPrimaryButton(label: '完成'),
+      footer: GlassPrimaryButton(
+        label: '完成',
+        onTap: () => Navigator.of(context).maybePop(),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -38,25 +44,25 @@ class ChatInfoSheet extends StatelessWidget {
                 icon: Icons.call_split_rounded,
                 label: '分支',
                 color: p.amber,
-                onTap: () {},
+                onTap: () => showTavernToast(context, '已从当前聊天创建分支'),
               ),
               ActionSpec(
                 icon: Icons.bookmark_add_outlined,
                 label: '检查点',
                 color: p.sage,
-                onTap: () {},
+                onTap: () => showTavernToast(context, '已创建检查点'),
               ),
               ActionSpec(
                 icon: Icons.ios_share_rounded,
                 label: '导出',
                 color: p.violet,
-                onTap: () {},
+                onTap: () => showTavernToast(context, '已导出 JSONL'),
               ),
               ActionSpec(
                 icon: Icons.search_rounded,
                 label: '搜索',
                 color: p.rose,
-                onTap: () {},
+                onTap: () => openGlassPage(context, const SearchPage()),
               ),
             ],
           ),
@@ -84,7 +90,7 @@ class ChatInfoSheet extends StatelessWidget {
                 title: '记忆与总结',
                 value: '已总结 12 段',
                 iconColor: p.violet,
-                onTap: () {},
+                onTap: () => showTavernToast(context, '已总结 12 段'),
               ),
               const Hairline(indent: 56),
               SettingRow(
@@ -92,7 +98,7 @@ class ChatInfoSheet extends StatelessWidget {
                 title: '聊天世界书',
                 value: '未绑定',
                 iconColor: p.sage,
-                onTap: () {},
+                onTap: () => showTavernToast(context, '未绑定聊天世界书'),
               ),
               const Hairline(indent: 56),
               SettingRow(
@@ -100,7 +106,7 @@ class ChatInfoSheet extends StatelessWidget {
                 title: '锁定人格',
                 value: '旅人',
                 iconColor: p.amber,
-                onTap: () {},
+                onTap: () => showTavernToast(context, '已锁定人格：旅人'),
               ),
             ],
           ),
@@ -112,7 +118,7 @@ class ChatInfoSheet extends StatelessWidget {
                 title: '聊天统计',
                 value: '128 条 · 32k 字',
                 iconColor: p.sage,
-                onTap: () {},
+                onTap: () => openGlassPage(context, const StatsPage()),
               ),
               const Hairline(indent: 56),
               SettingRow(
@@ -120,7 +126,7 @@ class ChatInfoSheet extends StatelessWidget {
                 title: '备份',
                 value: '最近 2 天前 · 12 份',
                 iconColor: p.violet,
-                onTap: () {},
+                onTap: () => showTavernToast(context, '已恢复最近备份'),
               ),
               const Hairline(indent: 56),
               SettingRow(
@@ -140,7 +146,7 @@ class ChatInfoSheet extends StatelessWidget {
                 title: '清空聊天',
                 value: '保留角色与设定',
                 iconColor: p.danger,
-                onTap: () {},
+                onTap: () => showTavernToast(context, '清空需要二次确认'),
               ),
               const Hairline(indent: 56),
               SettingRow(
@@ -148,7 +154,7 @@ class ChatInfoSheet extends StatelessWidget {
                 title: '删除聊天',
                 value: '不可撤销',
                 iconColor: p.danger,
-                onTap: () {},
+                onTap: () => showTavernToast(context, '删除需要二次确认'),
               ),
             ],
           ),

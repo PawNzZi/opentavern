@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
 import '../design/theme.dart';
+import '../design/toast.dart';
 
 class ConnectSheetScreen extends StatelessWidget {
   const ConnectSheetScreen({super.key});
@@ -142,9 +143,10 @@ class ImportSheetScreen extends StatelessWidget {
       title: '导入角色',
       subtitle: '支持 SillyTavern 角色卡、世界书与聊天记录',
       heightFactor: .72,
-      footer: const GlassPrimaryButton(
+      footer: GlassPrimaryButton(
         label: '选择文件',
         icon: Icons.folder_open_rounded,
+        onTap: () => showTavernToast(context, '已打开文件选择器'),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,7 +283,13 @@ class LoreEntrySheetScreen extends StatelessWidget {
       title: '编辑条目',
       subtitle: 'Eldoria 王国设定',
       heightFactor: .95,
-      footer: const GlassPrimaryButton(label: '保存条目'),
+      footer: GlassPrimaryButton(
+        label: '保存条目',
+        onTap: () {
+          showTavernToast(context, '条目已保存');
+          Navigator.of(context).maybePop();
+        },
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
