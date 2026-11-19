@@ -63,19 +63,19 @@ class PersonaEditorSheet extends StatelessWidget {
               ),
             ],
           ),
-          const _EditorField(label: '名字', value: '旅人'),
-          const _EditorField(
+          _EditorField(label: '名字', value: item.name),
+          _EditorField(
             label: '描述',
-            value: '一个在各地旅行的记录者，习惯先观察再开口。',
+            value: item.description,
             maxLines: 4,
           ),
           SettingsGroup(
             title: '行为',
-            children: const [
+            children: [
               SwitchLine(
                 title: '设为默认人格',
                 subtitle: '新聊天默认使用',
-                value: true,
+                value: item.isDefault,
               ),
               Hairline(indent: 14),
               SegmentLine(
