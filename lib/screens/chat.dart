@@ -30,7 +30,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final _chat = ChatController();
+  late final ChatController _chat;
   final _input = TextEditingController();
   final _scroll = ScrollController();
   bool _hasText = false;
@@ -38,6 +38,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _chat = ChatController(character: widget.character);
     _chat.addListener(_onChatChanged);
     if (widget.autoDemo) {
       Timer(const Duration(milliseconds: 900), () {
@@ -309,6 +310,10 @@ class _ChatScreenState extends State<ChatScreen> {
         for (var i = _chat.messages.length - 1; i >= 0; i--) {
           final message = _chat.messages[i];
           final isLast = i == _chat.messages.length - 1;
+          if (message.text.isEmpty &&
+              _chat.streamingMessage?.id == message.id) {
+            continue;
+          }
           items.add(
             _MessageEntrance(
               key: ValueKey(message.id),

@@ -2,103 +2,46 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-class ChatMessage {
-  ChatMessage({
-    required this.id,
-    required this.text,
-    this.isUser = false,
-    this.time,
-    this.reasoning,
-    List<String>? swipes,
-    this.swipeIndex = 0,
-    this.hidden = false,
-    this.bookmarked = false,
-  }) : swipes = swipes ?? [text];
+import '../core/llm.dart';
+import '../core/models.dart';
+import '../core/prompt.dart';
+import '../core/store.dart';
+import '../data/demo.dart';
 
-  final String id;
-  String text;
-  final bool isUser;
-  String? time;
-  String? reasoning;
-  List<String> swipes;
-  int swipeIndex;
-  bool hidden;
-  bool bookmarked;
+export '../core/models.dart' show ChatMessage;
 
-  bool get hasSwipes => swipes.length > 1;
-}
-
-/// Demo chat state machine. It simulates a streaming backend so the prototype
-/// can be felt end-to-end: send, stream, stop, regenerate, continue, swipe.
+/// Real chat state machine backed by the local store and a direct model API.
 class ChatController extends ChangeNotifier {
-  ChatController() {
-    _seed();
+  ChatController({required this.character}) {
+    _session = AppStore.instance.sessionFor(character);
+    if (_session.messages.isEmpty && character.greeting.trim().isNotEmpty) {
+      _session.messages.add(
+        ChatMessage(
+          id: 'greet-${DateTime.now().microsecondsSinceEpoch}',
+          text: character.greeting,
+          time: _time(),
+        ),
+      );
+    }
   }
 
-  final List<ChatMessage> messages = [];
+  final DemoCharacter character;
+  late final ChatSession _session;
+
+  List<ChatMessage> get messages => _session.messages;
+  ChatSession get session => _session;
+
   bool isGenerating = false;
   ChatMessage? streamingMessage;
 
-  Timer? _timer;
+  StreamSubscription<String>? _sub;
   bool _disposed = false;
-  String _target = '';
-  int _cursor = 0;
-  int _variant = 0;
+  bool _regenerating = false;
+  bool _continuing = false;
 
-  static const _replyVariants = <String>[
-    '她没有立刻回答。窗外的雨敲在玻璃上，像有人在极远的地方敲门。\n\n“坏消息也分种类。”她终于说，“有些是冲你来的，有些是冲我来的。”',
-    '“你带了伞吗？”\n\n她问得很轻，像是已经知道答案。\n\n“没有也没关系。塔顶的雨，通常只下给留下来的人看。”',
-    '她笑了一下，那笑意没有到眼睛里。\n\n“今晚的客人不只你一个。楼下的门，已经响了三次。”',
-    '她把星图转了个方向，指尖停在一颗很暗的星上。\n\n“你看，它一直在那里。只是今晚，它第一次被看见。”',
-  ];
-
-  static const _continuations = <String>[
-    '\n\n她把茶杯往你面前推了推，示意你坐下。',
-    '\n\n窗外的雨声忽然停了一瞬。',
-    '\n\n“别急着回答。”她说，“先听听雨。”',
-  ];
-
-  String _time() => '21:41';
-
-  void _seed() {
-    messages.addAll([
-      ChatMessage(
-        id: 'm1',
-        text: '外面的雨好像更大了。',
-        isUser: true,
-        time: '21:38',
-      ),
-      ChatMessage(
-        id: 'm2',
-        text:
-            '她把最后一枚星图钉按进软木墙，转身时耳坠轻轻一晃。\n\n是啊。王都的雨，总在预言之后来。\n\n你来得正好——我刚算到，今晚会有一位客人，带着坏消息。',
-        time: '21:39',
-        reasoning: '先建立场景与神秘感；用动作替代直接陈述；在结尾抛出一个钩子。',
-        swipes: [
-          '她把最后一枚星图钉按进软木墙，转身时耳坠轻轻一晃。\n\n是啊。王都的雨，总在预言之后来。\n\n你来得正好——我刚算到，今晚会有一位客人，带着坏消息。',
-          '她没回头，只是把窗推开了一条缝。\n\n“雨是预言的余音。”她说，“你听，它今晚的节奏不太对。”',
-          '“你迟到了。”\n\n她把一杯冷掉的茶推到你面前，像是早就准备好这句开场。',
-          '塔顶的风把星图吹得作响。\n\n她按住最上面那张纸，抬眼看你：“我等你很久了。”',
-        ],
-        swipeIndex: 0,
-      ),
-      ChatMessage(
-        id: 'm3',
-        text: '那你还让我进来？',
-        isUser: true,
-        time: '21:39',
-      ),
-      ChatMessage(
-        id: 'm4',
-        text:
-            '“因为坏消息也分种类。”\n\n她推来一杯还冒着热气的红茶，杯沿有一道细细的金边。\n\n“有些坏消息，只配在雨天说。”',
-        time: '21:40',
-        swipes: [
-          '“因为坏消息也分种类。”\n\n她推来一杯还冒着热气的红茶，杯沿有一道细细的金边。\n\n“有些坏消息，只配在雨天说。”',
-          '“因为我想看看，你会先问哪一件事。”\n\n她靠在窗边，雨光落在她的侧脸上。',
-        ],
-      ),
-    ]);
+  String _time() {
+    final now = DateTime.now();
+    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
   void send(String text) {
@@ -112,95 +55,145 @@ class ChatController extends ChangeNotifier {
         time: _time(),
       ),
     );
+    _session.updatedAt = DateTime.now().millisecondsSinceEpoch;
     notifyListeners();
-    Future<void>.delayed(const Duration(milliseconds: 420), () {
-      if (_disposed) return;
-      if (messages.isNotEmpty && messages.last.isUser) {
-        _startReply();
-      }
-    });
+    _save();
+    _startGeneration();
   }
 
-  void _startReply() {
-    final message = ChatMessage(
-      id: 'm${DateTime.now().microsecondsSinceEpoch}',
-      text: '',
-      time: _time(),
-    );
-    messages.add(message);
-    streamingMessage = message;
+  Future<void> _startGeneration({
+    bool regenerate = false,
+    bool continuation = false,
+  }) async {
+    if (isGenerating) return;
     isGenerating = true;
-    _target = _replyVariants[_variant++ % _replyVariants.length];
-    _cursor = 0;
+    _regenerating = regenerate;
+    _continuing = continuation;
+
+    if (!regenerate && !continuation) {
+      final message = ChatMessage(
+        id: 'm${DateTime.now().microsecondsSinceEpoch}',
+        text: '',
+        time: _time(),
+      );
+      messages.add(message);
+      streamingMessage = message;
+    } else {
+      final last = _lastAssistant();
+      if (last == null) {
+        isGenerating = false;
+        notifyListeners();
+        return;
+      }
+      if (regenerate) {
+        last.text = '';
+        last.time = _time();
+      }
+      streamingMessage = last;
+    }
     notifyListeners();
-    _runStream();
+
+    try {
+      final prompt = PromptBuilder.build(
+        character: character,
+        session: _session,
+        settings: AppStore.instance.settings,
+      );
+      final client = LLMClient();
+      final stream = client.stream(
+        settings: AppStore.instance.settings,
+        messages: prompt.messages,
+      );
+      _sub = stream.timeout(const Duration(seconds: 60), onTimeout: (sink) {
+        sink.addError(TimeoutException('请求超时，请检查网络或 API 地址'));
+        sink.close();
+      }).listen(
+        (chunk) {
+          final message = streamingMessage;
+          if (message == null || _disposed) return;
+          message.text += chunk;
+          notifyListeners();
+        },
+        onError: (Object error) {
+          _fail(error);
+        },
+        onDone: () {
+          _finishStream();
+        },
+        cancelOnError: true,
+      );
+    } catch (error) {
+      _fail(error);
+    }
   }
 
-  void _runStream() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(milliseconds: 28), (timer) {
-      final message = streamingMessage;
-      if (message == null) {
-        timer.cancel();
-        return;
-      }
-      if (_cursor >= _target.length) {
-        timer.cancel();
-        _finish();
-        return;
-      }
-      final step = 1 + (_cursor % 3);
-      final next = (_cursor + step).clamp(0, _target.length);
-      message.text = _target.substring(0, next);
-      _cursor = next;
-      notifyListeners();
-    });
-  }
-
-  void _finish() {
+  void _fail(Object error) {
     final message = streamingMessage;
     if (message != null) {
-      message.text = message.text.trim().isEmpty ? '……' : message.text;
-      if (!message.swipes.contains(message.text)) {
-        message.swipes = [message.text, ...message.swipes];
+      final readable = error is LLMException ? error.message : error.toString();
+      message.text = message.text.trim().isEmpty
+          ? '⚠️ $readable'
+          : '${message.text}\n\n⚠️ $readable';
+      message.time = _time();
+    }
+    _finishStream();
+  }
+
+  void _finishStream() {
+    final message = streamingMessage;
+    if (message != null) {
+      final text = message.text.trim();
+      message.text = text.isEmpty ? '……' : text;
+      message.time = _time();
+      if (_regenerating) {
+        if (message.swipes.isEmpty ||
+            message.swipes.every((s) => s.trim().isEmpty)) {
+          message.swipes = [message.text];
+        } else if (!message.swipes.contains(message.text)) {
+          message.swipes.insert(0, message.text);
+        }
+        message.swipeIndex = message.swipes.indexOf(message.text);
+      } else if (_continuing) {
+        if (message.swipes.isEmpty) {
+          message.swipes = [message.text];
+        } else {
+          final index = message.swipeIndex.clamp(0, message.swipes.length - 1);
+          message.swipes[index] = message.text;
+        }
+      } else if (message.swipes.isEmpty ||
+          message.swipes.every((s) => s.isEmpty)) {
+        message.swipes = [message.text];
         message.swipeIndex = 0;
       }
-      message.time = _time();
     }
     streamingMessage = null;
     isGenerating = false;
+    _regenerating = false;
+    _continuing = false;
+    _sub = null;
+    if (_disposed) return;
+    _session.updatedAt = DateTime.now().millisecondsSinceEpoch;
     notifyListeners();
+    _save();
   }
 
   void stop() {
-    _timer?.cancel();
-    _finish();
+    _sub?.cancel();
+    _sub = null;
+    _finishStream();
   }
 
   void regenerate() {
     if (isGenerating) return;
-    final last = _lastAssistant();
-    if (last == null) return;
-    last.text = '';
-    streamingMessage = last;
-    isGenerating = true;
-    _target = _replyVariants[_variant++ % _replyVariants.length];
-    _cursor = 0;
-    notifyListeners();
-    _runStream();
+    if (_lastAssistant() == null) return;
+    _startGeneration(regenerate: true);
   }
 
   void continueLast() {
     if (isGenerating) return;
     final last = _lastAssistant();
     if (last == null) return;
-    final base = last.text;
-    streamingMessage = last;
-    isGenerating = true;
-    _target = '$base${_continuations[_variant++ % _continuations.length]}';
-    _cursor = base.length;
-    notifyListeners();
-    _runStream();
+    _startGeneration(continuation: true);
   }
 
   void impersonate() {
@@ -208,12 +201,13 @@ class ChatController extends ChangeNotifier {
     messages.add(
       ChatMessage(
         id: 'm${DateTime.now().microsecondsSinceEpoch}',
-        text: '我先把伞收起来。你继续说。',
+        text: '（ impersonate 需要模型生成，请直接输入你的回复 ）',
         isUser: true,
         time: _time(),
       ),
     );
     notifyListeners();
+    _save();
   }
 
   void swipe(int delta) {
@@ -226,6 +220,7 @@ class ChatController extends ChangeNotifier {
     message.swipeIndex = next;
     message.text = message.swipes[next];
     notifyListeners();
+    _save();
   }
 
   void edit(ChatMessage message, String text) {
@@ -233,24 +228,31 @@ class ChatController extends ChangeNotifier {
     if (message.swipes.isEmpty) {
       message.swipes = [message.text];
     } else {
-      message.swipes[message.swipeIndex] = message.text;
+      final index = message.swipeIndex.clamp(0, message.swipes.length - 1);
+      message.swipes[index] = message.text;
     }
+    message.time = _time();
     notifyListeners();
+    _save();
   }
 
   void delete(ChatMessage message) {
     messages.remove(message);
     notifyListeners();
+    _save();
   }
 
   void toggleHidden(ChatMessage message) {
     message.hidden = !message.hidden;
+    message.isSystem = message.hidden;
     notifyListeners();
+    _save();
   }
 
   void toggleBookmark(ChatMessage message) {
     message.bookmarked = !message.bookmarked;
     notifyListeners();
+    _save();
   }
 
   ChatMessage? _lastAssistant() {
@@ -260,10 +262,14 @@ class ChatController extends ChangeNotifier {
     return null;
   }
 
+  void _save() {
+    AppStore.instance.saveSessions();
+  }
+
   @override
   void dispose() {
     _disposed = true;
-    _timer?.cancel();
+    _sub?.cancel();
     super.dispose();
   }
 }

@@ -22,6 +22,15 @@ class DemoCharacter {
     required this.colors,
     this.favorite = false,
     this.unread = 0,
+    this.personality = '',
+    this.scenario = '',
+    this.exampleDialogue = '',
+    this.systemPrompt = '',
+    this.postHistoryInstructions = '',
+    this.alternateGreetings = const [],
+    this.avatarBase64,
+    this.rawJson,
+    this.createdAt,
   });
 
   final String name;
@@ -40,6 +49,200 @@ class DemoCharacter {
   final List<Color> colors;
   final bool favorite;
   final int unread;
+  final String personality;
+  final String scenario;
+  final String exampleDialogue;
+  final String systemPrompt;
+  final String postHistoryInstructions;
+  final List<String> alternateGreetings;
+  final String? avatarBase64;
+  final Map<String, dynamic>? rawJson;
+  final int? createdAt;
+
+  DemoCharacter copyWith({
+    String? name,
+    String? title,
+    String? tagline,
+    String? description,
+    String? greeting,
+    List<String>? tags,
+    String? lorebook,
+    String? preset,
+    int? chats,
+    String? tokens,
+    List<Color>? colors,
+    bool? favorite,
+    int? unread,
+    String? personality,
+    String? scenario,
+    String? exampleDialogue,
+    String? systemPrompt,
+    String? postHistoryInstructions,
+    List<String>? alternateGreetings,
+  }) {
+    return DemoCharacter(
+      name: name ?? this.name,
+      initial: (name ?? this.name).isEmpty ? initial : (name ?? this.name).characters.first,
+      title: title ?? this.title,
+      tagline: tagline ?? this.tagline,
+      creator: creator,
+      version: version,
+      description: description ?? this.description,
+      greeting: greeting ?? this.greeting,
+      tags: tags ?? this.tags,
+      lorebook: lorebook ?? this.lorebook,
+      preset: preset ?? this.preset,
+      chats: chats ?? this.chats,
+      tokens: tokens ?? this.tokens,
+      colors: colors ?? this.colors,
+      favorite: favorite ?? this.favorite,
+      unread: unread ?? this.unread,
+      personality: personality ?? this.personality,
+      scenario: scenario ?? this.scenario,
+      exampleDialogue: exampleDialogue ?? this.exampleDialogue,
+      systemPrompt: systemPrompt ?? this.systemPrompt,
+      postHistoryInstructions: postHistoryInstructions ?? this.postHistoryInstructions,
+      alternateGreetings: alternateGreetings ?? this.alternateGreetings,
+      avatarBase64: avatarBase64,
+      rawJson: rawJson,
+      createdAt: createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'initial': initial,
+        'title': title,
+        'tagline': tagline,
+        'creator': creator,
+        'version': version,
+        'description': description,
+        'greeting': greeting,
+        'tags': tags,
+        'lorebook': lorebook,
+        'preset': preset,
+        'chats': chats,
+        'tokens': tokens,
+        'colors': colors.map((c) => c.value).toList(),
+        'favorite': favorite,
+        'unread': unread,
+        'personality': personality,
+        'scenario': scenario,
+        'exampleDialogue': exampleDialogue,
+        'systemPrompt': systemPrompt,
+        'postHistoryInstructions': postHistoryInstructions,
+        'alternateGreetings': alternateGreetings,
+        'avatarBase64': avatarBase64,
+        'rawJson': rawJson,
+        'createdAt': createdAt,
+      };
+
+  factory DemoCharacter.fromJson(Map<String, dynamic> json) {
+    final colors = (json['colors'] as List?)
+            ?.map((e) => Color((e as num).toInt()))
+            .toList() ??
+        _paletteFor((json['name'] ?? '?').toString());
+    return DemoCharacter(
+      name: (json['name'] ?? '未命名').toString(),
+      initial: (json['initial'] ?? (json['name'] ?? '?').toString().characters.first).toString(),
+      title: (json['title'] ?? '角色卡').toString(),
+      tagline: (json['tagline'] ?? '').toString(),
+      creator: (json['creator'] ?? '本地').toString(),
+      version: (json['version'] ?? '1.0').toString(),
+      description: (json['description'] ?? '').toString(),
+      greeting: (json['greeting'] ?? '').toString(),
+      tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      lorebook: (json['lorebook'] ?? '未绑定').toString(),
+      preset: (json['preset'] ?? '默认').toString(),
+      chats: (json['chats'] as num?)?.toInt() ?? 0,
+      tokens: (json['tokens'] ?? '0').toString(),
+      colors: colors,
+      favorite: json['favorite'] == true,
+      unread: (json['unread'] as num?)?.toInt() ?? 0,
+      personality: (json['personality'] ?? '').toString(),
+      scenario: (json['scenario'] ?? '').toString(),
+      exampleDialogue: (json['exampleDialogue'] ?? '').toString(),
+      systemPrompt: (json['systemPrompt'] ?? '').toString(),
+      postHistoryInstructions: (json['postHistoryInstructions'] ?? '').toString(),
+      alternateGreetings: (json['alternateGreetings'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      avatarBase64: json['avatarBase64']?.toString(),
+      rawJson: json['rawJson'] is Map
+          ? Map<String, dynamic>.from(json['rawJson'] as Map)
+          : null,
+      createdAt: (json['createdAt'] as num?)?.toInt(),
+    );
+  }
+
+  /// Imports a SillyTavern V2/V3 card (already decoded from PNG or JSON).
+  factory DemoCharacter.fromCardJson(
+    Map<String, dynamic> json, {
+    String? avatarBase64,
+  }) {
+    final data = json['data'] is Map
+        ? Map<String, dynamic>.from(json['data'] as Map)
+        : <String, dynamic>{};
+    final ext = data['extensions'] is Map
+        ? Map<String, dynamic>.from(data['extensions'] as Map)
+        : <String, dynamic>{};
+    String pick(String key) =>
+        (data[key] ?? json[key] ?? '').toString();
+    final name = pick('name').trim().isEmpty ? '未命名' : pick('name').trim();
+    final description = pick('description');
+    final tags = (data['tags'] ?? json['tags'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        const <String>[];
+    final alt = (data['alternate_greetings'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        const <String>[];
+    final book = data['character_book'] is Map
+        ? Map<String, dynamic>.from(data['character_book'] as Map)
+        : null;
+    return DemoCharacter(
+      name: name,
+      initial: name.characters.first,
+      title: pick('creator_notes').trim().isEmpty
+          ? '角色卡'
+          : pick('creator_notes').trim(),
+      tagline: description.split('\n').first,
+      creator: pick('creator').trim().isEmpty ? '导入' : pick('creator'),
+      version: pick('character_version').trim().isEmpty
+          ? '1.0'
+          : pick('character_version'),
+      description: description,
+      greeting: pick('first_mes'),
+      tags: tags,
+      lorebook: (ext['world'] ?? book?['name'] ?? '未绑定').toString(),
+      preset: '默认',
+      chats: 0,
+      tokens: '${((description.length + pick('first_mes').length) / 2).round()}',
+      colors: _paletteFor(name),
+      personality: pick('personality'),
+      scenario: pick('scenario'),
+      exampleDialogue: pick('mes_example'),
+      systemPrompt: pick('system_prompt'),
+      postHistoryInstructions: pick('post_history_instructions'),
+      alternateGreetings: alt,
+      avatarBase64: avatarBase64,
+      rawJson: json,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+}
+
+List<Color> _paletteFor(String name) {
+  const palettes = <List<Color>>[
+    [Color(0xFF8C4A3F), Color(0xFFD98E5F), Color(0xFF3B1E2A)],
+    [Color(0xFF2F4A46), Color(0xFF7FA893), Color(0xFF1A2624)],
+    [Color(0xFF2A2E5C), Color(0xFF6F6BB0), Color(0xFF14152B)],
+    [Color(0xFF3E5A3A), Color(0xFFB7C48A), Color(0xFF1C2A1B)],
+    [Color(0xFF4A3520), Color(0xFFC99A5B), Color(0xFF24170C)],
+  ];
+  return palettes[name.codeUnits.fold<int>(0, (a, b) => a + b) % palettes.length];
 }
 
 class DemoMessage {

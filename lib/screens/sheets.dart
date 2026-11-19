@@ -1,14 +1,117 @@
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
+
 import 'package:flutter/material.dart';
 
+import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
 
-class ConnectSheetScreen extends StatelessWidget {
+class ConnectSheetScreen extends StatefulWidget {
   const ConnectSheetScreen({super.key});
+
+  @override
+  State<ConnectSheetScreen> createState() => _ConnectSheetScreenState();
+}
+
+class _ConnectSheetScreenState extends State<ConnectSheetScreen> {
+  late final TextEditingController _base;
+  late final TextEditingController _key;
+  late final TextEditingController _model;
+  late String _provider;
+
+  static const _presets = <String, (String, String)>{
+    'Claude': ('https://api.anthropic.com', 'claude-sonnet-4-5'),
+    'OpenAI': ('https://api.openai.com/v1', 'gpt-4o-mini'),
+    'Gemini': (
+      'https://generativelanguage.googleapis.com/v1beta',
+      'gemini-2.5-flash'
+    ),
+    'DeepSeek': ('https://api.deepseek.com/v1', 'deepseek-chat'),
+    'Ollama': ('http://127.0.0.1:11434', 'llama3.2'),
+    '自定义': ('', ''),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    final api = AppStore.instance.settings.api;
+    _base = TextEditingController(text: api.baseUrl);
+    _key = TextEditingController(text: api.apiKey);
+    _model = TextEditingController(text: api.model);
+    _provider = _labelFor(api.provider);
+  }
+
+  @override
+  void dispose() {
+    _base.dispose();
+    _key.dispose();
+    _model.dispose();
+    super.dispose();
+  }
+
+  String _labelFor(String provider) {
+    switch (provider) {
+      case 'anthropic':
+        return 'Claude';
+      case 'gemini':
+        return 'Gemini';
+      case 'ollama':
+        return 'Ollama';
+      case 'deepseek':
+        return 'DeepSeek';
+      case 'openai':
+        return 'OpenAI';
+      default:
+        return '自定义';
+    }
+  }
+
+  String _providerKey(String label) {
+    switch (label) {
+      case 'Claude':
+        return 'anthropic';
+      case 'Gemini':
+        return 'gemini';
+      case 'Ollama':
+        return 'ollama';
+      case 'DeepSeek':
+        return 'deepseek';
+      case 'OpenAI':
+        return 'openai';
+      default:
+        return 'custom';
+    }
+  }
+
+  void _selectProvider(String label) {
+    setState(() {
+      _provider = label;
+      final preset = _presets[label];
+      if (preset != null && preset.$1.isNotEmpty) {
+        _base.text = preset.$1;
+        _model.text = preset.$2;
+      }
+    });
+  }
+
+  Future<void> _save() async {
+    final api = AppStore.instance.settings.api.copyWith(
+      provider: _providerKey(_provider),
+      baseUrl: _base.text.trim(),
+      apiKey: _key.text.trim(),
+      model: _model.text.trim(),
+    );
+    AppStore.instance.settings =
+        AppStore.instance.settings.copyWith(api: api);
+    await AppStore.instance.saveSettings();
+    if (!mounted) return;
+    showTavernToast(context, '连接配置已保存');
+    Navigator.of(context).maybePop();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,30 +120,10 @@ class ConnectSheetScreen extends StatelessWidget {
       title: '模型连接',
       subtitle: '支持 OpenAI 兼容、Claude、Gemini 与本地 Ollama',
       heightFactor: .92,
-      footer: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const GlassPrimaryButton(
-            label: '测试并保存',
-            icon: Icons.check_rounded,
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.lock_outline_rounded,
-                size: 11,
-                color: p.textTertiary,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                '密钥保存在本机钥匙串，不会上传',
-                style: appText(10, FontWeight.w400, p.textTertiary),
-              ),
-            ],
-          ),
-        ],
+      footer: GlassPrimaryButton(
+        label: '保存连接',
+        icon: Icons.check_rounded,
+        onTap: _save,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,71 +132,36 @@ class ConnectSheetScreen extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: const [
-              GlassPill(label: 'Claude', selected: true),
-              GlassPill(label: 'OpenAI'),
-              GlassPill(label: 'Gemini'),
-              GlassPill(label: 'DeepSeek'),
-              GlassPill(label: 'Ollama'),
-              GlassPill(label: '自定义'),
+            children: [
+              for (final label in _presets.keys)
+                GlassPill(
+                  label: label,
+                  selected: _provider == label,
+                  onTap: () => _selectProvider(label),
+                ),
             ],
           ),
           const _FieldLabel('凭据'),
-          const _SheetField(
+          _ApiField(
             label: 'API 地址',
-            value: 'https://api.anthropic.com',
+            controller: _base,
             icon: Icons.link_rounded,
+            hint: 'https://api.openai.com/v1',
           ),
           const SizedBox(height: 10),
-          const _SheetField(
+          _ApiField(
             label: '密钥',
-            value: 'sk-ant-••••••••••••••••',
+            controller: _key,
             icon: Icons.key_rounded,
-            trailing: Icons.visibility_outlined,
+            hint: 'sk-...',
+            obscure: true,
           ),
           const _FieldLabel('模型'),
-          Glass(
-            radius: 16,
-            blur: 18,
-            shadow: false,
-            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-            onTap: () {},
-            child: Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 16,
-                  color: p.amber,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Claude Sonnet 4.5',
-                    style: appText(14, FontWeight.w500, p.textPrimary),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: p.sage.withValues(alpha: .16),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '推荐',
-                    style: appText(8.5, FontWeight.w600, p.sage),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 17,
-                  color: p.textTertiary,
-                ),
-              ],
-            ),
+          _ApiField(
+            label: '模型名',
+            controller: _model,
+            icon: Icons.auto_awesome_rounded,
+            hint: 'gpt-4o-mini',
           ),
           const SizedBox(height: 18),
           const _ToggleRow(
@@ -126,6 +174,62 @@ class ConnectSheetScreen extends StatelessWidget {
             title: '自动重连',
             subtitle: '网络恢复后继续未完成的请求',
             value: true,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '密钥只保存在本机的应用数据目录，不会上传。',
+            style: appText(10, FontWeight.w400, p.textTertiary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ApiField extends StatelessWidget {
+  const _ApiField({
+    required this.label,
+    required this.controller,
+    required this.icon,
+    required this.hint,
+    this.obscure = false,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final IconData icon;
+  final String hint;
+  final bool obscure;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Glass(
+      radius: 16,
+      blur: 18,
+      shadow: false,
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: p.textTertiary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              obscureText: obscure,
+              autocorrect: false,
+              enableSuggestions: false,
+              style: appText(13, FontWeight.w500, p.textPrimary),
+              cursorColor: p.amber,
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                labelText: label,
+                labelStyle: appText(11, FontWeight.w400, p.textTertiary),
+                hintText: hint,
+                hintStyle: appText(12, FontWeight.w400, p.textTertiary),
+              ),
+            ),
           ),
         ],
       ),
@@ -144,9 +248,21 @@ class ImportSheetScreen extends StatelessWidget {
       subtitle: '支持 SillyTavern 角色卡、世界书与聊天记录',
       heightFactor: .72,
       footer: GlassPrimaryButton(
-        label: '选择文件',
+        label: '选择角色卡文件',
         icon: Icons.folder_open_rounded,
-        onTap: () => showTavernToast(context, '已打开文件选择器'),
+        onTap: () async {
+          final file = await FilePickerPlatform.instance.pickFile();
+          if (file == null) return;
+          final bytes = await file.readAsBytes();
+          final card = await AppStore.instance.importCard(bytes, file.name);
+          if (!context.mounted) return;
+          if (card == null) {
+            showTavernToast(context, '不是有效的 SillyTavern 角色卡');
+            return;
+          }
+          showTavernToast(context, '已导入 ${card.name}');
+          Navigator.of(context).maybePop();
+        },
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

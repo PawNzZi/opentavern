@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -27,15 +28,31 @@ class _LibraryScreenState extends State<LibraryScreen> {
   static const _tags = ['全部', '最近', '收藏', '奇幻', '科幻', '治愈'];
   String _tag = '全部';
 
+  @override
+  void initState() {
+    super.initState();
+    AppStore.instance.addListener(_sync);
+  }
+
+  void _sync() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppStore.instance.removeListener(_sync);
+    super.dispose();
+  }
+
   List<DemoCharacter> get _filtered {
     switch (_tag) {
       case '全部':
       case '最近':
-        return demoCharacters;
+        return AppStore.instance.characters;
       case '收藏':
-        return demoCharacters.where((c) => c.favorite).toList();
+        return AppStore.instance.characters.where((c) => c.favorite).toList();
       default:
-        return demoCharacters.where((c) => c.tags.contains(_tag)).toList();
+        return AppStore.instance.characters.where((c) => c.tags.contains(_tag)).toList();
     }
   }
 
@@ -83,10 +100,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           ),
           const SizedBox(height: 22),
-          _ContinueCard(
-            character: demoCharacters.first,
-            onTap: () => widget.onOpenChat(demoCharacters.first),
-          ),
+          if (characters.isNotEmpty)
+            _ContinueCard(
+              character: characters.first,
+              onTap: () => widget.onOpenChat(characters.first),
+            ),
           SectionLabel(
             '角色',
             trailing: Text(

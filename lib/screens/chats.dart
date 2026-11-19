@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/models.dart';
+import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -23,28 +25,73 @@ class ChatsScreen extends StatefulWidget {
 }
 
 class _ChatsScreenState extends State<ChatsScreen> {
-  late List<DemoChat> _chats = List.of(demoChats);
+  late List<DemoChat> _chats = _fromStore();
+
+  List<DemoChat> _fromStore() {
+    final result = <DemoChat>[];
+    for (final session in AppStore.instance.sessions) {
+      final character = AppStore.instance.characters.firstWhere(
+        (c) => c.name == session.characterName,
+        orElse: () => DemoCharacter(
+          name: session.characterName,
+          initial: session.characterName.isEmpty ? '?' : session.characterName.characters.first,
+          title: '', tagline: '', creator: '', version: '', description: '',
+          greeting: '', tags: const [], lorebook: '', preset: '', chats: 0,
+          tokens: '', colors: const [Color(0xFF8C4A3F), Color(0xFFD98E5F), Color(0xFF3B1E2A)],
+        ),
+      );
+      result.add(DemoChat(
+        character: character,
+        snippet: session.snippet,
+        time: _timeLabel(session.updatedAt),
+        pinned: session.pinned,
+      ));
+    }
+    return result;
+  }
+
+  String _timeLabel(int millis) {
+    final d = DateTime.fromMillisecondsSinceEpoch(millis);
+    final now = DateTime.now();
+    if (d.year == now.year && d.month == now.month && d.day == now.day) {
+      return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    }
+    return '${d.month}/${d.day}';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    AppStore.instance.addListener(_sync);
+  }
+
+  void _sync() {
+    if (!mounted) return;
+    setState(() => _chats = _fromStore());
+  }
+
+  @override
+  void dispose() {
+    AppStore.instance.removeListener(_sync);
+    super.dispose();
+  }
 
   void _togglePin(DemoChat chat) {
-    setState(() {
-      final i = _chats.indexWhere((c) => c.character.name == chat.character.name);
-      if (i < 0) return;
-      _chats[i] = DemoChat(
-        character: _chats[i].character,
-        snippet: _chats[i].snippet,
-        time: _chats[i].time,
-        unread: _chats[i].unread,
-        pinned: !_chats[i].pinned,
-      );
-      _chats.sort((a, b) => (b.pinned ? 1 : 0).compareTo(a.pinned ? 1 : 0));
-    });
+    final session = AppStore.instance.sessions.firstWhere(
+      (s) => s.characterName == chat.character.name,
+    );
+    session.pinned = !session.pinned;
+    AppStore.instance.saveSessions();
+    setState(() => _chats = _fromStore());
     showTavernToast(context, chat.pinned ? '已取消置顶' : '已置顶对话');
   }
 
   void _delete(DemoChat chat) {
-    setState(() {
-      _chats.removeWhere((c) => c.character.name == chat.character.name);
-    });
+    AppStore.instance.sessions.removeWhere(
+      (s) => s.characterName == chat.character.name,
+    );
+    AppStore.instance.saveSessions();
+    setState(() => _chats = _fromStore());
     showTavernToast(context, '已删除对话');
   }
 

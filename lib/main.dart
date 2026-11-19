@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'core/store.dart';
 import 'data/demo.dart';
 import 'design/glass.dart';
 import 'design/scaffold.dart';
@@ -30,7 +31,9 @@ import 'screens/prompts.dart';
 import 'screens/search.dart';
 import 'screens/stats.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppStore.instance.init();
   runApp(const TavernApp());
 }
 
