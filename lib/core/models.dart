@@ -1,5 +1,35 @@
 import 'dart:convert';
 
+class ChatAttachment {
+  ChatAttachment({
+    required this.id,
+    required this.name,
+    required this.mime,
+    required this.base64,
+  });
+
+  final String id;
+  final String name;
+  final String mime;
+  final String base64;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'mime': mime,
+        'base64': base64,
+      };
+
+  factory ChatAttachment.fromJson(Map<String, dynamic> json) {
+    return ChatAttachment(
+      id: (json['id'] ?? 'a${DateTime.now().microsecondsSinceEpoch}').toString(),
+      name: (json['name'] ?? 'image').toString(),
+      mime: (json['mime'] ?? 'image/png').toString(),
+      base64: (json['base64'] ?? '').toString(),
+    );
+  }
+}
+
 class ChatMessage {
   ChatMessage({
     required this.id,
@@ -13,7 +43,9 @@ class ChatMessage {
     this.hidden = false,
     this.bookmarked = false,
     int? createdAt,
+    List<ChatAttachment>? attachments,
   })  : swipes = swipes ?? [text],
+        attachments = attachments ?? [],
         createdAt = createdAt ?? DateTime.now().millisecondsSinceEpoch;
 
   final String id;
@@ -27,6 +59,7 @@ class ChatMessage {
   bool hidden;
   bool bookmarked;
   final int createdAt;
+  final List<ChatAttachment> attachments;
 
   bool get hasSwipes => swipes.length > 1;
 
@@ -41,6 +74,7 @@ class ChatMessage {
     int? swipeIndex,
     bool? hidden,
     bool? bookmarked,
+    List<ChatAttachment>? attachments,
   }) {
     return ChatMessage(
       id: id,
@@ -53,6 +87,7 @@ class ChatMessage {
       swipeIndex: swipeIndex ?? this.swipeIndex,
       hidden: hidden ?? this.hidden,
       bookmarked: bookmarked ?? this.bookmarked,
+      attachments: attachments ?? List.of(this.attachments),
       createdAt: this.createdAt,
     );
   }
@@ -69,6 +104,7 @@ class ChatMessage {
         'hidden': hidden,
         'bookmarked': bookmarked,
         'createdAt': createdAt,
+        'attachments': attachments.map((a) => a.toJson()).toList(),
       };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -86,6 +122,11 @@ class ChatMessage {
       hidden: json['hidden'] == true,
       bookmarked: json['bookmarked'] == true,
       createdAt: (json['createdAt'] as num?)?.toInt(),
+      attachments: (json['attachments'] as List?)
+              ?.whereType<Map>()
+              .map((e) => ChatAttachment.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          [],
     );
   }
 }

@@ -20,7 +20,7 @@ class LLMException implements Exception {
 class LLMClient {
   Stream<String> stream({
     required AppSettings settings,
-    required List<Map<String, String>> messages,
+    required List<Map<String, dynamic>> messages,
   }) async* {
     final api = settings.api;
     if (api.baseUrl.trim().isEmpty || api.model.trim().isEmpty) {
@@ -40,7 +40,7 @@ class LLMClient {
 
   Stream<String> _openAI(
     APISettings api,
-    List<Map<String, String>> messages,
+    List<Map<String, dynamic>> messages,
   ) async* {
     final client = http.Client();
     try {
@@ -56,7 +56,13 @@ class LLMClient {
         })
         ..body = jsonEncode({
           'model': api.model,
-          'messages': messages,
+          'messages': [
+            for (final message in messages)
+              {
+                'role': message['role'],
+                'content': _openAIContent(message['content']),
+              },
+          ],
           'temperature': api.temperature,
           'max_tokens': api.maxTokens,
           'stream': true,
@@ -90,7 +96,7 @@ class LLMClient {
 
   Stream<String> _anthropic(
     APISettings api,
-    List<Map<String, String>> messages,
+    List<Map<String, dynamic>> messages,
   ) async* {
     if (api.apiKey.trim().isEmpty) {
       throw LLMException('Claude 需要在设置中填写 API Key');
@@ -102,12 +108,15 @@ class LLMClient {
         base.endsWith('/v1/messages') ? base : '$base/v1/messages',
       );
       String? system;
-      final bodyMessages = <Map<String, String>>[];
+      final bodyMessages = <Map<String, dynamic>>[];
       for (final message in messages) {
         if (message['role'] == 'system') {
           system = '${system ?? ''}\n${message['content']}'.trim();
         } else {
-          bodyMessages.add(message);
+          bodyMessages.add({
+            'role': message['role'],
+            'content': _anthropicContent(message['content']),
+          });
         }
       }
       final request = http.Request('POST', uri)
@@ -152,7 +161,7 @@ class LLMClient {
 
   Stream<String> _gemini(
     APISettings api,
-    List<Map<String, String>> messages,
+    List<Map<String, dynamic>> messages,
   ) async* {
     if (api.apiKey.trim().isEmpty) {
       throw LLMException('Gemini 需要在设置中填写 API Key');
@@ -169,9 +178,7 @@ class LLMClient {
         }
         contents.add({
           'role': message['role'] == 'assistant' ? 'model' : 'user',
-          'parts': [
-            {'text': message['content']},
-          ],
+          'parts': _geminiParts(message['content']),
         });
       }
       final uri = Uri.parse(
@@ -226,7 +233,7 @@ class LLMClient {
 
   Stream<String> _ollama(
     APISettings api,
-    List<Map<String, String>> messages,
+    List<Map<String, dynamic>> messages,
   ) async* {
     final client = http.Client();
     try {
@@ -238,7 +245,9 @@ class LLMClient {
         ..headers['Content-Type'] = 'application/json'
         ..body = jsonEncode({
           'model': api.model,
-          'messages': messages,
+          'messages': [
+            for (final message in messages) _ollamaMessage(message),
+          ],
           'stream': true,
           'options': {
             'temperature': api.temperature,
@@ -266,6 +275,91 @@ class LLMClient {
     } finally {
       client.close();
     }
+  }
+
+  dynamic _openAIContent(dynamic content) {
+    if (content is String) return content;
+    if (content is List) {
+      return [
+        for (final part in content.whereType<Map>())
+          if (part['type'] == 'image')
+            {
+              'type': 'image_url',
+              'image_url': {
+                'url': 'data:${part['mime']};base64,${part['base64']}',
+              },
+            }
+          else
+            {'type': 'text', 'text': part['text'] ?? ''},
+      ];
+    }
+    return content?.toString() ?? '';
+  }
+
+  List<Map<String, dynamic>> _anthropicContent(dynamic content) {
+    if (content is String) return [{'type': 'text', 'text': content}];
+    if (content is List) {
+      return [
+        for (final part in content.whereType<Map>())
+          if (part['type'] == 'image')
+            {
+              'type': 'image',
+              'source': {
+                'type': 'base64',
+                'media_type': part['mime'] ?? 'image/png',
+                'data': part['base64'] ?? '',
+              },
+            }
+          else
+            {'type': 'text', 'text': part['text'] ?? ''},
+      ];
+    }
+    return [{'type': 'text', 'text': content?.toString() ?? ''}];
+  }
+
+  List<Map<String, dynamic>> _geminiParts(dynamic content) {
+    if (content is String) return [{'text': content}];
+    if (content is List) {
+      return [
+        for (final part in content.whereType<Map>())
+          if (part['type'] == 'image')
+            {
+              'inlineData': {
+                'mimeType': part['mime'] ?? 'image/png',
+                'data': part['base64'] ?? '',
+              },
+            }
+          else
+            {'text': part['text'] ?? ''},
+      ];
+    }
+    return [{'text': content?.toString() ?? ''}];
+  }
+
+  Map<String, dynamic> _ollamaMessage(Map<String, dynamic> message) {
+    final content = message['content'];
+    if (content is String) {
+      return {'role': message['role'], 'content': content};
+    }
+    if (content is List) {
+      final text = content
+          .whereType<Map>()
+          .where((p) => p['type'] != 'image')
+          .map((p) => p['text']?.toString() ?? '')
+          .join('\n');
+      final images = content
+          .whereType<Map>()
+          .where((p) => p['type'] == 'image')
+          .map((p) => p['base64'])
+          .whereType<String>()
+          .toList();
+      return {
+        'role': message['role'],
+        'content': text,
+        if (images.isNotEmpty) 'images': images,
+      };
+    }
+    return {'role': message['role'], 'content': ''};
   }
 
   String _trim(String value) {

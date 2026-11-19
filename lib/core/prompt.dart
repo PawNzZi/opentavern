@@ -11,7 +11,7 @@ class BuiltPrompt {
     required this.droppedMessages,
   });
 
-  final List<Map<String, String>> messages;
+  final List<Map<String, dynamic>> messages;
   final int approxTokens;
   final int droppedMessages;
 }
@@ -124,7 +124,7 @@ class PromptBuilder {
     final maxPrompt =
         settings.maxContext - settings.api.maxTokens - settings.tokenPadding;
     final systemTokens = estimateTokens(system.toString());
-    var history = <Map<String, String>>[];
+    var history = <Map<String, dynamic>>[];
     var used = systemTokens;
     var dropped = 0;
 
@@ -145,7 +145,17 @@ class PromptBuilder {
       }
       history.add({
         'role': m.isUser ? 'user' : 'assistant',
-        'content': content,
+        'content': m.attachments.isEmpty
+            ? content
+            : <Map<String, dynamic>>[
+                {'type': 'text', 'text': content},
+                for (final att in m.attachments)
+                  {
+                    'type': 'image',
+                    'mime': att.mime,
+                    'base64': att.base64,
+                  },
+              ],
       });
       used += tokens;
     }

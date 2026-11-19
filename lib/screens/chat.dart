@@ -1,9 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ui' as ui;
+
+import 'package:file_picker/file_picker.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../chat/chat_controller.dart';
+import '../core/models.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
@@ -39,6 +44,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
   bool _hasText = false;
+  final _pending = <ChatAttachment>[];
 
   @override
   void initState() {
@@ -81,11 +87,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _send() {
     final text = _input.text;
-    if (text.trim().isEmpty || _chat.isGenerating) return;
+    if ((text.trim().isEmpty && _pending.isEmpty) || _chat.isGenerating) return;
+    final attachments = [..._pending];
     _input.clear();
-    setState(() => _hasText = false);
+    setState(() {
+      _hasText = false;
+      _pending.clear();
+    });
     HapticFeedback.lightImpact();
-    _chat.send(text);
+    _chat.send(text, attachments: attachments);
   }
 
   void _openInfo() {
@@ -112,6 +122,42 @@ class _ChatScreenState extends State<ChatScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _pickImage(BuildContext sheetContext) async {
+    Navigator.of(sheetContext).pop();
+    final file = await FilePickerPlatform.instance.pickFile();
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    String encoded;
+    try {
+      final codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: 1024,
+        allowUpscaling: false,
+      );
+      final frame = await codec.getNextFrame();
+      final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+      frame.image.dispose();
+      codec.dispose();
+      encoded = data == null
+          ? base64Encode(bytes)
+          : base64Encode(data.buffer.asUint8List());
+    } catch (_) {
+      encoded = base64Encode(bytes);
+    }
+    if (!mounted) return;
+    setState(() {
+      _hasText = true;
+      _pending.add(
+        ChatAttachment(
+          id: 'att-${DateTime.now().microsecondsSinceEpoch}',
+          name: file.name,
+          mime: 'image/png',
+          base64: encoded,
+        ),
+      );
+    });
   }
 
   void _openAttachments() {
@@ -143,7 +189,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         icon: Icons.photo_outlined,
                         label: '图片',
                         color: p.amber,
-                        onTap: () => _toast('已打开相册'),
+                        onTap: () => _pickImage(context),
                       ),
                       _AttachAction(
                         icon: Icons.attach_file_rounded,
@@ -400,6 +446,53 @@ class _ChatScreenState extends State<ChatScreen> {
                         children: items,
                       ),
                     ),
+                    if (_pending.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: SizedBox(
+                          height: 60,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _pending.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                            itemBuilder: (context, i) {
+                              return Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.memory(
+                                      base64Decode(_pending[i].base64),
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    right: 0,
+                                    top: 0,
+                                    child: GestureDetector(
+                                      onTap: () => setState(() => _pending.removeAt(i)),
+                                      child: Container(
+                                        width: 18,
+                                        height: 18,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.black54,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.close_rounded,
+                                          size: 12,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                     if (quick != null && quick.replies.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -676,6 +769,13 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (message.attachments.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 7),
+                        child: _AttachmentStrip(
+                          attachments: message.attachments,
+                        ),
+                      ),
                     if (message.reasoning != null) ...[
                       Glass(
                         radius: 13,
@@ -932,6 +1032,11 @@ class _UserMessage extends StatelessWidget {
       child: Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
+        if (message.attachments.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 7),
+            child: _AttachmentStrip(attachments: message.attachments),
+          ),
         ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: MediaQuery.sizeOf(context).width * .76,
@@ -1408,6 +1513,32 @@ class _StaticMessageMenu extends StatelessWidget {
           bottom: 0,
           child: _MessageMenu(message: message, onAction: (_) {}),
         ),
+      ],
+    );
+  }
+}
+
+class _AttachmentStrip extends StatelessWidget {
+  const _AttachmentStrip({required this.attachments});
+
+  final List<ChatAttachment> attachments;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final item in attachments)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.memory(
+              base64Decode(item.base64),
+              width: 92,
+              height: 92,
+              fit: BoxFit.cover,
+            ),
+          ),
       ],
     );
   }

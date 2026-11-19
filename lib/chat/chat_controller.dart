@@ -46,15 +46,16 @@ class ChatController extends ChangeNotifier {
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
-  void send(String text) {
+  void send(String text, {List<ChatAttachment> attachments = const []}) {
     final value = text.trim();
-    if (value.isEmpty || isGenerating) return;
+    if ((value.isEmpty && attachments.isEmpty) || isGenerating) return;
     messages.add(
       ChatMessage(
         id: 'm${DateTime.now().microsecondsSinceEpoch}',
         text: value,
         isUser: true,
         time: _time(),
+        attachments: attachments,
       ),
     );
     _session.updatedAt = DateTime.now().millisecondsSinceEpoch;
