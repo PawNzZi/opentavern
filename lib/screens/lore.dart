@@ -232,6 +232,8 @@ class LorebookPage extends StatefulWidget {
 }
 
 class _LorebookPageState extends State<LorebookPage> {
+  final _query = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -241,6 +243,7 @@ class _LorebookPageState extends State<LorebookPage> {
   @override
   void dispose() {
     AppStore.instance.removeListener(_sync);
+    _query.dispose();
     super.dispose();
   }
 
@@ -265,10 +268,13 @@ class _LorebookPageState extends State<LorebookPage> {
     showTavernToast(context, uri == null ? '已取消导出' : '世界书已导出');
   }
 
-  Future<void> _moveEntry(int index, int delta) async {
+  Future<void> _moveEntry(LoreEntry entry, int delta) async {
+    final index = widget.book.entries.indexOf(entry);
     final target = index + delta;
-    if (target < 0 || target >= widget.book.entries.length) return;
-    final entry = widget.book.entries.removeAt(index);
+    if (index < 0 || target < 0 || target >= widget.book.entries.length) {
+      return;
+    }
+    widget.book.entries.removeAt(index);
     widget.book.entries.insert(target, entry);
     await AppStore.instance.saveLorebooks();
     if (mounted) setState(() {});
@@ -302,6 +308,13 @@ class _LorebookPageState extends State<LorebookPage> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final book = widget.book;
+    final q = _query.text.trim().toLowerCase();
+    final entryList = book.entries.where((e) {
+      if (q.isEmpty) return true;
+      return e.name.toLowerCase().contains(q) ||
+          e.content.toLowerCase().contains(q) ||
+          e.keys.any((k) => k.toLowerCase().contains(q));
+    }).toList();
     return TavernScaffold(
       intensity: 1.05,
       child: SafeArea(
@@ -359,13 +372,13 @@ class _LorebookPageState extends State<LorebookPage> {
                 ),
                 const Spacer(),
                 Text(
-                  '${book.entries.length} 条',
+                  '${entryList.length} 条',
                   style: appText(11, FontWeight.w400, p.textTertiary),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            if (book.entries.isEmpty)
+            if (entryList.isEmpty)
               Glass(
                 radius: 22,
                 blur: 22,
@@ -385,19 +398,19 @@ class _LorebookPageState extends State<LorebookPage> {
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
                   children: [
-                    for (var i = 0; i < book.entries.length; i++) ...[
+                    for (var i = 0; i < entryList.length; i++) ...[
                       SettingRow(
                         icon: Icons.article_outlined,
-                        title: book.entries[i].name.isEmpty
-                            ? book.entries[i].keys.join(' · ')
-                            : book.entries[i].name,
-                        subtitle: book.entries[i].keys.join(' · '),
-                        value: book.entries[i].constant
+                        title: entryList[i].name.isEmpty
+                            ? entryList[i].keys.join(' · ')
+                            : entryList[i].name,
+                        subtitle: entryList[i].keys.join(' · '),
+                        value: entryList[i].constant
                             ? '常驻'
-                            : book.entries[i].enabled
+                            : entryList[i].enabled
                                 ? '启用'
                                 : '关闭',
-                        iconColor: book.entries[i].enabled
+                        iconColor: entryList[i].enabled
                             ? p.amber
                             : p.textTertiary,
                         onTap: () async {
@@ -405,7 +418,7 @@ class _LorebookPageState extends State<LorebookPage> {
                             context,
                             LoreEntryEditorPage(
                               book: book,
-                              entry: book.entries[i],
+                              entry: entryList[i],
                             ),
                           );
                           if (mounted) setState(() {});
@@ -418,7 +431,7 @@ class _LorebookPageState extends State<LorebookPage> {
                               size: 28,
                               iconSize: 15,
                               blur: 0,
-                              onTap: () => _moveEntry(i, -1),
+                              onTap: () => _moveEntry(entryList[i], -1),
                             ),
                             const SizedBox(width: 2),
                             GlassCircleButton(
@@ -426,7 +439,7 @@ class _LorebookPageState extends State<LorebookPage> {
                               size: 28,
                               iconSize: 15,
                               blur: 0,
-                              onTap: () => _moveEntry(i, 1),
+                              onTap: () => _moveEntry(entryList[i], 1),
                             ),
                             const SizedBox(width: 2),
                             GlassCircleButton(
@@ -434,12 +447,12 @@ class _LorebookPageState extends State<LorebookPage> {
                               size: 28,
                               iconSize: 14,
                               blur: 0,
-                              onTap: () => _deleteEntry(book.entries[i]),
+                              onTap: () => _deleteEntry(entryList[i]),
                             ),
                           ],
                         ),
                       ),
-                      if (i != book.entries.length - 1)
+                      if (i != entryList.length - 1)
                         const Hairline(indent: 56),
                     ],
                   ],

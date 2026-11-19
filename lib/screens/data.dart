@@ -1,4 +1,6 @@
 import 'dart:convert';
+
+import 'package:archive/archive.dart';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -45,6 +47,30 @@ class DataPage extends StatelessWidget {
     );
     if (!context.mounted) return;
     showTavernToast(context, uri == null ? '已取消导出' : '备份已导出');
+  }
+
+  Future<void> _exportCharactersZip(BuildContext context) async {
+    final archive = Archive();
+    for (final character in AppStore.instance.characters) {
+      final data = utf8.encode(
+        const JsonEncoder.withIndent('  ').convert(character.toCardJson()),
+      );
+      final safe = character.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      archive.addFile(ArchiveFile('$safe.json', data.length, data));
+    }
+    final bytes = ZipEncoder().encode(archive);
+    if (bytes == null) return;
+    final uri = await FilePickerPlatform.instance.saveFile(
+      fileName: 'opentavern-characters.zip',
+      bytes: Uint8List.fromList(bytes),
+      mimeType: 'application/zip',
+      dialogTitle: '导出全部角色卡',
+    );
+    if (!context.mounted) return;
+    showTavernToast(
+      context,
+      uri == null ? '已取消导出' : '已导出 ${AppStore.instance.characters.length} 个角色',
+    );
   }
 
   Future<void> _importFile(BuildContext context) async {
@@ -170,6 +196,15 @@ class DataPage extends StatelessWidget {
               value: 'JSON',
               iconColor: p.sage,
               onTap: () => _importFile(context),
+            ),
+            const Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.archive_outlined,
+              title: '导出全部角色卡',
+              subtitle: '打包为 ZIP，内含每个角色的 V2 JSON',
+              value: '${store.characters.length} 个',
+              iconColor: p.violet,
+              onTap: () => _exportCharactersZip(context),
             ),
             const Hairline(indent: 56),
             SettingRow(
