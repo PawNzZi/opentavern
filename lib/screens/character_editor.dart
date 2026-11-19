@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -82,8 +83,27 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
     final file = await FilePickerPlatform.instance.pickFile();
     if (file == null) return;
     final bytes = await file.readAsBytes();
+    String encoded;
+    try {
+      final codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: 512,
+        allowUpscaling: false,
+      );
+      final frame = await codec.getNextFrame();
+      final data = await frame.image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      frame.image.dispose();
+      codec.dispose();
+      encoded = data == null
+          ? base64Encode(bytes)
+          : base64Encode(data.buffer.asUint8List());
+    } catch (_) {
+      encoded = base64Encode(bytes);
+    }
     if (!mounted) return;
-    setState(() => _avatarBase64 = base64Encode(bytes));
+    setState(() => _avatarBase64 = encoded);
   }
 
   Future<void> _pickLorebook() async {

@@ -4,11 +4,19 @@ String applyRegexScripts(
   String text,
   List<RegexScript> scripts, {
   required String stage,
+  String? characterName,
 }) {
   var result = text;
   for (final script in scripts) {
     if (!script.enabled) continue;
     if (script.placement != 'both' && script.placement != stage) continue;
+    final scope = script.scope.trim();
+    if (scope.isNotEmpty &&
+        scope != '全局' &&
+        scope != 'global' &&
+        scope != characterName) {
+      continue;
+    }
     final find = script.find.trim();
     if (find.isEmpty) continue;
     try {

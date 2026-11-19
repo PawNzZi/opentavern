@@ -212,6 +212,30 @@ class _LorebookPageState extends State<LorebookPage> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _deleteEntry(LoreEntry entry) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除条目'),
+        content: Text('确定删除「${entry.name}」？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    widget.book.entries.removeWhere((e) => e.id == entry.id);
+    await AppStore.instance.saveLorebooks();
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
@@ -292,6 +316,13 @@ class _LorebookPageState extends State<LorebookPage> {
                           );
                           if (mounted) setState(() {});
                         },
+                        trailing: GlassCircleButton(
+                          icon: Icons.delete_outline_rounded,
+                          size: 30,
+                          iconSize: 14,
+                          blur: 0,
+                          onTap: () => _deleteEntry(book.entries[i]),
+                        ),
                       ),
                       if (i != book.entries.length - 1)
                         const Hairline(indent: 56),

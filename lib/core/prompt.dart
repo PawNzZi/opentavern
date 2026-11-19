@@ -136,6 +136,7 @@ class PromptBuilder {
         m.text,
         AppStore.instance.regexScripts,
         stage: 'prompt',
+        characterName: character.name,
       );
       final tokens = estimateTokens(content) + 4;
       if (used + tokens > maxPrompt) {

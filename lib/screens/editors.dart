@@ -118,6 +118,7 @@ class _RegexEditorSheetState extends State<RegexEditorSheet> {
   late final TextEditingController _replace;
   late String _placement;
   late bool _enabled;
+  late final TextEditingController _scope;
 
   @override
   void initState() {
@@ -128,6 +129,7 @@ class _RegexEditorSheetState extends State<RegexEditorSheet> {
     _replace = TextEditingController(text: s?.replace ?? '');
     _placement = s?.placement ?? 'both';
     _enabled = s?.enabled ?? true;
+    _scope = TextEditingController(text: s?.scope ?? '全局');
   }
 
   @override
@@ -135,6 +137,7 @@ class _RegexEditorSheetState extends State<RegexEditorSheet> {
     _name.dispose();
     _find.dispose();
     _replace.dispose();
+    _scope.dispose();
     super.dispose();
   }
 
@@ -155,7 +158,8 @@ class _RegexEditorSheetState extends State<RegexEditorSheet> {
       ..find = _find.text.trim()
       ..replace = _replace.text
       ..placement = _placement
-      ..enabled = _enabled;
+      ..enabled = _enabled
+      ..scope = _scope.text.trim().isEmpty ? '全局' : _scope.text.trim();
     if (widget.script == null) AppStore.instance.regexScripts.add(script);
     await AppStore.instance.saveRegexes();
     if (!mounted) return;
@@ -188,6 +192,11 @@ class _RegexEditorSheetState extends State<RegexEditorSheet> {
             label: '替换为',
             controller: _replace,
             hint: r'\n\n',
+          ),
+          _LiveField(
+            label: '作用域（全局或角色名）',
+            controller: _scope,
+            hint: '全局',
           ),
           const SizedBox(height: 10),
           SettingsGroup(

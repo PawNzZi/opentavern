@@ -149,6 +149,7 @@ class ChatController extends ChangeNotifier {
         text.isEmpty ? '……' : text,
         AppStore.instance.regexScripts,
         stage: 'display',
+        characterName: character.name,
       );
       message.text = cleaned;
       message.time = _time();
