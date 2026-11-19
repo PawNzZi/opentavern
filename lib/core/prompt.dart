@@ -73,6 +73,9 @@ class PromptBuilder {
     if (character.scenario.trim().isNotEmpty) {
       system.writeln('场景：${macro(character.scenario).trim()}');
     }
+    if (session.summary.trim().isNotEmpty) {
+      system.writeln('\n[前情提要]\n${session.summary.trim()}');
+    }
     if (lore.isNotEmpty) system.writeln('\n[世界设定]\n$lore');
     if (settings.personaDescription.trim().isNotEmpty) {
       system.writeln(

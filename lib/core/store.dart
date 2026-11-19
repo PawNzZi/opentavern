@@ -403,6 +403,45 @@ class AppStore extends ChangeNotifier {
     await saveSessions();
   }
 
+  String exportChatJsonl(ChatSession session) {
+    final header = jsonEncode({
+      'user_name': settings.userName,
+      'character_name': session.characterName,
+      'create_date': DateTime.fromMillisecondsSinceEpoch(
+        session.updatedAt,
+      ).toIso8601String(),
+      'chat_metadata': {
+        'integrity': session.id,
+        'variables': session.variables,
+        'summary': session.summary,
+      },
+    });
+    final lines = <String>[header];
+    for (final m in session.messages) {
+      lines.add(jsonEncode({
+        'name': m.isUser ? settings.userName : session.characterName,
+        'is_user': m.isUser,
+        'is_system': m.isSystem,
+        'send_date': DateTime.fromMillisecondsSinceEpoch(m.createdAt).toIso8601String(),
+        'mes': m.text,
+        'extra': {'bookmarked': m.bookmarked, 'hidden': m.hidden},
+        'swipes': m.swipes,
+        'swipe_id': m.swipeIndex,
+      }));
+    }
+    return lines.join('\n');
+  }
+
+  String exportChatTxt(ChatSession session) {
+    final buffer = StringBuffer();
+    for (final m in session.messages) {
+      if (m.isSystem || m.hidden) continue;
+      buffer.writeln('${m.isUser ? settings.userName : session.characterName}: ${m.text}');
+      buffer.writeln();
+    }
+    return buffer.toString();
+  }
+
   String exportBackup() {
     return jsonEncode({
       'version': 1,

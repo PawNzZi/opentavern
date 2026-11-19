@@ -39,6 +39,7 @@ class ChatController extends ChangeNotifier {
   bool _disposed = false;
   bool _regenerating = false;
   bool _continuing = false;
+  bool _summarizing = false;
 
   String _time() {
     final now = DateTime.now();
@@ -181,6 +182,7 @@ class ChatController extends ChangeNotifier {
     _session.updatedAt = DateTime.now().millisecondsSinceEpoch;
     notifyListeners();
     _save();
+    _maybeSummarize();
   }
 
   void stop() {
@@ -272,6 +274,60 @@ class ChatController extends ChangeNotifier {
       if (!messages[i].isUser) return messages[i];
     }
     return null;
+  }
+
+  Future<void> summarizeNow() async {
+    if (_summarizing || isGenerating) return;
+    await _summarize();
+  }
+
+  Future<void> _maybeSummarize() async {
+    final settings = AppStore.instance.settings;
+    if (!settings.memoryEnabled || _summarizing) return;
+    if (_session.messages.length - _session.summaryUpTo < settings.summaryInterval) {
+      return;
+    }
+    await _summarize();
+  }
+
+  Future<void> _summarize() async {
+    _summarizing = true;
+    try {
+      final settings = AppStore.instance.settings;
+      final interval = settings.summaryInterval.clamp(4, 100);
+      final recent = _session.messages
+          .where((m) => !m.hidden && !m.isSystem && m.text.trim().isNotEmpty)
+          .toList();
+      final start = (recent.length - interval).clamp(0, recent.length);
+      final transcript = recent
+          .sublist(start)
+          .map((m) => '${m.isUser ? settings.userName : character.name}: ${m.text}')
+          .join('\n\n');
+      if (transcript.trim().isEmpty) return;
+      final buffer = StringBuffer();
+      final stream = LLMClient().stream(
+        settings: settings,
+        messages: [
+          {'role': 'system', 'content': settings.summaryPrompt},
+          {'role': 'user', 'content': transcript},
+        ],
+      );
+      await for (final chunk in stream) {
+        buffer.write(chunk);
+        if (buffer.length > 8000) break;
+      }
+      if (_disposed) return;
+      final summary = buffer.toString().trim();
+      if (summary.isEmpty) return;
+      _session.summary = summary;
+      _session.summaryUpTo = _session.messages.length;
+      _save();
+      notifyListeners();
+    } catch (_) {
+      // Quiet failure: memory must never break the main chat.
+    } finally {
+      _summarizing = false;
+    }
   }
 
   void _save() {

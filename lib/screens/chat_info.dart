@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
@@ -18,6 +22,19 @@ class ChatInfoSheet extends StatelessWidget {
 
   final ChatSession session;
   final DemoCharacter character;
+
+  Future<void> _export(BuildContext context) async {
+    final data = AppStore.instance.exportChatJsonl(session);
+    final name = '${session.characterName}-chat.jsonl'.replaceAll('/', '_');
+    final uri = await FilePickerPlatform.instance.saveFile(
+      fileName: name,
+      bytes: Uint8List.fromList(utf8.encode(data)),
+      mimeType: 'application/jsonl',
+      dialogTitle: '导出聊天 JSONL',
+    );
+    if (!context.mounted) return;
+    showTavernToast(context, uri == null ? '已取消导出' : '聊天已导出');
+  }
 
   Future<void> _rename(BuildContext context) async {
     final controller = TextEditingController(text: session.title);
@@ -100,7 +117,7 @@ class ChatInfoSheet extends StatelessWidget {
                 icon: Icons.ios_share_rounded,
                 label: '导出',
                 color: p.violet,
-                onTap: () => showTavernToast(context, '已导出 JSONL'),
+                onTap: () => _export(context),
               ),
               ActionSpec(
                 icon: Icons.search_rounded,

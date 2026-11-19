@@ -99,6 +99,8 @@ class ChatSession {
     this.pinned = false,
     int? updatedAt,
     Map<String, String>? variables,
+    this.summary = '',
+    this.summaryUpTo = 0,
   })  : messages = messages ?? [],
         variables = variables ?? {},
         updatedAt = updatedAt ?? DateTime.now().millisecondsSinceEpoch;
@@ -110,6 +112,8 @@ class ChatSession {
   bool pinned;
   int updatedAt;
   final Map<String, String> variables;
+  String summary;
+  int summaryUpTo;
 
   ChatMessage? get lastMessage {
     for (var i = messages.length - 1; i >= 0; i--) {
@@ -132,6 +136,8 @@ class ChatSession {
         'pinned': pinned,
         'updatedAt': updatedAt,
         'variables': variables,
+        'summary': summary,
+        'summaryUpTo': summaryUpTo,
         'messages': messages.map((m) => m.toJson()).toList(),
       };
 
@@ -146,6 +152,8 @@ class ChatSession {
             (k, v) => MapEntry(k.toString(), v.toString()),
           ) ??
           {},
+      summary: (json['summary'] ?? '').toString(),
+      summaryUpTo: (json['summaryUpTo'] as num?)?.toInt() ?? 0,
       messages: (json['messages'] as List?)
               ?.whereType<Map>()
               .map((e) => ChatMessage.fromJson(Map<String, dynamic>.from(e)))
@@ -231,6 +239,10 @@ class AppSettings {
     this.authorNote = '',
     this.maxContext = 8192,
     this.tokenPadding = 64,
+    this.memoryEnabled = true,
+    this.summaryInterval = 20,
+    this.summaryPrompt =
+        '请用简洁的中文总结以下角色对话的剧情、人物关系、当前场景与未解决的线索。只输出摘要，不要续写对话。',
   });
 
   final APISettings api;
@@ -241,6 +253,9 @@ class AppSettings {
   final String authorNote;
   final int maxContext;
   final int tokenPadding;
+  final bool memoryEnabled;
+  final int summaryInterval;
+  final String summaryPrompt;
 
   AppSettings copyWith({
     APISettings? api,
@@ -251,6 +266,9 @@ class AppSettings {
     String? authorNote,
     int? maxContext,
     int? tokenPadding,
+    bool? memoryEnabled,
+    int? summaryInterval,
+    String? summaryPrompt,
   }) {
     return AppSettings(
       api: api ?? this.api,
@@ -261,6 +279,9 @@ class AppSettings {
       authorNote: authorNote ?? this.authorNote,
       maxContext: maxContext ?? this.maxContext,
       tokenPadding: tokenPadding ?? this.tokenPadding,
+      memoryEnabled: memoryEnabled ?? this.memoryEnabled,
+      summaryInterval: summaryInterval ?? this.summaryInterval,
+      summaryPrompt: summaryPrompt ?? this.summaryPrompt,
     );
   }
 
@@ -273,6 +294,9 @@ class AppSettings {
         'authorNote': authorNote,
         'maxContext': maxContext,
         'tokenPadding': tokenPadding,
+        'memoryEnabled': memoryEnabled,
+        'summaryInterval': summaryInterval,
+        'summaryPrompt': summaryPrompt,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -292,6 +316,11 @@ class AppSettings {
       authorNote: (json['authorNote'] ?? '').toString(),
       maxContext: (json['maxContext'] as num?)?.toInt() ?? 8192,
       tokenPadding: (json['tokenPadding'] as num?)?.toInt() ?? 64,
+      memoryEnabled: json['memoryEnabled'] != false,
+      summaryInterval: (json['summaryInterval'] as num?)?.toInt() ?? 20,
+      summaryPrompt: (json['summaryPrompt'] ??
+              '请用简洁的中文总结以下角色对话的剧情、人物关系、当前场景与未解决的线索。只输出摘要，不要续写对话。')
+          .toString(),
     );
   }
 
