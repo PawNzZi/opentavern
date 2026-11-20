@@ -1475,7 +1475,7 @@ class _MessageMenu extends StatelessWidget {
     ];
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 104),
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         child: Align(
           alignment: Alignment.bottomCenter,
           child: Glass(

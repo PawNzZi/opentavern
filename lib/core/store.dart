@@ -44,6 +44,10 @@ class AppStore extends ChangeNotifier {
 
     await _load();
     await _purgeDemoDataOnce();
+    if (quickReplySets.isEmpty) {
+      _seedQuickReplies();
+      await saveQuickReplies();
+    }
     _ready = true;
     notifyListeners();
   }

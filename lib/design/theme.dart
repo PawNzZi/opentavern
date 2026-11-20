@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 /// The visual language of the app: a warm, low-contrast "tavern at night"
@@ -178,6 +179,12 @@ ThemeData buildTavernTheme({required bool dark}) {
     scaffoldBackgroundColor: p.canvasTop,
     splashFactory: NoSplash.splashFactory,
     highlightColor: Colors.transparent,
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+      },
+    ),
   );
   return base.copyWith(
     extensions: [p],

@@ -36,24 +36,27 @@ class DetailPage extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+              child: Row(
+                children: [
+                  GlassCircleButton(
+                    icon: Icons.arrow_back_ios_new_rounded,
+                    size: 40,
+                    iconSize: 15,
+                    onTap: () => Navigator.maybePop(context),
+                  ),
+                  const Spacer(),
+                  if (trailing != null) trailing!,
+                ],
+              ),
+            ),
             Expanded(
               child: ListView(
-                padding: padding,
+                padding: padding.copyWith(top: 0),
                 physics: const BouncingScrollPhysics(),
                 children: [
-                  Row(
-                    children: [
-                      GlassCircleButton(
-                        icon: Icons.arrow_back_ios_new_rounded,
-                        size: 40,
-                        iconSize: 15,
-                        onTap: () => Navigator.maybePop(context),
-                      ),
-                      const Spacer(),
-                      if (trailing != null) trailing!,
-                    ],
-                  ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
                   PageHeader(
                     eyebrow: eyebrow,
                     title: title,

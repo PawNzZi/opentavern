@@ -293,28 +293,7 @@ class _RootShellState extends State<RootShell> {
 
   void _push(Widget screen) {
     Navigator.of(context).push(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 320),
-        reverseTransitionDuration: const Duration(milliseconds: 260),
-        pageBuilder: (_, animation, __) => screen,
-        transitionsBuilder: (_, animation, __, child) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, .035),
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
-      ),
+      MaterialPageRoute(builder: (_) => screen),
     );
   }
 
