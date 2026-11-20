@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -293,7 +294,7 @@ class _RootShellState extends State<RootShell> {
 
   void _push(Widget screen) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => screen),
+      CupertinoPageRoute(builder: (_) => screen),
     );
   }
 

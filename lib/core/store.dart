@@ -44,10 +44,7 @@ class AppStore extends ChangeNotifier {
 
     await _load();
     await _purgeDemoDataOnce();
-    if (quickReplySets.isEmpty) {
-      _seedQuickReplies();
-      await saveQuickReplies();
-    }
+    await _seedMissingQuickReplies();
     _ready = true;
     notifyListeners();
   }
@@ -210,8 +207,11 @@ class AppStore extends ChangeNotifier {
     }
   }
 
-  void _seedQuickReplies() {
+  Future<void> _seedMissingQuickReplies() async {
+    var added = false;
     for (final set in demoQuickSets) {
+      if (quickReplySets.any((q) => q.name == set.name)) continue;
+      added = true;
       quickReplySets.add(
         QuickReplySet(
           id: 'seed-qr-${set.name}',
@@ -227,9 +227,10 @@ class AppStore extends ChangeNotifier {
         ),
       );
     }
-    if (quickReplySets.isNotEmpty) {
+    if (quickReplySets.isNotEmpty && activeQuickSetId.isEmpty) {
       activeQuickSetId = quickReplySets.first.id;
     }
+    if (added) await saveQuickReplies();
   }
 
   Future<void> addPreset(PromptPreset preset) async {

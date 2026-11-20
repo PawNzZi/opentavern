@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 
 import '../core/store.dart';
@@ -23,7 +24,7 @@ class SettingsScreen extends StatelessWidget {
   final VoidCallback onOpenConnect;
 
   void _open(BuildContext context, Widget page) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+    Navigator.of(context).push(CupertinoPageRoute(builder: (_) => page));
   }
 
   @override

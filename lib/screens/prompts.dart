@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
@@ -80,7 +81,7 @@ class _PromptManagerPageState extends State<PromptManagerPage> {
 
   Future<void> openEntry(PromptEntry entry) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => _PromptEntryPage(preset: _preset, entry: entry),
       ),
     );
@@ -109,7 +110,7 @@ class _PromptManagerPageState extends State<PromptManagerPage> {
             icon: Icons.account_tree_outlined,
             height: 32,
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PromptPreviewPage()),
+              CupertinoPageRoute(builder: (_) => const PromptPreviewPage()),
             ),
           ),
         ),
@@ -138,7 +139,7 @@ class _PromptManagerPageState extends State<PromptManagerPage> {
                   label: '编辑主提示词',
                   height: 30,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
+                    CupertinoPageRoute(
                       builder: (_) => _MainPromptPage(preset: _preset),
                     ),
                   ),

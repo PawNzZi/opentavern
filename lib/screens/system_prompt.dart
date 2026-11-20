@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -75,7 +76,7 @@ class SystemPromptPage extends StatelessWidget {
               icon: Icons.account_tree_outlined,
               height: 34,
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PromptPreviewPage()),
+                CupertinoPageRoute(builder: (_) => const PromptPreviewPage()),
               ),
             ),
           ],

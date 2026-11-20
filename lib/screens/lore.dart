@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
@@ -97,7 +98,7 @@ class _LoreScreenState extends State<LoreScreen> {
 
   Future<void> _newBook() async {
     final name = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const _NewLorebookPage()),
+      CupertinoPageRoute(builder: (_) => const _NewLorebookPage()),
     );
     if (name == null || name.trim().isEmpty) return;
     final book = Lorebook(

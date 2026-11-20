@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 
 import '../core/character_png.dart';
@@ -257,7 +258,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                         size: 44,
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(
+                            CupertinoPageRoute(
                               builder: (_) => CharacterEditorPage(
                                 character: c,
                               ),
@@ -372,7 +373,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
     DemoCharacter character,
   ) async {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => _ExportCardPage(
           character: character,
           onPng: () => _exportCharacterPng(context, character),
@@ -401,7 +402,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
 
   void _showMore(BuildContext context, DemoCharacter character) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => _CharacterMorePage(
           character: character,
           onExport: () => _exportCharacterMenu(context, character),
@@ -421,7 +422,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
     }
     if (!context.mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => ChatScreen(
           character: c,
           sessionId: sessions.first.id,
@@ -438,7 +439,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
     String? chosen;
     if (greetings.length > 1) {
       final index = await Navigator.of(context).push<int>(
-        MaterialPageRoute(
+        CupertinoPageRoute(
           builder: (_) => _GreetingPickerPage(
             character: c,
             greetings: greetings,
@@ -452,7 +453,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
     }
     if (!context.mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => ChatScreen(
           character: c,
           newSession: true,
@@ -590,7 +591,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   value: activePreset?.name ?? '默认',
                   iconColor: p.violet,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PresetsPage()),
+                    CupertinoPageRoute(builder: (_) => const PresetsPage()),
                   ),
                 ),
                 const Hairline(indent: 56),
@@ -600,7 +601,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   value: c.systemPrompt.trim().isEmpty ? '未设置' : '已设置',
                   iconColor: p.amber,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
+                    CupertinoPageRoute(
                       builder: (_) => CharacterEditorPage(character: c),
                     ),
                   ),
@@ -612,7 +613,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   value: c.postHistoryInstructions.trim().isEmpty ? '未设置' : '已设置',
                   iconColor: p.rose,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
+                    CupertinoPageRoute(
                       builder: (_) => CharacterEditorPage(character: c),
                     ),
                   ),
@@ -629,7 +630,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   value: '$charRegex 条脚本',
                   iconColor: const Color(0xFFA9A0E8),
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AutomationPage()),
+                    CupertinoPageRoute(builder: (_) => const AutomationPage()),
                   ),
                 ),
               ],
@@ -668,7 +669,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   iconColor: p.amber,
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(
+                      CupertinoPageRoute(
                         builder: (_) => CharacterEditorPage(character: c),
                       ),
                     );
@@ -815,7 +816,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     value: activePreset?.name ?? '默认',
                     iconColor: p.violet,
                     onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PresetsPage()),
+                      CupertinoPageRoute(builder: (_) => const PresetsPage()),
                     ),
                   ),
 
@@ -1099,7 +1100,7 @@ class _CharacterMorePage extends StatelessWidget {
                 title: '编辑角色',
                 iconColor: p.amber,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
+                  CupertinoPageRoute(
                     builder: (_) => CharacterEditorPage(character: character),
                   ),
                 ),

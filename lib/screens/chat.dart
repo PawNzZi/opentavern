@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -107,7 +108,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _openInfo() {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => ChatInfoSheet(
           session: _chat.session,
           character: widget.character,
