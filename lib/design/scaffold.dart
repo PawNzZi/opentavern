@@ -405,9 +405,7 @@ class _SheetStageState extends State<SheetStage>
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _dismiss,
-              child: ColoredBox(
-                color: Colors.black.withValues(alpha: p.isDark ? .38 : .18),
-              ),
+              child: const ColoredBox(color: Colors.transparent),
             ),
           ),
           AnimatedBuilder(
@@ -428,11 +426,9 @@ class _SheetStageState extends State<SheetStage>
               );
             },
             child: Container(
-              height: h * widget.heightFactor,
+              height: h,
               decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(36),
-                ),
+                borderRadius: BorderRadius.zero,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: .35),
@@ -442,7 +438,7 @@ class _SheetStageState extends State<SheetStage>
                 ],
               ),
               child: Glass(
-                radius: 36,
+                radius: 0,
                 blur: 40,
                 fill: 1.6,
                 padding: EdgeInsets.zero,

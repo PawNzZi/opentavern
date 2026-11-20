@@ -14,8 +14,10 @@ import '../design/settings_kit.dart';
 import '../design/routes.dart';
 import '../design/theme.dart';
 import 'editors.dart';
+import 'lore.dart';
 import 'search.dart';
 import 'prompt_preview.dart';
+import 'system_prompt.dart';
 import 'stats.dart';
 import '../design/toast.dart';
 
@@ -118,15 +120,10 @@ class ChatInfoSheet extends StatelessWidget {
     final settings = AppStore.instance.settings;
     final messageCount = session.messages.length;
     final charCount = session.messages.fold<int>(0, (n, m) => n + m.text.length);
-    final built = PromptBuilder.build(
-      character: character,
-      session: session,
-      settings: settings,
-    );
-    final systemPrompt = built.messages
-            .where((m) => m['role'] == 'system')
-            .map((m) => m['content']?.toString() ?? '')
-            .join('\n\n');
+    Lorebook? linkedBook;
+    for (final book in AppStore.instance.lorebooks) {
+      if (book.name == character.lorebook) linkedBook = book;
+    }
     final created = session.messages.isEmpty
         ? null
         : DateTime.fromMillisecondsSinceEpoch(session.messages.first.createdAt);
@@ -235,7 +232,16 @@ class ChatInfoSheet extends StatelessWidget {
                 title: '聊天世界书',
                 value: c.lorebook,
                 iconColor: p.sage,
-                onTap: () => showTavernToast(context, '未绑定聊天世界书'),
+                onTap: () {
+                  if (linkedBook == null) {
+                    showTavernToast(context, '未找到关联世界书');
+                    return;
+                  }
+                  openGlassPage(
+                    context,
+                    LorebookPage(book: linkedBook!),
+                  );
+                },
               ),
               const Hairline(indent: 56),
               SettingRow(
@@ -248,21 +254,24 @@ class ChatInfoSheet extends StatelessWidget {
             ],
           ),
           SettingsGroup(
-            title: '当前 System Prompt',
+            title: 'Prompt',
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                child: SelectableText(
-                  systemPrompt.isEmpty ? '（空）' : systemPrompt,
-                  style: appText(11, FontWeight.w400, p.textSecondary, height: 1.55),
+              SettingRow(
+                icon: Icons.code_rounded,
+                title: 'System Prompt',
+                value: '查看',
+                iconColor: p.sage,
+                onTap: () => openGlassPage(
+                  context,
+                  SystemPromptPage(character: character, session: session),
                 ),
               ),
-              const Hairline(indent: 14),
+              const Hairline(indent: 56),
               SettingRow(
                 icon: Icons.account_tree_outlined,
-                title: '查看完整构建',
+                title: '完整构建顺序',
                 value: '顺序与 Token',
-                iconColor: p.sage,
+                iconColor: p.violet,
                 onTap: () => openGlassPage(context, const PromptPreviewPage()),
               ),
             ],

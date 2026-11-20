@@ -17,13 +17,18 @@ class PromptPreviewPage extends StatefulWidget {
 
 class _PromptPreviewPageState extends State<PromptPreviewPage> {
   static const _labels = <String, String>{
-    'main': '主提示词',
-    'character': '角色卡设定',
+    'main': '主提示词 / 规则',
+    'worldInfoBefore': '世界书（角色前）',
+    'personaDescription': '用户设定（Persona）',
+    'charDescription': '角色描述',
+    'charPersonality': '性格',
+    'scenario': '场景',
+    'charSystemPrompt': '角色专属提示词',
+    'worldInfoAfter': '世界书（角色后）',
+    'dialogueExamples': '示例对话',
     'summary': '前情提要',
-    'lore': '世界书',
-    'persona': '用户人格',
-    'examples': '对话示例',
-    'authorNote': '作者笔记',
+    'authorsNote': '作者笔记',
+    'jailbreak': '越狱 / PHI（历史后）',
   };
 
   late List<String> _order;
@@ -32,7 +37,9 @@ class _PromptPreviewPageState extends State<PromptPreviewPage> {
   void initState() {
     super.initState();
     final stored = AppStore.instance.settings.promptOrder;
-    _order = stored.isEmpty ? _labels.keys.toList() : List.of(stored);
+    _order = stored.contains('charDescription')
+        ? List.of(stored)
+        : _labels.keys.toList();
   }
 
   Future<void> _move(int index, int delta) async {

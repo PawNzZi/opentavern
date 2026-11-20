@@ -62,46 +62,66 @@ class PromptBuilder {
         .take(8)
         .map((m) => m.text)
         .join('\n');
-    final lore = _activateLore(character, recentText);
+    final loreEntries = _activatedLore(character, recentText);
+    final loreBefore = loreEntries
+        .where((e) => e.position != 'after')
+        .map((e) => e.content.trim())
+        .where((e) => e.isNotEmpty)
+        .join('\n\n');
+    final loreAfter = loreEntries
+        .where((e) => e.position == 'after')
+        .map((e) => e.content.trim())
+        .where((e) => e.isNotEmpty)
+        .join('\n\n');
 
     final sections = <String, String>{};
     final preset = AppStore.instance.activePreset;
-    final main = character.systemPrompt.trim().isNotEmpty
-        ? character.systemPrompt
-        : (preset?.mainPrompt.trim().isNotEmpty == true
-            ? preset!.mainPrompt
-            : settings.mainPrompt);
+    final main = preset?.mainPrompt.trim().isNotEmpty == true
+        ? preset!.mainPrompt
+        : settings.mainPrompt;
     if (main.trim().isNotEmpty) {
       sections['main'] = macro(main).trim();
     }
-    final characterSection = StringBuffer();
-    characterSection.writeln('\n[角色]\n名字：${character.name}');
+    if (character.systemPrompt.trim().isNotEmpty) {
+      sections['charSystemPrompt'] =
+          '\n[角色专属提示词]\n${macro(character.systemPrompt).trim()}';
+    }
+    if (loreBefore.isNotEmpty) {
+      sections['worldInfoBefore'] = '\n[世界设定 · 角色前]\n$loreBefore';
+    }
     if (character.description.trim().isNotEmpty) {
-      characterSection.writeln('设定：${macro(character.description).trim()}');
+      sections['charDescription'] =
+          '\n[角色描述]\n${macro(character.description).trim()}';
     }
     if (character.personality.trim().isNotEmpty) {
-      characterSection.writeln('性格：${macro(character.personality).trim()}');
+      sections['charPersonality'] =
+          '\n[性格]\n${macro(character.personality).trim()}';
     }
     if (character.scenario.trim().isNotEmpty) {
-      characterSection.writeln('场景：${macro(character.scenario).trim()}');
+      sections['scenario'] = '\n[场景]\n${macro(character.scenario).trim()}';
     }
-    sections['character'] = characterSection.toString().trim();
-    if (session.summary.trim().isNotEmpty) {
-      sections['summary'] = '\n[前情提要]\n${session.summary.trim()}';
+    if (loreAfter.isNotEmpty) {
+      sections['worldInfoAfter'] = '\n[世界设定 · 角色后]\n$loreAfter';
     }
-    if (lore.isNotEmpty) sections['lore'] = '\n[世界设定]\n$lore';
     if (settings.personaDescription.trim().isNotEmpty) {
-      sections['persona'] =
-          '\n[用户]\n名字：${settings.userName}\n'
+      sections['personaDescription'] =
+          '\n[用户设定]\n名字：${settings.userName}\n'
           '${macro(settings.personaDescription).trim()}';
     }
     if (character.exampleDialogue.trim().isNotEmpty) {
-      sections['examples'] =
+      sections['dialogueExamples'] =
           '\n[对话示例]\n${macro(character.exampleDialogue).trim()}';
     }
+    if (session.summary.trim().isNotEmpty) {
+      sections['summary'] = '\n[前情提要]\n${session.summary.trim()}';
+    }
     if (settings.authorNote.trim().isNotEmpty) {
-      sections['authorNote'] =
+      sections['authorsNote'] =
           '\n[作者笔记]\n${macro(settings.authorNote).trim()}';
+    }
+    if (character.postHistoryInstructions.trim().isNotEmpty) {
+      sections['jailbreak'] =
+          '\n[越狱 / PHI]\n${macro(character.postHistoryInstructions).trim()}';
     }
     final system = StringBuffer();
     for (final key in settings.promptOrder) {
@@ -195,9 +215,9 @@ class PromptBuilder {
     );
   }
 
-  static String _activateLore(DemoCharacter character, String text) {
+  static List<LoreEntry> _activatedLore(DemoCharacter character, String text) {
     final lower = text.toLowerCase();
-    final selected = <(int, String)>[];
+    final selected = <LoreEntry>[];
 
     void scanEntries(List<LoreEntry> entries) {
       for (final entry in entries) {
@@ -213,7 +233,7 @@ class PromptBuilder {
           );
           if (!secondary) continue;
         }
-        selected.add((entry.order, entry.content.trim()));
+        selected.add(entry);
       }
     }
 
@@ -242,14 +262,25 @@ class PromptBuilder {
             );
             if (!matched) continue;
             final content = (entry['content'] ?? '').toString().trim();
-            if (content.isNotEmpty) selected.add((100, content));
+            if (content.isNotEmpty) {
+              selected.add(
+                LoreEntry(
+                  id: 'embedded-${selected.length}',
+                  name: entry['comment']?.toString() ?? '',
+                  keys: keys,
+                  content: content,
+                  constant: entry['constant'] == true,
+                  position: entry['position'] == 'after_char' ? 'after' : 'before',
+                ),
+              );
+            }
           }
         }
       }
     }
 
-    selected.sort((a, b) => b.$1.compareTo(a.$1));
-    return selected.map((e) => e.$2).take(6).join('\n\n');
+    selected.sort((a, b) => b.order.compareTo(a.order));
+    return selected.take(6).toList();
   }
 }
 

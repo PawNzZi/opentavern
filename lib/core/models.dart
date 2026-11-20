@@ -292,12 +292,17 @@ class AppSettings {
         '请用简洁的中文总结以下角色对话的剧情、人物关系、当前场景与未解决的线索。只输出摘要，不要续写对话。',
     this.promptOrder = const [
       'main',
-      'character',
+      'worldInfoBefore',
+      'personaDescription',
+      'charDescription',
+      'charPersonality',
+      'scenario',
+      'charSystemPrompt',
+      'worldInfoAfter',
+      'dialogueExamples',
       'summary',
-      'lore',
-      'persona',
-      'examples',
-      'authorNote',
+      'authorsNote',
+      'jailbreak',
     ],
   });
 
@@ -360,6 +365,10 @@ class AppSettings {
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
+    final storedOrder = (json['promptOrder'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        const <String>[];
     return AppSettings(
       api: APISettings.fromJson(
         json['api'] is Map
@@ -380,18 +389,22 @@ class AppSettings {
       summaryPrompt: (json['summaryPrompt'] ??
               '请用简洁的中文总结以下角色对话的剧情、人物关系、当前场景与未解决的线索。只输出摘要，不要续写对话。')
           .toString(),
-      promptOrder: (json['promptOrder'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [
-            'main',
-            'character',
-            'summary',
-            'lore',
-            'persona',
-            'examples',
-            'authorNote',
-          ],
+      promptOrder: storedOrder.contains('charDescription')
+          ? storedOrder
+          : const [
+              'main',
+              'worldInfoBefore',
+              'personaDescription',
+              'charDescription',
+              'charPersonality',
+              'scenario',
+              'charSystemPrompt',
+              'worldInfoAfter',
+              'dialogueExamples',
+              'summary',
+              'authorsNote',
+              'jailbreak',
+            ],
     );
   }
 

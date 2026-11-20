@@ -93,60 +93,9 @@ class _LoreScreenState extends State<LoreScreen> {
   }
 
   Future<void> _newBook() async {
-    final controller = TextEditingController();
-    final name = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(ctx).bottom + 16,
-          left: 12,
-          right: 12,
-        ),
-        child: Glass(
-          radius: 26,
-          blur: 30,
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('新建世界书', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                style: const TextStyle(fontSize: 15),
-                decoration: const InputDecoration(hintText: '世界书名称'),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: GlassPill(
-                      label: '取消',
-                      height: 38,
-                      onTap: () => Navigator.pop(ctx),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: GlassPill(
-                      label: '创建',
-                      height: 38,
-                      selected: true,
-                      onTap: () => Navigator.pop(ctx, controller.text),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+    final name = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const _NewLorebookPage()),
     );
-    controller.dispose();
     if (name == null || name.trim().isEmpty) return;
     final book = Lorebook(
       id: 'book-${DateTime.now().microsecondsSinceEpoch}',
@@ -756,6 +705,54 @@ class _LoreCard extends StatelessWidget {
           Icon(Icons.chevron_right_rounded, size: 18, color: p.textTertiary),
         ],
       ),
+    );
+  }
+}
+
+class _NewLorebookPage extends StatefulWidget {
+  const _NewLorebookPage();
+
+  @override
+  State<_NewLorebookPage> createState() => _NewLorebookPageState();
+}
+
+class _NewLorebookPageState extends State<_NewLorebookPage> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DetailPage(
+      eyebrow: 'NEW LOREBOOK',
+      title: '新建世界书',
+      subtitle: '只会在本机保存。',
+      footer: GlassPrimaryButton(
+        label: '创建',
+        icon: Icons.check_rounded,
+        onTap: () => Navigator.of(context).pop(_controller.text),
+      ),
+      children: [
+        const SizedBox(height: 12),
+        Glass(
+          radius: 18,
+          blur: 18,
+          padding: const EdgeInsets.all(12),
+          child: TextField(
+            controller: _controller,
+            autofocus: true,
+            style: const TextStyle(fontSize: 15),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              hintText: '世界书名称',
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

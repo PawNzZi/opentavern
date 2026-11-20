@@ -128,33 +128,13 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
   }
 
   Future<void> _pickLorebook() async {
-    final names = <String>['未绑定', ...AppStore.instance.lorebooks.map((b) => b.name)];
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          child: Glass(
-            radius: 26,
-            blur: 30,
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < names.length; i++) ...[
-                  SettingRow(
-                    icon: Icons.auto_stories_rounded,
-                    title: names[i],
-                    iconColor: AppPalette.of(ctx).amber,
-                    onTap: () => Navigator.pop(ctx, names[i]),
-                  ),
-                  if (i != names.length - 1) const Hairline(indent: 56),
-                ],
-              ],
-            ),
-          ),
-        ),
+    final names = <String>[
+      '未绑定',
+      ...AppStore.instance.lorebooks.map((b) => b.name),
+    ];
+    final picked = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => _LorebookPickerPage(names: names),
       ),
     );
     if (picked != null && mounted) setState(() => _lorebook = picked);
@@ -353,6 +333,43 @@ class _EditField extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LorebookPickerPage extends StatelessWidget {
+  const _LorebookPickerPage({required this.names});
+
+  final List<String> names;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return DetailPage(
+      eyebrow: 'LOREBOOK',
+      title: '绑定世界书',
+      subtitle: '${names.length - 1} 本本地世界书',
+      children: [
+        const SizedBox(height: 12),
+        Glass(
+          radius: 22,
+          blur: 22,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              for (var i = 0; i < names.length; i++) ...[
+                SettingRow(
+                  icon: Icons.auto_stories_rounded,
+                  title: names[i],
+                  iconColor: p.amber,
+                  onTap: () => Navigator.of(context).pop(names[i]),
+                ),
+                if (i != names.length - 1) const Hairline(indent: 56),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

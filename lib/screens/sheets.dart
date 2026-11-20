@@ -314,90 +314,17 @@ class ImportSheetScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 13),
                     Text(
-                      '拖入文件，或从下方选择',
+                      '选择角色卡文件',
                       style: appText(14, FontWeight.w500, p.textPrimary),
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'PNG · JSON · CHARX · 最大 100 MB',
+                      'PNG · JSON · 可多选',
                       style: appText(11, FontWeight.w400, p.textTertiary),
                     ),
                   ],
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: const [
-              Expanded(
-                child: _ImportOption(
-                  icon: Icons.folder_rounded,
-                  label: '文件',
-                ),
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: _ImportOption(
-                  icon: Icons.photo_library_rounded,
-                  label: '相册',
-                ),
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: _ImportOption(
-                  icon: Icons.link_rounded,
-                  label: '链接',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text(
-            '最近导入',
-            style: appText(11.5, FontWeight.w600, p.textTertiary, letterSpacing: 1.2),
-          ),
-          const SizedBox(height: 8),
-          Glass(
-            radius: 18,
-            blur: 18,
-            shadow: false,
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF8C4A3F), Color(0xFF3B1E2A)],
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.person_rounded,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '角色卡文件',
-                        style: appText(13, FontWeight.w500, p.textPrimary),
-                      ),
-                      Text(
-                        '选择后在本机解析',
-                        style: appText(10, FontWeight.w400, p.textTertiary),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.check_circle_rounded, size: 16, color: p.sage),
-              ],
             ),
           ),
         ],

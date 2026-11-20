@@ -14,6 +14,7 @@ import '../core/pdf_text.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
+import '../design/settings_kit.dart';
 import '../design/scaffold.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
@@ -132,7 +133,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _pickFile(BuildContext sheetContext) async {
-    Navigator.of(sheetContext).pop();
     final file = await FilePickerPlatform.instance.pickFile();
     if (file == null) return;
     final bytes = await file.readAsBytes();
@@ -175,7 +175,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _pickImage(BuildContext sheetContext) async {
-    Navigator.of(sheetContext).pop();
     final file = await FilePickerPlatform.instance.pickFile();
     if (file == null) return;
     final bytes = await file.readAsBytes();
@@ -211,51 +210,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _openAttachments() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: .35),
-      builder: (context) {
-        final p = AppPalette.of(context);
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-            child: Glass(
-              radius: 26,
-              blur: 34,
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '添加内容',
-                    style: appText(15, FontWeight.w600, p.textPrimary),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      _AttachAction(
-                        icon: Icons.photo_outlined,
-                        label: '图片',
-                        color: p.amber,
-                        onTap: () => _pickImage(context),
-                      ),
-                      _AttachAction(
-                        icon: Icons.attach_file_rounded,
-                        label: '文件',
-                        color: p.sage,
-                        onTap: () => _pickFile(context),
-                      ),
-
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _AttachmentPage(
+          onImage: () => _pickImage(context),
+          onFile: () => _pickFile(context),
+        ),
+      ),
     );
   }
 
@@ -264,32 +225,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showMessageMenu(ChatMessage message) {
-    showGeneralDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'message-menu',
-      barrierColor: Colors.black.withValues(alpha: .38),
-      transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (dialogContext, animation, __) => _MessageMenu(
-        message: message,
-        onAction: (action) {
-          Navigator.of(dialogContext).pop();
-          _handleMenuAction(action, message);
-        },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _MessageMenuPage(
+          message: message,
+          onAction: (action) => _handleMenuAction(action, message),
+        ),
       ),
-      transitionBuilder: (context, animation, __, child) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: .96, end: 1).animate(curved),
-            child: child,
-          ),
-        );
-      },
     );
   }
 
@@ -385,79 +327,18 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _editMessage(ChatMessage message) {
-    final controller = TextEditingController(text: message.text);
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: .38),
-      builder: (context) {
-        final p = AppPalette.of(context);
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(context).bottom,
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-              child: Glass(
-                radius: 26,
-                blur: 36,
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '编辑消息',
-                      style: appText(16, FontWeight.w600, p.textPrimary),
-                    ),
-                    const SizedBox(height: 10),
-                    Glass(
-                      radius: 16,
-                      blur: 18,
-                      shadow: false,
-                      padding: const EdgeInsets.all(12),
-                      child: TextField(
-                        controller: controller,
-                        maxLines: 6,
-                        minLines: 3,
-                        style: appText(14, FontWeight.w400, p.textPrimary),
-                        cursorColor: p.amber,
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          isDense: true,
-                          hintText: '输入消息内容',
-                          hintStyle: appText(
-                            14,
-                            FontWeight.w400,
-                            p.textTertiary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    GlassPrimaryButton(
-                      label: '保存修改',
-                      height: 48,
-                      onTap: () {
-                        final wasLast = _chat.messages.isNotEmpty &&
-                            _chat.messages.last.id == message.id;
-                        _chat.edit(message, controller.text);
-                        Navigator.of(context).pop();
-                        _toast('已保存');
-                        if (!wasLast) _askAfterEdit(message);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+  Future<void> _editMessage(ChatMessage message) async {
+    final text = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => _EditMessagePage(initial: message.text),
+      ),
     );
+    if (text == null) return;
+    final wasLast = _chat.messages.isNotEmpty &&
+        _chat.messages.last.id == message.id;
+    _chat.edit(message, text);
+    _toast('已保存');
+    if (!wasLast) await _askAfterEdit(message);
   }
 
   @override
@@ -1723,4 +1604,163 @@ void _showImage(BuildContext context, String data) {
       ),
     ),
   );
+}
+
+class _MessageMenuPage extends StatelessWidget {
+  const _MessageMenuPage({required this.message, required this.onAction});
+
+  final ChatMessage message;
+  final ValueChanged<String> onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final items = <(IconData, String, Color)>[
+      (Icons.copy_rounded, '复制', p.textPrimary),
+      (Icons.edit_outlined, '编辑', p.textPrimary),
+      (Icons.visibility_off_outlined, '隐藏', p.textPrimary),
+      (Icons.delete_outline_rounded, '删除', p.danger),
+      (Icons.bookmark_add_outlined, '书签', p.textPrimary),
+      (Icons.call_split_rounded, '分支', p.textPrimary),
+      (Icons.restart_alt_rounded, '从此重写', p.amber),
+      (Icons.playlist_remove_rounded, '删除后续', p.danger),
+      (Icons.auto_awesome_rounded, '查看推理', p.amber),
+    ];
+    return DetailPage(
+      eyebrow: 'MESSAGE',
+      title: '消息操作',
+      subtitle: message.text.replaceAll('\n', ' '),
+      children: [
+        const SizedBox(height: 12),
+        Glass(
+          radius: 22,
+          blur: 22,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              for (var i = 0; i < items.length; i++) ...[
+                SettingRow(
+                  icon: items[i].$1,
+                  title: items[i].$2,
+                  iconColor: items[i].$3,
+                  chevron: false,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onAction(items[i].$2);
+                  },
+                ),
+                if (i != items.length - 1) const Hairline(indent: 56),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditMessagePage extends StatefulWidget {
+  const _EditMessagePage({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_EditMessagePage> createState() => _EditMessagePageState();
+}
+
+class _EditMessagePageState extends State<_EditMessagePage> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return DetailPage(
+      eyebrow: 'EDIT MESSAGE',
+      title: '编辑消息',
+      subtitle: '修改后会询问如何处理后续消息。',
+      footer: GlassPrimaryButton(
+        label: '保存修改',
+        icon: Icons.check_rounded,
+        onTap: () => Navigator.of(context).pop(_controller.text),
+      ),
+      children: [
+        const SizedBox(height: 12),
+        Glass(
+          radius: 18,
+          blur: 18,
+          padding: const EdgeInsets.all(12),
+          child: TextField(
+            controller: _controller,
+            maxLines: 10,
+            minLines: 5,
+            autofocus: true,
+            style: appText(14, FontWeight.w400, p.textPrimary, height: 1.5),
+            cursorColor: p.amber,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              hintText: '输入消息内容',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AttachmentPage extends StatelessWidget {
+  const _AttachmentPage({required this.onImage, required this.onFile});
+
+  final VoidCallback onImage;
+  final VoidCallback onFile;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return DetailPage(
+      eyebrow: 'ATTACH',
+      title: '添加内容',
+      subtitle: '图片会压缩到 1024px；文本/PDF/DOCX 作为上下文。',
+      children: [
+        const SizedBox(height: 12),
+        Glass(
+          radius: 22,
+          blur: 22,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              SettingRow(
+                icon: Icons.photo_outlined,
+                title: '图片',
+                subtitle: '相册图片，作为多模态输入',
+                iconColor: p.amber,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onImage();
+                },
+              ),
+              const Hairline(indent: 56),
+              SettingRow(
+                icon: Icons.attach_file_rounded,
+                title: '文件',
+                subtitle: 'TXT / MD / JSON / CSV / DOCX / PDF',
+                iconColor: p.sage,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onFile();
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }

@@ -15,7 +15,10 @@ import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
+import 'automation.dart';
 import 'character_editor.dart';
+import 'lore.dart';
+import 'presets.dart';
 import 'chat.dart';
 
 class CharacterScreen extends StatefulWidget {
@@ -34,9 +37,7 @@ class CharacterScreen extends StatefulWidget {
 
 class _CharacterScreenState extends State<CharacterScreen> {
   late int _tab = widget.initialTab;
-  late final ScrollController _scroll = ScrollController(
-    initialScrollOffset: widget.initialTab > 0 ? 520 : 0,
-  );
+  final ScrollController _scroll = ScrollController();
 
   @override
   void dispose() {
@@ -165,7 +166,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                           blur: 20,
                           shadow: false,
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          onTap: null,
+                          onTap: () => _continueChat(context, c),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -208,13 +209,6 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     index: _tab,
                     onChanged: (i) {
                       setState(() => _tab = i);
-                      if (_scroll.hasClients) {
-                        _scroll.animateTo(
-                          520,
-                          duration: const Duration(milliseconds: 280),
-                          curve: Curves.easeOutCubic,
-                        );
-                      }
                     },
                   ),
                   const SizedBox(height: 6),
@@ -222,7 +216,9 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   const SizedBox(height: 28),
                   Center(
                     child: Text(
-                      '导入于 2026 年 11 月 · ${c.tokens} tokens',
+                      c.createdAt == null
+                          ? '本地角色 · ${c.tokens} tokens'
+                          : '本地角色 · 创建于 ${DateTime.fromMillisecondsSinceEpoch(c.createdAt!).year}-${DateTime.fromMillisecondsSinceEpoch(c.createdAt!).month.toString().padLeft(2, '0')}-${DateTime.fromMillisecondsSinceEpoch(c.createdAt!).day.toString().padLeft(2, '0')} · ${c.tokens} tokens',
                       style: appText(10.5, FontWeight.w400, p.textTertiary),
                     ),
                   ),
@@ -351,43 +347,12 @@ class _CharacterScreenState extends State<CharacterScreen> {
     BuildContext context,
     DemoCharacter character,
   ) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          child: Glass(
-            radius: 26,
-            blur: 30,
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SettingRow(
-                  icon: Icons.image_outlined,
-                  title: 'PNG 角色卡',
-                  subtitle: '写入 chara / ccv3 元数据，可直接分享',
-                  iconColor: AppPalette.of(ctx).amber,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _exportCharacterPng(context, character);
-                  },
-                ),
-                const Hairline(indent: 56),
-                SettingRow(
-                  icon: Icons.data_object_rounded,
-                  title: 'JSON 数据',
-                  subtitle: '仅导出角色卡字段',
-                  iconColor: AppPalette.of(ctx).sage,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _exportCharacterJson(context, character);
-                  },
-                ),
-              ],
-            ),
-          ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _ExportCardPage(
+          character: character,
+          onPng: () => _exportCharacterPng(context, character),
+          onJson: () => _exportCharacterJson(context, character),
         ),
       ),
     );
@@ -411,150 +376,48 @@ class _CharacterScreenState extends State<CharacterScreen> {
   }
 
   void _showMore(BuildContext context) {
-    final p = AppPalette.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: .35),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          child: Glass(
-            radius: 26,
-            blur: 34,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SettingRow(
-                  icon: Icons.edit_outlined,
-                  title: '编辑角色',
-                  iconColor: p.amber,
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    openGlassPage(
-                      context,
-                      CharacterEditorPage(character: widget.character),
-                    );
-                  },
-                ),
-                const Hairline(indent: 56),
-                SettingRow(
-                  icon: Icons.copy_rounded,
-                  title: '复制角色',
-                  iconColor: p.sage,
-                  onTap: () async {
-                    Navigator.of(sheetContext).pop();
-                    final copy = widget.character.copyWith(
-                      name: '${widget.character.name} 副本',
-                    );
-                    await AppStore.instance.addCharacter(copy);
-                    if (context.mounted) {
-                      showTavernToast(context, '已复制角色');
-                    }
-                  },
-                ),
-                const Hairline(indent: 56),
-                SettingRow(
-                  icon: Icons.ios_share_rounded,
-                  title: '导出角色卡',
-                  iconColor: p.violet,
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _exportCharacterMenu(context, widget.character);
-                  },
-                ),
-                const Hairline(indent: 56),
-                SettingRow(
-                  icon: Icons.delete_outline_rounded,
-                  title: '删除角色',
-                  iconColor: p.danger,
-                  onTap: () async {
-                    Navigator.of(sheetContext).pop();
-                    final ok = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('删除角色'),
-                        content: Text('删除「${widget.character.name}」及其全部聊天？'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('取消'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text('删除'),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (ok != true) return;
-                    await AppStore.instance.deleteCharacter(
-                      widget.character,
-                      deleteChats: true,
-                    );
-                    if (context.mounted) Navigator.of(context).maybePop();
-                  },
-                ),
-              ],
-            ),
-          ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _CharacterMorePage(
+          character: widget.character,
+          onExport: () => _exportCharacterMenu(context, widget.character),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _continueChat(BuildContext context, DemoCharacter c) async {
+    final sessions = AppStore.instance.sessions
+        .where((s) => s.characterName == c.name)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    if (sessions.isEmpty) {
+      await _startChat(context, c);
+      return;
+    }
+    if (!context.mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          character: c,
+          sessionId: sessions.first.id,
         ),
       ),
     );
   }
 
   Future<void> _startChat(BuildContext context, DemoCharacter c) async {
-    final p = AppPalette.of(context);
     final greetings = <String>[
       if (c.greeting.trim().isNotEmpty) c.greeting,
       ...c.alternateGreetings.where((g) => g.trim().isNotEmpty),
     ];
     String? chosen;
     if (greetings.length > 1) {
-      final index = await showModalBottomSheet<int>(
-        context: context,
-        backgroundColor: Colors.transparent,
-        builder: (ctx) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-            child: Glass(
-              radius: 26,
-              blur: 30,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-                    child: Text(
-                      '选择开场白',
-                      style: appText(15, FontWeight.w600, p.textPrimary),
-                    ),
-                  ),
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: greetings.length,
-                      itemBuilder: (context, i) => ListTile(
-                        title: Text(
-                          greetings[i],
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: appText(13, FontWeight.w400, p.textPrimary),
-                        ),
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color: p.textTertiary,
-                        ),
-                        onTap: () => Navigator.pop(context, i),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      final index = await Navigator.of(context).push<int>(
+        MaterialPageRoute(
+          builder: (_) => _GreetingPickerPage(
+            character: c,
+            greetings: greetings,
           ),
         ),
       );
@@ -691,7 +554,9 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   title: '默认预设',
                   value: activePreset?.name ?? '默认',
                   iconColor: p.violet,
-                  onTap: null,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PresetsPage()),
+                  ),
                 ),
                 const Hairline(indent: 56),
                 SettingRow(
@@ -699,7 +564,11 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   title: '主提示词覆盖',
                   value: c.systemPrompt.trim().isEmpty ? '未设置' : '已设置',
                   iconColor: p.amber,
-                  onTap: null,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CharacterEditorPage(character: c),
+                    ),
+                  ),
                 ),
                 const Hairline(indent: 56),
                 SettingRow(
@@ -707,7 +576,11 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   title: 'Post-History Instructions',
                   value: c.postHistoryInstructions.trim().isEmpty ? '未设置' : '已设置',
                   iconColor: p.rose,
-                  onTap: null,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CharacterEditorPage(character: c),
+                    ),
+                  ),
                 ),
 
               ],
@@ -720,7 +593,9 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   title: '角色正则',
                   value: '$charRegex 条脚本',
                   iconColor: const Color(0xFFA9A0E8),
-                  onTap: null,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AutomationPage()),
+                  ),
                 ),
               ],
             ),
@@ -890,7 +765,17 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     title: '世界书',
                     value: c.lorebook,
                     iconColor: p.sage,
-                    onTap: null,
+                    onTap: () {
+                      if (book == null) {
+                        showTavernToast(context, '未绑定世界书');
+                        return;
+                      }
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => LorebookPage(book: book!),
+                        ),
+                      );
+                    },
                   ),
                   const Hairline(indent: 56),
                   SettingRow(
@@ -898,7 +783,9 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     title: '预设',
                     value: activePreset?.name ?? '默认',
                     iconColor: p.violet,
-                    onTap: null,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const PresetsPage()),
+                    ),
                   ),
 
                 ],
@@ -1119,6 +1006,201 @@ class _MetaRow extends StatelessWidget {
         Text(
           value,
           style: appText(10.5, FontWeight.w500, p.textSecondary),
+        ),
+      ],
+    );
+  }
+}
+
+class _CharacterMorePage extends StatelessWidget {
+  const _CharacterMorePage({
+    required this.character,
+    required this.onExport,
+  });
+
+  final DemoCharacter character;
+  final VoidCallback onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return DetailPage(
+      eyebrow: 'CHARACTER',
+      title: '更多操作',
+      subtitle: character.name,
+      children: [
+        const SizedBox(height: 12),
+        Glass(
+          radius: 22,
+          blur: 22,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              SettingRow(
+                icon: Icons.edit_outlined,
+                title: '编辑角色',
+                iconColor: p.amber,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CharacterEditorPage(character: character),
+                  ),
+                ),
+              ),
+              const Hairline(indent: 56),
+              SettingRow(
+                icon: Icons.copy_rounded,
+                title: '复制角色',
+                iconColor: p.sage,
+                onTap: () async {
+                  final copy = character.copyWith(name: '${character.name} 副本');
+                  await AppStore.instance.addCharacter(copy);
+                  if (context.mounted) {
+                    showTavernToast(context, '已复制角色');
+                    Navigator.of(context).pop();
+                  }
+                },
+              ),
+              const Hairline(indent: 56),
+              SettingRow(
+                icon: Icons.ios_share_rounded,
+                title: '导出角色卡',
+                value: 'PNG / JSON',
+                iconColor: p.violet,
+                onTap: onExport,
+              ),
+              const Hairline(indent: 56),
+              SettingRow(
+                icon: Icons.delete_outline_rounded,
+                title: '删除角色',
+                value: '同时删除其聊天',
+                iconColor: p.danger,
+                onTap: () async {
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('删除角色'),
+                      content: Text('删除「${character.name}」及其全部聊天？'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('取消'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('删除'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (ok != true) return;
+                  await AppStore.instance.deleteCharacter(
+                    character,
+                    deleteChats: true,
+                  );
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GreetingPickerPage extends StatelessWidget {
+  const _GreetingPickerPage({
+    required this.character,
+    required this.greetings,
+  });
+
+  final DemoCharacter character;
+  final List<String> greetings;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return DetailPage(
+      eyebrow: 'GREETING',
+      title: '选择开场白',
+      subtitle: character.name,
+      children: [
+        const SizedBox(height: 12),
+        Glass(
+          radius: 22,
+          blur: 22,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              for (var i = 0; i < greetings.length; i++) ...[
+                SettingRow(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  title: greetings[i],
+                  subtitle: '开场白 ${i + 1}',
+                  iconColor: p.amber,
+                  onTap: () => Navigator.of(context).pop(i),
+                ),
+                if (i != greetings.length - 1) const Hairline(indent: 56),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ExportCardPage extends StatelessWidget {
+  const _ExportCardPage({
+    required this.character,
+    required this.onPng,
+    required this.onJson,
+  });
+
+  final DemoCharacter character;
+  final VoidCallback onPng;
+  final VoidCallback onJson;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return DetailPage(
+      eyebrow: 'EXPORT',
+      title: '导出角色卡',
+      subtitle: character.name,
+      children: [
+        const SizedBox(height: 12),
+        Glass(
+          radius: 22,
+          blur: 22,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              SettingRow(
+                icon: Icons.image_outlined,
+                title: 'PNG 角色卡',
+                subtitle: '写入 chara / ccv3 元数据，可直接分享',
+                iconColor: p.amber,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onPng();
+                },
+              ),
+              const Hairline(indent: 56),
+              SettingRow(
+                icon: Icons.data_object_rounded,
+                title: 'JSON 数据',
+                subtitle: '仅导出角色卡字段',
+                iconColor: p.sage,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onJson();
+                },
+              ),
+            ],
+          ),
         ),
       ],
     );

@@ -28,20 +28,26 @@ void main() {
       settings: const AppSettings(authorNote: '笔记'),
     );
     final normalSystem = normal.messages.first['content'] as String;
-    expect(normalSystem.indexOf('角色'), lessThan(normalSystem.indexOf('作者')));
+    expect(
+      normalSystem.indexOf('角色描述'),
+      lessThan(normalSystem.indexOf('作者笔记')),
+    );
     final reversed = PromptBuilder.build(
       character: character,
       session: session,
       settings: const AppSettings(
         authorNote: '笔记',
         promptOrder: [
-          'authorNote',
-          'character',
+          'authorsNote',
+          'charDescription',
           'main',
         ],
       ),
     );
     final reversedSystem = reversed.messages.first['content'] as String;
-    expect(reversedSystem.indexOf('作者'), lessThan(reversedSystem.indexOf('角色')));
+    expect(
+      reversedSystem.indexOf('作者笔记'),
+      lessThan(reversedSystem.indexOf('角色描述')),
+    );
   });
 }

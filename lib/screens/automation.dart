@@ -103,34 +103,6 @@ class _AutomationPageState extends State<AutomationPage> {
             ],
           ],
         ),
-        SettingsGroup(
-          title: '变量',
-          children: [
-            SettingRow(
-              icon: Icons.data_object_rounded,
-              title: '局部变量',
-              value: '${localVars.length} 个 · 全部聊天',
-              iconColor: p.violet,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.public_rounded,
-              title: '全局变量',
-              value: '未启用',
-              iconColor: p.amber,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.delete_outline_rounded,
-              title: '清理未使用变量',
-              value: '未启用',
-              iconColor: p.rose,
-              onTap: () {},
-            ),
-          ],
-        ),
         const SizedBox(height: 18),
         const HintCard(
           text: '正则可能带来性能问题。每次执行都有超时与长度限制；复杂的文本处理建议写成 STscript 或扩展。',
