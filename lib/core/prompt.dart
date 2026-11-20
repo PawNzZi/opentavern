@@ -306,7 +306,7 @@ class PromptBuilder {
     }
 
     selected.sort((a, b) => b.order.compareTo(a.order));
-    return selected.take(6).toList();
+    return selected.take(20).toList();
   }
 }
 
