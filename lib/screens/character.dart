@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +20,40 @@ import 'lore.dart';
 import 'presets.dart';
 import 'chat.dart';
 
+/// 复制角色时生成不会互相覆盖的名字。
+String _uniqueCopyName(String base) {
+  final names = AppStore.instance.characters.map((c) => c.name).toSet();
+  if (!names.contains('$base 副本')) return '$base 副本';
+  var index = 2;
+  while (names.contains('$base 副本 $index')) {
+    index++;
+  }
+  return '$base 副本 $index';
+}
+
+/// 复制角色卡与设定并真正落盘；关闭入口时可以顺带返回上一页。
+Future<void> _copyCharacter(
+  BuildContext context,
+  DemoCharacter character, {
+  bool closeAfter = false,
+}) async {
+  final copy = character.copyWith(
+    name: _uniqueCopyName(character.name),
+    chats: 0,
+    unread: 0,
+  );
+  await AppStore.instance.addCharacter(copy);
+  if (!context.mounted) return;
+  showTavernToast(context, '已复制为「${copy.name}」');
+  if (closeAfter) Navigator.of(context).pop();
+}
+
+String _formatDate(int? timestamp) {
+  if (timestamp == null) return '未知';
+  final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+}
+
 class CharacterScreen extends StatefulWidget {
   const CharacterScreen({
     super.key,
@@ -40,7 +73,34 @@ class _CharacterScreenState extends State<CharacterScreen> {
   final ScrollController _scroll = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    AppStore.instance.addListener(_syncStore);
+  }
+
+  void _syncStore() {
+    if (mounted) setState(() {});
+  }
+
+  /// The store replaces character objects on every edit/favorite toggle, so
+  /// always render the newest copy instead of the one passed at push time.
+  DemoCharacter _resolveCharacter() {
+    final store = AppStore.instance;
+    final createdAt = widget.character.createdAt;
+    if (createdAt != null) {
+      for (final candidate in store.characters) {
+        if (candidate.createdAt == createdAt) return candidate;
+      }
+    }
+    for (final candidate in store.characters) {
+      if (candidate.name == widget.character.name) return candidate;
+    }
+    return widget.character;
+  }
+
+  @override
   void dispose() {
+    AppStore.instance.removeListener(_syncStore);
     _scroll.dispose();
     super.dispose();
   }
@@ -48,8 +108,11 @@ class _CharacterScreenState extends State<CharacterScreen> {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final c = widget.character;
+    final c = _resolveCharacter();
     final width = MediaQuery.sizeOf(context).width;
+    final chatCount = AppStore.instance.sessions
+        .where((s) => s.characterName == c.name)
+        .length;
     return TavernScaffold(
       intensity: 1.2,
       child: Stack(
@@ -150,7 +213,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  _Stats(character: c),
+                  _Stats(character: c, chatCount: chatCount),
                   const SizedBox(height: 16),
                   GlassPrimaryButton(
                     label: '开始新对话',
@@ -218,7 +281,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     child: Text(
                       c.createdAt == null
                           ? '本地角色 · ${c.tokens} tokens'
-                          : '本地角色 · 创建于 ${DateTime.fromMillisecondsSinceEpoch(c.createdAt!).year}-${DateTime.fromMillisecondsSinceEpoch(c.createdAt!).month.toString().padLeft(2, '0')}-${DateTime.fromMillisecondsSinceEpoch(c.createdAt!).day.toString().padLeft(2, '0')} · ${c.tokens} tokens',
+                          : '本地角色 · 创建于 ${_formatDate(c.createdAt)} · ${c.tokens} tokens',
                       style: appText(10.5, FontWeight.w400, p.textTertiary),
                     ),
                   ),
@@ -252,28 +315,33 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   ),
                   const Spacer(),
                   GlassCircleButton(
-                    icon: Icons.star_rounded,
+                    icon: c.favorite
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
                     size: 40,
                     iconSize: 18,
-                    iconColor: p.amber,
-                    tint: p.amber,
+                    iconColor: c.favorite ? p.amber : p.textPrimary,
+                    tint: c.favorite ? p.amber : null,
                     onTap: () async {
-                    await AppStore.instance.addCharacter(
-                      c.copyWith(favorite: !c.favorite),
-                    );
-                    if (context.mounted) {
-                      showTavernToast(
-                        context,
-                        c.favorite ? '已取消收藏' : '已收藏 ${c.name}',
+                      final latest = _resolveCharacter();
+                      await AppStore.instance.addCharacter(
+                        latest.copyWith(favorite: !latest.favorite),
                       );
-                    }
-                  },
+                      if (context.mounted) {
+                        showTavernToast(
+                          context,
+                          latest.favorite
+                              ? '已取消收藏 ${latest.name}'
+                              : '已收藏 ${latest.name}',
+                        );
+                      }
+                    },
                   ),
                   const SizedBox(width: 8),
                   GlassCircleButton(
                     icon: Icons.more_horiz_rounded,
                     size: 40,
-                    onTap: () => _showMore(context),
+                    onTap: () => _showMore(context, c),
                   ),
                 ],
               ),
@@ -282,50 +350,6 @@ class _CharacterScreenState extends State<CharacterScreen> {
         ],
       ),
     );
-  }
-
-  Future<Uint8List> _characterPng(DemoCharacter character) async {
-    final avatar = character.avatarBase64;
-    if (avatar != null && avatar.isNotEmpty) {
-      try {
-        final codec = await ui.instantiateImageCodec(
-          base64Decode(avatar),
-          targetWidth: 512,
-          allowUpscaling: false,
-        );
-        final frame = await codec.getNextFrame();
-        final data = await frame.image.toByteData(
-          format: ui.ImageByteFormat.png,
-        );
-        frame.image.dispose();
-        codec.dispose();
-        if (data != null) return data.buffer.asUint8List();
-      } catch (_) {}
-    }
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    const size = 512.0;
-    final colors = character.colors.length >= 2
-        ? [character.colors.first, character.colors.last]
-        : [const Color(0xFF8C4A3F), const Color(0xFFD98E5F)];
-    final paint = ui.Paint()
-      ..shader = ui.Gradient.linear(
-        Offset.zero,
-        const Offset(size, size),
-        colors,
-      );
-    canvas.drawRect(const Rect.fromLTWH(0, 0, size, size), paint);
-    canvas.drawCircle(
-      const Offset(390, 110),
-      100,
-      ui.Paint()..color = Colors.white.withValues(alpha: .16),
-    );
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(512, 512);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    image.dispose();
-    picture.dispose();
-    return data!.buffer.asUint8List();
   }
 
   Future<void> _exportCharacterPng(
@@ -375,12 +399,12 @@ class _CharacterScreenState extends State<CharacterScreen> {
     showTavernToast(context, uri == null ? '已取消导出' : '角色卡已导出');
   }
 
-  void _showMore(BuildContext context) {
+  void _showMore(BuildContext context, DemoCharacter character) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => _CharacterMorePage(
-          character: widget.character,
-          onExport: () => _exportCharacterMenu(context, widget.character),
+          character: character,
+          onExport: () => _exportCharacterMenu(context, character),
         ),
       ),
     );
@@ -466,10 +490,13 @@ class _CharacterScreenState extends State<CharacterScreen> {
               radius: 22,
               blur: 22,
               padding: const EdgeInsets.all(13),
-              onTap: () => showTavernToast(
-                context,
-                book == null ? '未绑定世界书' : '已绑定：${book.name}',
-              ),
+              onTap: () {
+                if (book == null) {
+                  openGlassPage(context, const LoreScreen());
+                  return;
+                }
+                openGlassPage(context, LorebookPage(book: book));
+              },
               child: Row(
                 children: [
                   Container(
@@ -528,10 +555,18 @@ class _CharacterScreenState extends State<CharacterScreen> {
                 else
                   for (var i = 0; i < loreEntries.take(4).length; i++) ...[
                     _LoreEntryRow(
-                      name: loreEntries[i].name.isEmpty
-                          ? loreEntries[i].keys.join(' · ')
-                          : loreEntries[i].name,
-                      keys: loreEntries[i].keys.join(' · '),
+                      entry: loreEntries[i],
+                      onTap: () {
+                        final boundBook = book;
+                        if (boundBook == null) return;
+                        openGlassPage(
+                          context,
+                          LoreEntryEditorPage(
+                            book: boundBook,
+                            entry: loreEntries[i],
+                          ),
+                        );
+                      },
                     ),
                     if (i != loreEntries.take(4).length - 1)
                       const Hairline(indent: 12),
@@ -643,15 +678,9 @@ class _CharacterScreenState extends State<CharacterScreen> {
                 SettingRow(
                   icon: Icons.copy_rounded,
                   title: '复制角色',
-                  value: '含聊天目录',
+                  value: '角色卡与设定',
                   iconColor: p.sage,
-                  onTap: () async {
-                    final copy = c.copyWith(name: '${c.name} 副本');
-                    await AppStore.instance.addCharacter(copy);
-                    if (context.mounted) {
-                      showTavernToast(context, '已复制角色');
-                    }
-                  },
+                  onTap: () => _copyCharacter(context, c),
                 ),
                 const Hairline(indent: 56),
                 SettingRow(
@@ -700,13 +729,19 @@ class _CharacterScreenState extends State<CharacterScreen> {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               child: Column(
                 children: [
-                  _MetaRow(label: '创建者', value: c.creator),
+                  _MetaRow(
+                    label: '创建者',
+                    value: c.creator.trim().isEmpty ? '未知' : c.creator,
+                  ),
                   const SizedBox(height: 7),
                   _MetaRow(label: '版本', value: 'v${c.version}'),
                   const SizedBox(height: 7),
-                  _MetaRow(label: '创建时间', value: '2026-11-02'),
+                  _MetaRow(label: '创建时间', value: _formatDate(c.createdAt)),
                   const SizedBox(height: 7),
-                  _MetaRow(label: '文件', value: 'Seraphina.png · 1.2 MB'),
+                  _MetaRow(
+                    label: '来源',
+                    value: c.rawJson != null ? '导入的角色卡' : '本地创建',
+                  ),
                 ],
               ),
             ),
@@ -767,14 +802,10 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     iconColor: p.sage,
                     onTap: () {
                       if (book == null) {
-                        showTavernToast(context, '未绑定世界书');
+                        openGlassPage(context, const LoreScreen());
                         return;
                       }
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => LorebookPage(book: book!),
-                        ),
-                      );
+                      openGlassPage(context, LorebookPage(book: book));
                     },
                   ),
                   const Hairline(indent: 56),
@@ -853,9 +884,10 @@ class _DetailTabs extends StatelessWidget {
 }
 
 class _Stats extends StatelessWidget {
-  const _Stats({required this.character});
+  const _Stats({required this.character, required this.chatCount});
 
   final DemoCharacter character;
+  final int chatCount;
 
   @override
   Widget build(BuildContext context) {
@@ -884,7 +916,7 @@ class _Stats extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 13),
       child: Row(
         children: [
-          cell('${character.chats}', '段对话'),
+          cell('$chatCount', '段对话'),
           Container(width: .6, height: 24, color: p.divider),
           cell(character.tokens, 'tokens'),
           Container(width: .6, height: 24, color: p.divider),
@@ -896,50 +928,76 @@ class _Stats extends StatelessWidget {
 }
 
 class _LoreEntryRow extends StatelessWidget {
-  const _LoreEntryRow({required this.name, required this.keys});
+  const _LoreEntryRow({required this.entry, this.onTap});
 
-  final String name;
-  final String keys;
+  final LoreEntry entry;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(9),
-              color: p.sage.withValues(alpha: .14),
+    final title = entry.name.isEmpty
+        ? entry.keys.join(' · ')
+        : entry.name;
+    final badge = entry.constant
+        ? '常驻'
+        : entry.enabled
+            ? '启用'
+            : '关闭';
+    final badgeColor = entry.constant
+        ? const Color(0xFF8FD0BE)
+        : entry.enabled
+            ? p.amber
+            : p.textTertiary;
+    return Pressable(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+        child: Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                color: badgeColor.withValues(alpha: .14),
+              ),
+              child: Icon(
+                Icons.bolt_rounded,
+                size: 14,
+                color: badgeColor,
+              ),
             ),
-            child: Icon(
-              Icons.bolt_rounded,
-              size: 14,
-              color: p.sage,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: appText(12.5, FontWeight.w500, p.textPrimary),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    entry.keys.join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: appText(9, FontWeight.w400, p.textTertiary),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: appText(12.5, FontWeight.w500, p.textPrimary),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  keys,
-                  style: appText(9, FontWeight.w400, p.textTertiary),
-                ),
-              ],
+            TagBadge(badge, color: badgeColor),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 16,
+              color: p.textTertiary,
             ),
-          ),
-          const TagBadge('常驻', color: Color(0xFF8FD0BE)),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1051,14 +1109,7 @@ class _CharacterMorePage extends StatelessWidget {
                 icon: Icons.copy_rounded,
                 title: '复制角色',
                 iconColor: p.sage,
-                onTap: () async {
-                  final copy = character.copyWith(name: '${character.name} 副本');
-                  await AppStore.instance.addCharacter(copy);
-                  if (context.mounted) {
-                    showTavernToast(context, '已复制角色');
-                    Navigator.of(context).pop();
-                  }
-                },
+                onTap: () => _copyCharacter(context, character, closeAfter: true),
               ),
               const Hairline(indent: 56),
               SettingRow(

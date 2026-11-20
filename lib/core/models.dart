@@ -274,6 +274,26 @@ class APISettings {
   }
 }
 
+/// 默认的系统段落顺序，贴近 SillyTavern 的 prompt 顺序。
+///
+/// [PromptBuilder] 按这个顺序把非空段落拼进第一条 system 消息；其中
+/// `jailbreak`（角色卡 post_history_instructions / PHI）保留在顺序表里，
+/// 但发送时固定放在历史消息之后，见 `lib/core/prompt.dart`。
+const List<String> kDefaultPromptOrder = [
+  'main',
+  'worldInfoBefore',
+  'personaDescription',
+  'charDescription',
+  'charPersonality',
+  'scenario',
+  'charSystemPrompt',
+  'worldInfoAfter',
+  'dialogueExamples',
+  'summary',
+  'authorsNote',
+  'jailbreak',
+];
+
 class AppSettings {
   const AppSettings({
     this.api = const APISettings(),
@@ -290,20 +310,7 @@ class AppSettings {
     this.summaryInterval = 20,
     this.summaryPrompt =
         '请用简洁的中文总结以下角色对话的剧情、人物关系、当前场景与未解决的线索。只输出摘要，不要续写对话。',
-    this.promptOrder = const [
-      'main',
-      'worldInfoBefore',
-      'personaDescription',
-      'charDescription',
-      'charPersonality',
-      'scenario',
-      'charSystemPrompt',
-      'worldInfoAfter',
-      'dialogueExamples',
-      'summary',
-      'authorsNote',
-      'jailbreak',
-    ],
+    this.promptOrder = kDefaultPromptOrder,
   });
 
   final APISettings api;
@@ -391,20 +398,7 @@ class AppSettings {
           .toString(),
       promptOrder: storedOrder.contains('charDescription')
           ? storedOrder
-          : const [
-              'main',
-              'worldInfoBefore',
-              'personaDescription',
-              'charDescription',
-              'charPersonality',
-              'scenario',
-              'charSystemPrompt',
-              'worldInfoAfter',
-              'dialogueExamples',
-              'summary',
-              'authorsNote',
-              'jailbreak',
-            ],
+          : kDefaultPromptOrder,
     );
   }
 

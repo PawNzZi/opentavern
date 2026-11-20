@@ -29,8 +29,21 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The profile card and the counters below all read from AppStore, so the
+    // page has to rebuild after persona / quick reply / character edits.
+    return AnimatedBuilder(
+      animation: AppStore.instance,
+      builder: (context, _) => _content(context),
+    );
+  }
+
+  Widget _content(BuildContext context) {
     final p = AppPalette.of(context);
-    final api = AppStore.instance.settings.api;
+    final settings = AppStore.instance.settings;
+    final personaName = settings.personaName.trim();
+    final personaDesc = settings.personaDescription.trim();
+    final quickSets = AppStore.instance.quickReplySets.length;
+    final api = settings.api;
     final preset = AppStore.instance.activePreset;
     final promptCount = preset?.entries.length ?? 0;
     final loreCount = AppStore.instance.lorebooks.fold<int>(
@@ -62,12 +75,14 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => _open(context, const InteractionPage()),
             child: Row(
               children: [
-                const SizedBox(
+                SizedBox(
                   width: 54,
                   height: 54,
                   child: Portrait(
-                    initial: '旅',
-                    colors: [
+                    initial: personaName.isEmpty
+                        ? '?'
+                        : personaName.characters.first,
+                    colors: const [
                       Color(0xFF6B4E3D),
                       Color(0xFFC99A6B),
                       Color(0xFF2A1E17),
@@ -82,9 +97,17 @@ class SettingsScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            '旅人',
-                            style: appText(17, FontWeight.w600, p.textPrimary),
+                          Flexible(
+                            child: Text(
+                              personaName.isEmpty ? '未设置人格' : personaName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: appText(
+                                17,
+                                FontWeight.w600,
+                                p.textPrimary,
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 7),
                           Container(
@@ -105,7 +128,11 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '已陪伴 42 天 · 3 个人格',
+                        personaDesc.isEmpty
+                            ? '$quickSets 组快捷回复 · 点击设置人格'
+                            : personaDesc,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: appText(11.5, FontWeight.w400, p.textTertiary),
                       ),
                     ],

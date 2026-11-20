@@ -7,16 +7,58 @@ import '../design/routes.dart';
 import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
+import '../design/toast.dart';
 import 'editors.dart';
 
 class InteractionPage extends StatelessWidget {
   const InteractionPage({super.key});
 
+  /// 创建一个真正的空白集合（不伪造任何按钮），落盘后立刻打开编辑器。
+  Future<void> _createSet(BuildContext context) async {
+    final store = AppStore.instance;
+    final set = QuickReplySet(
+      id: 'qr-${DateTime.now().microsecondsSinceEpoch}',
+      name: '新集合 ${store.quickReplySets.length + 1}',
+      replies: [],
+    );
+    store.quickReplySets.add(set);
+    store.activeQuickSetId = set.id;
+    await store.saveQuickReplies();
+    if (!context.mounted) return;
+    await openGlassPage(context, QuickReplyEditorSheet(quickSet: set));
+    if (!context.mounted) return;
+    // 取消编辑后不留下空集合。
+    if (set.replies.isEmpty && store.quickReplySets.contains(set)) {
+      store.quickReplySets.remove(set);
+      if (store.activeQuickSetId == set.id) {
+        store.activeQuickSetId =
+            store.quickReplySets.isEmpty ? '' : store.quickReplySets.first.id;
+      }
+      await store.saveQuickReplies();
+    }
+  }
+
+  Future<void> _activate(BuildContext context, QuickReplySet set) async {
+    final store = AppStore.instance;
+    if (store.activeQuickSetId == set.id) return;
+    store.activeQuickSetId = set.id;
+    await store.saveQuickReplies();
+    if (context.mounted) showTavernToast(context, '已切换到「${set.name}」');
+  }
+
   @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: AppStore.instance,
+      builder: (context, _) => _content(context),
+    );
+  }
+
+  Widget _content(BuildContext context) {
     final p = AppPalette.of(context);
-    final settings = AppStore.instance.settings;
-    final quick = AppStore.instance.activeQuickSet;
+    final store = AppStore.instance;
+    final settings = store.settings;
+    final quick = store.activeQuickSet;
     final personaName = settings.personaName.trim();
     final personaDesc = settings.personaDescription.trim();
     final note = settings.authorNote.trim();
@@ -29,7 +71,7 @@ class InteractionPage extends StatelessWidget {
           title: '人格（Persona）',
           footnote: '人格名字与描述会替换 Prompt 中的 {{user}} 相关内容。',
           trailing: Text(
-            personaName.isEmpty ? '未设置' : '1 个',
+            personaName.isEmpty ? '未设置' : '已设置',
             style: appText(11, FontWeight.w400, p.textTertiary),
           ),
           children: [
@@ -80,7 +122,14 @@ class InteractionPage extends StatelessWidget {
                   runSpacing: 7,
                   children: [
                     for (final reply in quick.replies)
-                      GlassPill(label: reply.label, height: 32),
+                      GlassPill(
+                        label: reply.label,
+                        height: 32,
+                        onTap: () => openGlassPage(
+                          context,
+                          QuickReplyEditorSheet(quickSet: quick),
+                        ),
+                      ),
                   ],
                 ),
               const SizedBox(height: 12),
@@ -92,20 +141,7 @@ class InteractionPage extends StatelessWidget {
                     height: 32,
                     onTap: () async {
                       if (quick == null) {
-                        final set = QuickReplySet(
-                          id: 'qr-${DateTime.now().microsecondsSinceEpoch}',
-                          name: '新集合 1',
-                          replies: [
-                            QuickReply(
-                              id: 'qr-${DateTime.now().microsecondsSinceEpoch}-1',
-                              label: '继续',
-                              message: '继续',
-                            ),
-                          ],
-                        );
-                        AppStore.instance.quickReplySets.add(set);
-                        AppStore.instance.activeQuickSetId = set.id;
-                        await AppStore.instance.saveQuickReplies();
+                        await _createSet(context);
                         return;
                       }
                       await openGlassPage(
@@ -116,7 +152,7 @@ class InteractionPage extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    '显示在输入框上方',
+                    '聊天中点击会填入输入框',
                     style: appText(9.5, FontWeight.w400, p.textTertiary),
                   ),
                 ],
@@ -124,72 +160,45 @@ class InteractionPage extends StatelessWidget {
             ],
           ),
         ),
-        AnimatedBuilder(
-          animation: AppStore.instance,
-          builder: (context, _) => SettingsGroup(
-            title: '快捷回复集合',
-            children: [
-              for (var i = 0;
-                  i < AppStore.instance.quickReplySets.length;
-                  i++) ...[
-                SettingRow(
-                  icon: Icons.bolt_rounded,
-                  title: AppStore.instance.quickReplySets[i].name,
-                  subtitle:
-                      '${AppStore.instance.quickReplySets[i].replies.length} 个按钮',
-                  value: AppStore.instance.quickReplySets[i].id ==
-                          AppStore.instance.activeQuickSetId
-                      ? '当前'
-                      : '',
-                  iconColor: p.amber,
-                  onTap: () async {
-                    AppStore.instance.activeQuickSetId =
-                        AppStore.instance.quickReplySets[i].id;
-                    await AppStore.instance.saveQuickReplies();
-                  },
-                  trailing: GlassCircleButton(
-                    icon: Icons.edit_outlined,
-                    size: 30,
-                    iconSize: 14,
-                    blur: 0,
-                    onTap: () => openGlassPage(
-                      context,
-                      QuickReplyEditorSheet(
-                        quickSet: AppStore.instance.quickReplySets[i],
-                      ),
+        SettingsGroup(
+          title: '快捷回复集合',
+          children: [
+            for (var i = 0; i < store.quickReplySets.length; i++) ...[
+              SettingRow(
+                icon: Icons.bolt_rounded,
+                title: store.quickReplySets[i].name,
+                subtitle: '${store.quickReplySets[i].replies.length} 个按钮',
+                value: store.quickReplySets[i].id == store.activeQuickSetId
+                    ? '当前'
+                    : '',
+                iconColor: p.amber,
+                onTap: () => _activate(context, store.quickReplySets[i]),
+                trailing: GlassCircleButton(
+                  icon: Icons.edit_outlined,
+                  size: 30,
+                  iconSize: 14,
+                  blur: 0,
+                  onTap: () => openGlassPage(
+                    context,
+                    QuickReplyEditorSheet(
+                      quickSet: store.quickReplySets[i],
                     ),
                   ),
                 ),
-                if (i != AppStore.instance.quickReplySets.length - 1)
-                  const Hairline(indent: 56),
-              ],
-              if (AppStore.instance.quickReplySets.isNotEmpty)
-                const Hairline(indent: 56),
-              SettingRow(
-                icon: Icons.add_rounded,
-                title: '新建集合',
-                value: '空白集合',
-                iconColor: p.amber,
-                onTap: () async {
-                  final set = QuickReplySet(
-                    id: 'qr-${DateTime.now().microsecondsSinceEpoch}',
-                    name:
-                        '新集合 ${AppStore.instance.quickReplySets.length + 1}',
-                    replies: [
-                      QuickReply(
-                        id: 'qr-${DateTime.now().microsecondsSinceEpoch}-1',
-                        label: '继续',
-                        message: '继续',
-                      ),
-                    ],
-                  );
-                  AppStore.instance.quickReplySets.add(set);
-                  AppStore.instance.activeQuickSetId = set.id;
-                  await AppStore.instance.saveQuickReplies();
-                },
               ),
+              if (i != store.quickReplySets.length - 1)
+                const Hairline(indent: 56),
             ],
-          ),
+            if (store.quickReplySets.isNotEmpty)
+              const Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.add_rounded,
+              title: '新建集合',
+              value: '空白集合',
+              iconColor: p.amber,
+              onTap: () => _createSet(context),
+            ),
+          ],
         ),
         SettingsGroup(
           title: '作者笔记',

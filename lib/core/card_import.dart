@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../data/demo.dart';
+import 'lore_io.dart';
 import 'models.dart';
 
 /// Parses a SillyTavern V2/V3 character card from a PNG (tEXt/iTXt `chara` or
@@ -105,58 +106,64 @@ String? _pngCardJson(Uint8List b) {
 int _u32(Uint8List b, int o) =>
     (b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3];
 
+/// Extracts the embedded `character_book` of a V2/V3 card into a [Lorebook].
+///
+/// The book normally lives at `data.character_book`, but third-party cards also
+/// put it at the root or under `data.extensions.character_book`, so all three
+/// locations are checked. Every entry with content is imported (see
+/// [loreEntryFromMap]): empty-key constant entries, disabled entries, selective
+/// entries, secondary keys, position and insertion order are all preserved.
 Lorebook? parseCharacterBook(Map<String, dynamic>? raw, {String? linked}) {
   if (raw == null) return null;
-  final data = raw['data'] is Map ? raw['data'] as Map : raw;
-  final book = data['character_book'];
-  if (book is! Map) return null;
-  final entries = book['entries'];
-  if (entries is! List || entries.isEmpty) return null;
+  final data = raw['data'] is Map
+      ? Map<String, dynamic>.from(raw['data'] as Map)
+      : raw;
+
+  Map<String, dynamic>? book;
+  final candidates = <dynamic>[
+    data['character_book'],
+    raw['character_book'],
+    if (data['extensions'] is Map)
+      (data['extensions'] as Map)['character_book'],
+  ];
+  for (final candidate in candidates) {
+    if (candidate is Map) {
+      book = Map<String, dynamic>.from(candidate);
+      break;
+    }
+  }
+  if (book == null) return null;
+
+  final entriesRaw = book['entries'];
+  final stamp = DateTime.now().microsecondsSinceEpoch;
   final result = <LoreEntry>[];
-  for (final entry in entries.whereType<Map>()) {
-    final keys = (entry['keys'] as List?)
-            ?.map((e) => e.toString())
-            .where((e) => e.trim().isNotEmpty)
-            .toList() ??
-        [];
-    final content = (entry['content'] ?? '').toString().trim();
-    final constant = entry['constant'] == true;
-    if ((keys.isEmpty && !constant) || content.isEmpty) continue;
-    final ext = entry['extensions'] is Map
-        ? Map<String, dynamic>.from(entry['extensions'] as Map)
-        : const <String, dynamic>{};
-    result.add(
-      LoreEntry(
-        id: 'lore-${DateTime.now().microsecondsSinceEpoch}-${result.length}',
-        name: (entry['name'] ?? entry['comment'] ?? (keys.isEmpty ? '常驻条目' : keys.first))
-            .toString(),
-        keys: keys,
-        secondaryKeys: (entry['secondary_keys'] as List?)
-                ?.map((e) => e.toString())
-                .toList() ??
-            const [],
-        content: content,
-        enabled: entry['enabled'] != false,
-        constant: constant,
-        selective: entry['selective'] == true,
-        order: (entry['insertion_order'] as num?)?.toInt() ??
-            (entry['order'] as num?)?.toInt() ??
-            100,
-        position: (entry['position'] == 'after_char' ||
-                entry['position'] == 1 ||
-                ext['position'] == 1)
-            ? 'after'
-            : 'before',
-        depth: (ext['depth'] as num?)?.toInt() ?? 4,
-        role: (ext['role'] ?? 'system').toString(),
-        comment: (entry['comment'] ?? '').toString(),
-      ),
-    );
+  if (entriesRaw is List) {
+    for (var i = 0; i < entriesRaw.length; i++) {
+      final value = entriesRaw[i];
+      if (value is! Map) continue;
+      final entry = loreEntryFromMap(
+        Map<String, dynamic>.from(value),
+        id: 'card-$stamp-$i',
+      );
+      if (entry != null) result.add(entry);
+    }
+  } else if (entriesRaw is Map) {
+    for (final item in entriesRaw.entries) {
+      final value = item.value;
+      if (value is! Map) continue;
+      final entry = loreEntryFromMap(
+        Map<String, dynamic>.from(value),
+        id: 'card-$stamp-${item.key}',
+      );
+      if (entry != null) result.add(entry);
+    }
   }
   if (result.isEmpty) return null;
+
+  final bookName = (book['name'] ?? '').toString().trim();
   return Lorebook(
-    id: 'book-${DateTime.now().microsecondsSinceEpoch}',
-    name: (book['name'] ?? linked ?? '角色世界书').toString(),
+    id: 'book-$stamp',
+    name: bookName.isNotEmpty ? bookName : (linked ?? '角色世界书'),
     linked: linked,
     entries: result,
   );

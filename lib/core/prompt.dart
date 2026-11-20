@@ -1,4 +1,4 @@
-﻿import '../data/demo.dart';
+import '../data/demo.dart';
 import 'regex.dart';
 import 'store.dart';
 import 'macros.dart';
@@ -9,11 +9,18 @@ class BuiltPrompt {
     required this.messages,
     required this.approxTokens,
     required this.droppedMessages,
+    this.sections = const {},
   });
 
   final List<Map<String, dynamic>> messages;
   final int approxTokens;
   final int droppedMessages;
+
+  /// 实际拼接进 prompt 的系统段落，按发送顺序排列。
+  ///
+  /// `jailbreak`（角色卡的 post_history_instructions / PHI）固定排在最后：
+  /// 它作为历史消息之后的最后一条 system 消息发送。
+  final Map<String, String> sections;
 }
 
 int estimateTokens(String text) {
@@ -119,19 +126,25 @@ class PromptBuilder {
       sections['authorsNote'] =
           '\n[作者笔记]\n${macro(settings.authorNote).trim()}';
     }
-    if (character.postHistoryInstructions.trim().isNotEmpty) {
-      sections['jailbreak'] =
-          '\n[越狱 / PHI]\n${macro(character.postHistoryInstructions).trim()}';
-    }
+    // PHI（角色的 post_history_instructions）不参与 system 段落排序：
+    // 它固定作为历史消息之后的最后一条 system 消息发送，贴近 SillyTavern。
+    final postHistory = character.postHistoryInstructions.trim().isEmpty
+        ? ''
+        : '\n[越狱 / PHI]\n${macro(character.postHistoryInstructions).trim()}';
     final system = StringBuffer();
+    final usedSections = <String, String>{};
     for (final key in settings.promptOrder) {
       final section = sections.remove(key);
       if (section != null && section.trim().isNotEmpty) {
         system.writeln(section);
+        usedSections[key] = section.trim();
       }
     }
-    for (final section in sections.values) {
-      if (section.trim().isNotEmpty) system.writeln(section);
+    for (final entry in sections.entries) {
+      if (entry.value.trim().isNotEmpty) {
+        system.writeln(entry.value);
+        usedSections[entry.key] = entry.value.trim();
+      }
     }
 
     final extra = <Map<String, String>>[];
@@ -154,9 +167,14 @@ class PromptBuilder {
 
     final maxPrompt =
         settings.maxContext - settings.api.maxTokens - settings.tokenPadding;
-    final systemTokens = estimateTokens(system.toString());
+    var used = estimateTokens(system.toString());
+    // PHI 在历史之后发送，但同样占用上下文预算。
+    if (postHistory.trim().isNotEmpty) used += estimateTokens(postHistory);
+    // 预设里的 user/assistant 条目插在历史之前，也要计入。
+    for (final entry in extra) {
+      used += estimateTokens(entry['content'] ?? '') + 4;
+    }
     var history = <Map<String, dynamic>>[];
-    var used = systemTokens;
     var dropped = 0;
     var imageCount = 0;
 
@@ -209,9 +227,17 @@ class PromptBuilder {
         {'role': 'system', 'content': system.toString().trim()},
         ...extra,
         ...history,
+        // 与 SillyTavern 的 post-history instructions 一致：PHI 是历史之后
+        // 的最后一条 system 消息，而不是混在开头那条 system 里。
+        if (postHistory.trim().isNotEmpty)
+          {'role': 'system', 'content': postHistory.trim()},
       ],
       approxTokens: used,
       droppedMessages: dropped,
+      sections: {
+        ...usedSections,
+        if (postHistory.trim().isNotEmpty) 'jailbreak': postHistory.trim(),
+      },
     );
   }
 

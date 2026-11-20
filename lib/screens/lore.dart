@@ -77,6 +77,7 @@ class _LoreScreenState extends State<LoreScreen> {
           failed,
           source: '世界书 ZIP 导入',
         );
+        if (!mounted) return;
         await showImportFailures(context, failed);
       }
       if (!mounted) return;
@@ -87,7 +88,9 @@ class _LoreScreenState extends State<LoreScreen> {
     if (!mounted) return;
     showTavernToast(
       context,
-      book == null ? '不是有效的世界书 JSON' : '已导入 ${book.name}',
+      book == null
+          ? '不是有效的世界书 JSON'
+          : '已导入 ${book.name} · ${book.entries.length} 条',
     );
     if (book != null) setState(() {});
   }
@@ -291,6 +294,30 @@ class _LorebookPageState extends State<LorebookPage> {
     if (mounted) setState(() {});
   }
 
+  String _entryTitle(LoreEntry entry) {
+    if (entry.name.trim().isNotEmpty) return entry.name.trim();
+    if (entry.keys.isNotEmpty) return entry.keys.first;
+    return '无标题条目';
+  }
+
+  /// 列表里直接展示正文开头，这样导入后不打开编辑器也能确认内容已解析出来。
+  String _entrySubtitle(LoreEntry entry) {
+    final preview = entry.content.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final head = entry.keys.isNotEmpty
+        ? entry.keys.join(' · ')
+        : entry.constant
+            ? '常驻'
+            : '无关键词';
+    return preview.isEmpty ? head : '$head · $preview';
+  }
+
+  String _entryStatus(LoreEntry entry) {
+    if (!entry.enabled) return '关闭';
+    if (entry.constant) return '常驻';
+    if (entry.keys.isEmpty) return '未生效';
+    return '启用';
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
@@ -388,15 +415,9 @@ class _LorebookPageState extends State<LorebookPage> {
                     for (var i = 0; i < entryList.length; i++) ...[
                       SettingRow(
                         icon: Icons.article_outlined,
-                        title: entryList[i].name.isEmpty
-                            ? entryList[i].keys.join(' · ')
-                            : entryList[i].name,
-                        subtitle: entryList[i].keys.join(' · '),
-                        value: entryList[i].constant
-                            ? '常驻'
-                            : entryList[i].enabled
-                                ? '启用'
-                                : '关闭',
+                        title: _entryTitle(entryList[i]),
+                        subtitle: _entrySubtitle(entryList[i]),
+                        value: _entryStatus(entryList[i]),
                         iconColor: entryList[i].enabled
                             ? p.amber
                             : p.textTertiary,
@@ -473,7 +494,9 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
   late final TextEditingController _secondary;
   late bool _constant;
   late bool _enabled;
+  late bool _selective;
   late String _position;
+  late int _order;
 
   @override
   void initState() {
@@ -485,7 +508,9 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
     _secondary = TextEditingController(text: e?.secondaryKeys.join(', ') ?? '');
     _constant = e?.constant ?? false;
     _enabled = e?.enabled ?? true;
+    _selective = e?.selective ?? false;
     _position = e?.position ?? 'before';
+    _order = e?.order ?? 100;
   }
 
   @override
@@ -505,92 +530,132 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
 
   Future<void> _save() async {
     final keys = _split(_keys.text);
-    if (keys.isEmpty || _content.text.trim().isEmpty) {
-      showTavernToast(context, '至少填写关键词和内容');
+    final content = _content.text.trim();
+    if (content.isEmpty) {
+      showTavernToast(context, '条目内容不能为空');
       return;
     }
-    final entry = widget.entry ?? LoreEntry(id: 'entry-${DateTime.now().microsecondsSinceEpoch}');
+    final name = _name.text.trim();
+    final resolvedName = name.isNotEmpty
+        ? name
+        : keys.isNotEmpty
+            ? keys.first
+            : _constant
+                ? '常驻条目'
+                : '无关键词条目';
+    final entry = widget.entry ??
+        LoreEntry(id: 'entry-${DateTime.now().microsecondsSinceEpoch}');
     entry
-      ..name = _name.text.trim()
+      ..name = resolvedName
       ..keys = keys
       ..secondaryKeys = _split(_secondary.text)
-      ..content = _content.text.trim()
+      ..content = content
       ..constant = _constant
       ..enabled = _enabled
-      ..position = _position;
+      ..selective = _selective
+      ..position = _position
+      ..order = _order
+      ..comment = resolvedName;
     if (widget.entry == null) widget.book.entries.add(entry);
     widget.book.updatedAt = DateTime.now().millisecondsSinceEpoch;
     await AppStore.instance.saveLorebooks();
     if (!mounted) return;
-    showTavernToast(context, '条目已保存');
+    showTavernToast(
+      context,
+      keys.isEmpty && !_constant
+          ? '条目已保存（无关键词且未常驻，不会自动生效）'
+          : '条目已保存',
+    );
     Navigator.of(context).maybePop();
   }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return SheetStage(
-      title: widget.entry == null ? '新建条目' : '编辑条目',
-      subtitle: widget.book.name,
-      heightFactor: .92,
+    final isNew = widget.entry == null;
+    final status = !_enabled
+        ? '已关闭'
+        : _constant
+            ? '常驻'
+            : '关键词触发';
+    return DetailPage(
+      eyebrow: isNew ? 'NEW LORE ENTRY' : 'LORE ENTRY',
+      title: isNew ? '新建条目' : '编辑条目',
+      subtitle: '${widget.book.name} · $status',
       footer: GlassPrimaryButton(
         label: '保存条目',
         icon: Icons.check_rounded,
         onTap: _save,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _LoreField(label: '条目名', controller: _name, hint: '例如：王都的雨'),
-          _LoreField(
-            label: '关键词（逗号分隔）',
-            controller: _keys,
-            hint: '王都, 雨, 预言',
-          ),
-          _LoreField(
-            label: '内容',
-            controller: _content,
-            hint: '命中关键词后注入模型的世界设定…',
-            maxLines: 6,
-          ),
-          _LoreField(
-            label: '次要关键词（可选）',
-            controller: _secondary,
-            hint: '启用选择性匹配时使用',
-          ),
-          const SizedBox(height: 8),
-          SettingsGroup(
-            title: '条目设置',
-            children: [
-              SwitchLine(
-                title: '常驻',
-                subtitle: '不扫描关键词，每次对话都注入',
-                value: _constant,
-                onChanged: (v) => setState(() => _constant = v),
-              ),
-              const Hairline(indent: 14),
-              SwitchLine(
-                title: '启用',
-                subtitle: '关闭后不会进入 Prompt',
-                value: _enabled,
-                onChanged: (v) => setState(() => _enabled = v),
-              ),
-              const Hairline(indent: 14),
-              SegmentLine(
-                title: '注入位置',
-                options: const ['角色前', '角色后'],
-                index: _position == 'after' ? 1 : 0,
-                onChanged: (i) =>
-                    setState(() => _position = i == 1 ? 'after' : 'before'),
-              ),
-            ],
-          ),
-          Text(
-            '关键词支持逗号分隔多个；当前版本按最近 8 条消息扫描。',
-            style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
-          ),
-        ],
-      ),
+      children: [
+        const SizedBox(height: 6),
+        _LoreField(label: '条目名', controller: _name, hint: '例如：王都的雨'),
+        _LoreField(
+          label: '关键词（逗号分隔）',
+          controller: _keys,
+          hint: '王都, 雨, 预言',
+        ),
+        _LoreField(
+          label: '内容',
+          controller: _content,
+          hint: '命中关键词后注入模型的世界设定…',
+          minLines: 10,
+          maxLines: null,
+        ),
+        _LoreField(
+          label: '次要关键词（可选）',
+          controller: _secondary,
+          hint: '启用选择性匹配时使用',
+        ),
+        const SizedBox(height: 16),
+        SettingsGroup(
+          title: '条目设置',
+          children: [
+            SwitchLine(
+              title: '常驻',
+              subtitle: '不扫描关键词，每次对话都注入',
+              value: _constant,
+              onChanged: (v) => setState(() => _constant = v),
+            ),
+            const Hairline(indent: 14),
+            SwitchLine(
+              title: '启用',
+              subtitle: '关闭后不会进入 Prompt，但仍保留在列表中',
+              value: _enabled,
+              onChanged: (v) => setState(() => _enabled = v),
+            ),
+            const Hairline(indent: 14),
+            SwitchLine(
+              title: '选择性匹配',
+              subtitle: '同时命中次要关键词才注入（ST selective）',
+              value: _selective,
+              onChanged: (v) => setState(() => _selective = v),
+            ),
+            const Hairline(indent: 14),
+            SegmentLine(
+              title: '注入位置',
+              options: const ['角色前', '角色后'],
+              index: _position == 'after' ? 1 : 0,
+              onChanged: (i) =>
+                  setState(() => _position = i == 1 ? 'after' : 'before'),
+            ),
+            const Hairline(indent: 14),
+            StepperRow(
+              title: '插入顺序',
+              subtitle: '对应 ST 的 insertion_order，数字越大越靠前',
+              value: '$_order',
+              onMinus: () => setState(() => _order--),
+              onPlus: () => setState(() => _order++),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '关键词支持逗号分隔多个；当前版本按最近 8 条消息扫描。'
+          '无关键词且未设为常驻的条目会被保留，但不会自动触发。',
+          style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
+        ),
+      ],
     );
   }
 }
@@ -600,13 +665,15 @@ class _LoreField extends StatelessWidget {
     required this.label,
     required this.controller,
     required this.hint,
+    this.minLines = 1,
     this.maxLines = 1,
   });
 
   final String label;
   final TextEditingController controller;
   final String hint;
-  final int maxLines;
+  final int minLines;
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -625,6 +692,7 @@ class _LoreField extends StatelessWidget {
             const SizedBox(height: 4),
             TextField(
               controller: controller,
+              minLines: minLines,
               maxLines: maxLines,
               style: appText(14, FontWeight.w400, p.textPrimary, height: 1.45),
               cursorColor: p.amber,

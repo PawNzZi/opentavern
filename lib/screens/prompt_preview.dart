@@ -8,6 +8,8 @@ import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
 
+/// 「构建预览」页：只展示系统段落的顺序（可上下调整并写回
+/// `settings.promptOrder`）以及 Token / 统计信息，不再罗列每条 prompt 的正文。
 class PromptPreviewPage extends StatefulWidget {
   const PromptPreviewPage({super.key});
 
@@ -31,15 +33,51 @@ class _PromptPreviewPageState extends State<PromptPreviewPage> {
     'jailbreak': '越狱 / PHI（历史后）',
   };
 
+  /// PHI 固定放在历史消息之后，不参与系统段落排序。
+  static const _phiKey = 'jailbreak';
+
+  /// 可上下移动的系统段落（顺序即写入 settings.promptOrder 的顺序）。
+  static const _movable = <String>[
+    'main',
+    'worldInfoBefore',
+    'personaDescription',
+    'charDescription',
+    'charPersonality',
+    'scenario',
+    'charSystemPrompt',
+    'worldInfoAfter',
+    'dialogueExamples',
+    'summary',
+    'authorsNote',
+  ];
+
   late List<String> _order;
 
   @override
   void initState() {
     super.initState();
-    final stored = AppStore.instance.settings.promptOrder;
-    _order = stored.contains('charDescription')
-        ? List.of(stored)
-        : _labels.keys.toList();
+    _order = _normalize(AppStore.instance.settings.promptOrder);
+  }
+
+  /// 去掉未知 / 固定段落，并补齐缺失段落，保证可调段落齐全。
+  List<String> _normalize(List<String> stored) {
+    final result = <String>[];
+    for (final key in stored) {
+      if (_movable.contains(key) && !result.contains(key)) result.add(key);
+    }
+    for (final key in _movable) {
+      if (!result.contains(key)) result.add(key);
+    }
+    return result;
+  }
+
+  Future<void> _saveOrder() async {
+    final settings = AppStore.instance.settings.copyWith(
+      // jailbreak 仍保留在 promptOrder 末尾以便配置往返；实际发送位置固定。
+      promptOrder: [..._order, _phiKey],
+    );
+    AppStore.instance.settings = settings;
+    await AppStore.instance.saveSettings();
   }
 
   Future<void> _move(int index, int delta) async {
@@ -49,11 +87,14 @@ class _PromptPreviewPageState extends State<PromptPreviewPage> {
       final item = _order.removeAt(index);
       _order.insert(target, item);
     });
-    final settings = AppStore.instance.settings.copyWith(
-      promptOrder: List.of(_order),
-    );
-    AppStore.instance.settings = settings;
-    await AppStore.instance.saveSettings();
+    await _saveOrder();
+  }
+
+  Future<void> _reset() async {
+    setState(() {
+      _order = _normalize(kDefaultPromptOrder);
+    });
+    await _saveOrder();
   }
 
   @override
@@ -93,6 +134,44 @@ class _PromptPreviewPageState extends State<PromptPreviewPage> {
       session: session,
       settings: store.settings,
     );
+    final phi = built.sections[_phiKey];
+
+    Widget sectionRow(int index) {
+      final key = _order[index];
+      final section = built.sections[key];
+      final active = section != null;
+      return SettingRow(
+        icon: Icons.drag_indicator_rounded,
+        title: _labels[key] ?? key,
+        subtitle: active
+            ? '已拼接 · 约 ${estimateTokens(section)} tok'
+            : '该段落为空，发送时跳过',
+        value: '${index + 1}',
+        iconColor: active ? p.amber : p.textTertiary,
+        chevron: false,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GlassCircleButton(
+              icon: Icons.keyboard_arrow_up_rounded,
+              size: 28,
+              iconSize: 15,
+              blur: 0,
+              onTap: () => _move(index, -1),
+            ),
+            const SizedBox(width: 2),
+            GlassCircleButton(
+              icon: Icons.keyboard_arrow_down_rounded,
+              size: 28,
+              iconSize: 15,
+              blur: 0,
+              onTap: () => _move(index, 1),
+            ),
+          ],
+        ),
+      );
+    }
+
     return DetailPage(
       eyebrow: 'PROMPT INSPECTOR',
       title: '构建预览',
@@ -134,111 +213,46 @@ class _PromptPreviewPageState extends State<PromptPreviewPage> {
           child: Column(
             children: [
               for (var i = 0; i < _order.length; i++) ...[
-                SettingRow(
-                  icon: Icons.drag_indicator_rounded,
-                  title: _labels[_order[i]] ?? _order[i],
-                  value: '${i + 1}',
-                  iconColor: p.amber,
-                  chevron: false,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      GlassCircleButton(
-                        icon: Icons.keyboard_arrow_up_rounded,
-                        size: 28,
-                        iconSize: 15,
-                        blur: 0,
-                        onTap: () => _move(i, -1),
-                      ),
-                      const SizedBox(width: 2),
-                      GlassCircleButton(
-                        icon: Icons.keyboard_arrow_down_rounded,
-                        size: 28,
-                        iconSize: 15,
-                        blur: 0,
-                        onTap: () => _move(i, 1),
-                      ),
-                    ],
-                  ),
-                ),
+                sectionRow(i),
                 if (i != _order.length - 1) const Hairline(indent: 56),
               ],
             ],
           ),
         ),
-        const SectionLabel('最终发送顺序'),
-        for (var i = 0; i < built.messages.length; i++) ...[
-          _PromptMessage(
-            index: i,
-            message: built.messages[i],
-            palette: p,
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerRight,
+          child: GlassPill(
+            label: '恢复默认顺序',
+            icon: Icons.restart_alt_rounded,
+            height: 30,
+            onTap: _reset,
           ),
-          const SizedBox(height: 8),
-        ],
-        const SizedBox(height: 8),
+        ),
+        const SectionLabel('固定位置'),
+        Glass(
+          radius: 22,
+          blur: 22,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: SettingRow(
+            icon: Icons.lock_outline_rounded,
+            title: _labels[_phiKey]!,
+            subtitle: phi == null
+                ? '未设置，发送时跳过'
+                : '固定为历史消息之后的最后一条 system 消息',
+            value: phi == null ? '未设置' : '${estimateTokens(phi)} tok',
+            iconColor: p.amber,
+            chevron: false,
+          ),
+        ),
+        const SizedBox(height: 10),
         Text(
-          '系统段落按上面的顺序拼接；预设附加条目排在系统消息之后、历史消息之前。',
+          '系统段落按上面的顺序拼成第一条 system 消息，空段落自动跳过；'
+          'PHI 始终作为历史消息之后的最后一条 system 消息发送。'
+          '点击上下箭头会立即保存到 settings.promptOrder。',
           style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
         ),
       ],
-    );
-  }
-}
-
-class _PromptMessage extends StatelessWidget {
-  const _PromptMessage({
-    required this.index,
-    required this.message,
-    required this.palette,
-  });
-
-  final int index;
-  final Map<String, dynamic> message;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    final role = (message['role'] ?? 'user').toString();
-    final content = message['content'];
-    final text = content is String
-        ? content
-        : content is List
-            ? content
-                .whereType<Map>()
-                .map((e) => e['text']?.toString() ?? '[图片]')
-                .join('\n')
-            : content?.toString() ?? '';
-    return Glass(
-      radius: 20,
-      blur: 20,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              TagBadge(
-                '$index · ${role.toUpperCase()}',
-                color: role == 'system'
-                    ? palette.amber
-                    : role == 'assistant'
-                        ? palette.violet
-                        : palette.sage,
-              ),
-              const Spacer(),
-              Text(
-                '${estimateTokens(text)} tok',
-                style: appText(9.5, FontWeight.w400, palette.textTertiary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            text.isEmpty ? '（空）' : text,
-            style: appText(11.5, FontWeight.w400, palette.textSecondary, height: 1.55),
-          ),
-        ],
-      ),
     );
   }
 }

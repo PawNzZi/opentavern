@@ -132,9 +132,41 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
       '未绑定',
       ...AppStore.instance.lorebooks.map((b) => b.name),
     ];
-    final picked = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        builder: (_) => _LorebookPickerPage(names: names),
+    final picked = await showTavernSheet<String>(
+      context,
+      title: '绑定世界书',
+      subtitle: '${names.length - 1} 本本地世界书',
+      heightFactor: .72,
+      child: Builder(
+        builder: (sheetContext) {
+          final p = AppPalette.of(sheetContext);
+          return Glass(
+            radius: 22,
+            blur: 22,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                for (var i = 0; i < names.length; i++) ...[
+                  SettingRow(
+                    icon: names[i] == '未绑定'
+                        ? Icons.link_off_rounded
+                        : Icons.auto_stories_rounded,
+                    title: names[i],
+                    iconColor: names[i] == _lorebook
+                        ? p.amber
+                        : p.textTertiary,
+                    chevron: false,
+                    trailing: names[i] == _lorebook
+                        ? Icon(Icons.check_rounded, size: 17, color: p.amber)
+                        : null,
+                    onTap: () => Navigator.of(sheetContext).pop(names[i]),
+                  ),
+                  if (i != names.length - 1) const Hairline(indent: 56),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
     if (picked != null && mounted) setState(() => _lorebook = picked);
@@ -333,43 +365,6 @@ class _EditField extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _LorebookPickerPage extends StatelessWidget {
-  const _LorebookPickerPage({required this.names});
-
-  final List<String> names;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return DetailPage(
-      eyebrow: 'LOREBOOK',
-      title: '绑定世界书',
-      subtitle: '${names.length - 1} 本本地世界书',
-      children: [
-        const SizedBox(height: 12),
-        Glass(
-          radius: 22,
-          blur: 22,
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            children: [
-              for (var i = 0; i < names.length; i++) ...[
-                SettingRow(
-                  icon: Icons.auto_stories_rounded,
-                  title: names[i],
-                  iconColor: p.amber,
-                  onTap: () => Navigator.of(context).pop(names[i]),
-                ),
-                if (i != names.length - 1) const Hairline(indent: 56),
-              ],
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

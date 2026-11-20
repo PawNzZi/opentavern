@@ -306,7 +306,7 @@ class _QuickReplyEditorSheetState extends State<QuickReplyEditorSheet> {
     return SheetStage(
       title: '编辑快捷回复',
       subtitle: '按钮会显示在聊天输入框上方',
-      heightFactor: .94,
+      heightFactor: .92,
       footer: GlassPrimaryButton(
         label: '保存集合',
         icon: Icons.check_rounded,
@@ -405,7 +405,7 @@ class PromptEditorSheet extends StatelessWidget {
     return SheetStage(
       title: '编辑提示词',
       subtitle: item.identifier,
-      heightFactor: .95,
+      heightFactor: .92,
       footer: GlassPrimaryButton(
         label: '保存条目',
         icon: Icons.check_rounded,
