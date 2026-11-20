@@ -43,33 +43,64 @@ class AppStore extends ChangeNotifier {
     }
 
     await _load();
-    if (characters.isEmpty) {
-      characters.addAll(demoCharacters);
-      await _seedSessions();
-      _seedLorebooks();
-      _seedQuickReplies();
-      _seedPresets();
-      _seedRegexes();
-      await saveCharacters();
-      await saveSessions();
-      await saveLorebooks();
-    } else if (lorebooks.isEmpty) {
-      _seedLorebooks();
-      await saveLorebooks();
-    }
-    if (quickReplySets.isEmpty) {
-      _seedQuickReplies();
-      await saveQuickReplies();
-    }
-    if (presets.isEmpty) {
-      _seedPresets();
-      await savePresets();
-    }
-    if (regexScripts.isEmpty) {
-      _seedRegexes();
-      await saveRegexes();
-    }
+    await _purgeDemoDataOnce();
     _ready = true;
+    notifyListeners();
+  }
+
+  Future<void> _purgeDemoDataOnce() async {
+    if (_dir == null) return;
+    final marker = File('${_dir!.path}/.demo_purged');
+    if (await marker.exists()) return;
+    final demoNames = demoCharacters.map((c) => c.name).toSet();
+    characters.removeWhere(
+      (c) => c.rawJson == null && demoNames.contains(c.name),
+    );
+    sessions.removeWhere((s) => s.id.startsWith('seed-'));
+    lorebooks.removeWhere((b) => b.id.startsWith('seed-'));
+    quickReplySets.removeWhere((q) => q.id.startsWith('seed-'));
+    presets.removeWhere(
+      (p) => p.id == 'preset-default' || p.id.startsWith('seed-'),
+    );
+    regexScripts.removeWhere((r) => r.id.startsWith('seed-'));
+    if (settings.personaName == '旅人' &&
+        settings.personaDescription == '一个在各地旅行的记录者，习惯先观察再开口。') {
+      settings = settings.copyWith(
+        userName: '',
+        personaName: '',
+        personaDescription: '',
+      );
+      await saveSettings();
+    }
+    if (!presets.any((p) => p.id == activePresetId)) activePresetId = '';
+    if (!quickReplySets.any((q) => q.id == activeQuickSetId)) {
+      activeQuickSetId = '';
+    }
+    await saveCharacters();
+    await saveSessions();
+    await saveLorebooks();
+    await saveQuickReplies();
+    await savePresets();
+    await saveRegexes();
+    await marker.writeAsString(DateTime.now().toIso8601String());
+  }
+
+  /// Removes all user content while keeping API and UI preferences.
+  Future<void> clearAllContent() async {
+    characters.clear();
+    sessions.clear();
+    lorebooks.clear();
+    quickReplySets.clear();
+    presets.clear();
+    regexScripts.clear();
+    activePresetId = '';
+    activeQuickSetId = '';
+    await saveCharacters();
+    await saveSessions();
+    await saveLorebooks();
+    await saveQuickReplies();
+    await savePresets();
+    await saveRegexes();
     notifyListeners();
   }
 
@@ -534,6 +565,19 @@ class AppStore extends ChangeNotifier {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<void> deleteCharacter(
+    DemoCharacter character, {
+    bool deleteChats = false,
+  }) async {
+    characters.removeWhere((c) => c.name == character.name);
+    if (deleteChats) {
+      sessions.removeWhere((s) => s.characterName == character.name);
+      await saveSessions();
+    }
+    await saveCharacters();
+    notifyListeners();
   }
 
   Future<void> addCharacter(DemoCharacter character) async {

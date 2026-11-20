@@ -72,10 +72,56 @@ class ChatInfoSheet extends StatelessWidget {
     if (context.mounted) showTavernToast(context, '标题已更新');
   }
 
+  Future<void> _clearChat(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('清空聊天'),
+        content: const Text('删除本会话的全部消息，角色与设定保留。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('清空')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    session.messages.clear();
+    session.summary = '';
+    session.summaryUpTo = 0;
+    await AppStore.instance.saveSessions();
+    if (context.mounted) showTavernToast(context, '聊天已清空');
+  }
+
+  Future<void> _deleteChat(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除聊天'),
+        content: const Text('删除后不可撤销。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await AppStore.instance.deleteSession(session.id);
+    if (context.mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final c = character;
+    final settings = AppStore.instance.settings;
+    final messageCount = session.messages.length;
+    final charCount = session.messages.fold<int>(0, (n, m) => n + m.text.length);
+    final created = session.messages.isEmpty
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(session.messages.first.createdAt);
+    String createdText() => created == null
+        ? '暂无消息'
+        : '${created.year}-${created.month.toString().padLeft(2, '0')}-${created.day.toString().padLeft(2, '0')} ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}';
     return SheetStage(
       title: '聊天信息',
       subtitle: '${c.name} · ${session.title}',
@@ -147,7 +193,7 @@ class ChatInfoSheet extends StatelessWidget {
               SettingRow(
                 icon: Icons.sticky_note_2_outlined,
                 title: '作者笔记',
-                value: '每 3 条 · 深度 4',
+                value: settings.authorNote.trim().isEmpty ? '跟随全局' : '已设置',
                 iconColor: p.rose,
                 onTap: () => openGlassPage(context, const AuthorNoteSheet()),
               ),
@@ -176,17 +222,17 @@ class ChatInfoSheet extends StatelessWidget {
               SettingRow(
                 icon: Icons.auto_stories_rounded,
                 title: '聊天世界书',
-                value: '未绑定',
+                value: c.lorebook,
                 iconColor: p.sage,
                 onTap: () => showTavernToast(context, '未绑定聊天世界书'),
               ),
               const Hairline(indent: 56),
               SettingRow(
                 icon: Icons.face_rounded,
-                title: '锁定人格',
-                value: '旅人',
+                title: '当前人格',
+                value: settings.personaName.trim().isEmpty ? '未设置' : settings.personaName,
                 iconColor: p.amber,
-                onTap: () => showTavernToast(context, '已锁定人格：旅人'),
+                onTap: () => showTavernToast(context, '人格在「交互」里修改'),
               ),
             ],
           ),
@@ -196,7 +242,7 @@ class ChatInfoSheet extends StatelessWidget {
               SettingRow(
                 icon: Icons.analytics_outlined,
                 title: '聊天统计',
-                value: '128 条 · 32k 字',
+                value: '$messageCount 条 · $charCount 字',
                 iconColor: p.sage,
                 onTap: () => openGlassPage(context, const StatsPage()),
               ),
@@ -204,15 +250,15 @@ class ChatInfoSheet extends StatelessWidget {
               SettingRow(
                 icon: Icons.backup_outlined,
                 title: '备份',
-                value: '最近 2 天前 · 12 份',
+                value: '手动导出',
                 iconColor: p.violet,
-                onTap: () => showTavernToast(context, '已恢复最近备份'),
+                onTap: () => showTavernToast(context, '请在「数据与备份」里导出'),
               ),
               const Hairline(indent: 56),
               SettingRow(
                 icon: Icons.schedule_rounded,
                 title: '创建时间',
-                value: '2026-11-02 21:14',
+                value: createdText(),
                 iconColor: p.amber,
                 chevron: false,
               ),
@@ -226,7 +272,7 @@ class ChatInfoSheet extends StatelessWidget {
                 title: '清空聊天',
                 value: '保留角色与设定',
                 iconColor: p.danger,
-                onTap: () => showTavernToast(context, '清空需要二次确认'),
+                onTap: () => _clearChat(context),
               ),
               const Hairline(indent: 56),
               SettingRow(
@@ -234,7 +280,7 @@ class ChatInfoSheet extends StatelessWidget {
                 title: '删除聊天',
                 value: '不可撤销',
                 iconColor: p.danger,
-                onTap: () => showTavernToast(context, '删除需要二次确认'),
+                onTap: () => _deleteChat(context),
               ),
             ],
           ),

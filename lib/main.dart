@@ -113,9 +113,12 @@ class TavernApp extends StatelessWidget {
   Widget _screenFor(String screen, Map<String, String> params) {
     switch (screen) {
       case 'chat':
+        if (AppStore.instance.characters.isEmpty) {
+          return const CharacterEditorPage();
+        }
         return ChatScreen(
-          character: demoCharacters.first,
-          autoDemo: params['demo'] == '1',
+          character: AppStore.instance.characters.first,
+          autoDemo: false,
         );
       case 'persona':
         return const PersonaEditorSheet();
@@ -128,21 +131,28 @@ class TavernApp extends StatelessWidget {
       case 'authornote':
         return const AuthorNoteSheet();
       case 'chatmenu':
+        if (AppStore.instance.characters.isEmpty) {
+          return const CharacterEditorPage();
+        }
         return ChatScreen(
-          character: demoCharacters.first,
+          character: AppStore.instance.characters.first,
           showMessageMenu: true,
         );
       case 'chatinfo':
-        final infoCharacter = AppStore.instance.characters.isEmpty
-            ? demoCharacters.first
-            : AppStore.instance.characters.first;
+        if (AppStore.instance.characters.isEmpty) {
+          return const CharacterEditorPage();
+        }
+        final infoCharacter = AppStore.instance.characters.first;
         return ChatInfoSheet(
           session: AppStore.instance.sessionFor(infoCharacter),
           character: infoCharacter,
         );
       case 'character':
+        if (AppStore.instance.characters.isEmpty) {
+          return const CharacterEditorPage();
+        }
         return CharacterScreen(
-          character: demoCharacters.first,
+          character: AppStore.instance.characters.first,
           initialTab: int.tryParse(params['tab'] ?? '0') ?? 0,
         );
       case 'editor':

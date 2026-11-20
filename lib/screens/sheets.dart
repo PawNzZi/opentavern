@@ -386,11 +386,11 @@ class ImportSheetScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Seraphina.png',
+                        '角色卡文件',
                         style: appText(13, FontWeight.w500, p.textPrimary),
                       ),
                       Text(
-                        '2 天前 · 24 条世界书',
+                        '选择后在本机解析',
                         style: appText(10, FontWeight.w400, p.textTertiary),
                       ),
                     ],

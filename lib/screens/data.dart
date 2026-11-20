@@ -50,6 +50,24 @@ class DataPage extends StatelessWidget {
     showTavernToast(context, uri == null ? '已取消导出' : '备份已导出');
   }
 
+  Future<void> _clearAll(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('清空所有数据'),
+        content: const Text('会删除全部角色、聊天、世界书、快捷回复、预设与正则，且不可撤销。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('全部删除')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await AppStore.instance.clearAllContent();
+    if (!context.mounted) return;
+    showTavernToast(context, '已清空所有内容');
+  }
+
   Future<void> _showImportLog(BuildContext context) async {
     final log = await AppStore.instance.readImportFailures();
     if (!context.mounted) return;
@@ -342,6 +360,15 @@ class DataPage extends StatelessWidget {
               value: 'JSON',
               iconColor: p.violet,
               onTap: () => _export(context),
+            ),
+            const Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.delete_forever_rounded,
+              title: '清空所有数据',
+              subtitle: '删除全部角色、聊天、世界书、预设与正则',
+              value: '不可撤销',
+              iconColor: p.danger,
+              onTap: () => _clearAll(context),
             ),
             const Hairline(indent: 56),
             SettingRow(

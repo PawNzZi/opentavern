@@ -240,14 +240,8 @@ class DemoCharacter {
         (data[key] ?? json[key] ?? '').toString();
     final name = pick('name').trim().isEmpty ? '未命名' : pick('name').trim();
     final description = pick('description');
-    final tags = (data['tags'] ?? json['tags'] as List?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        const <String>[];
-    final alt = (data['alternate_greetings'] as List?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        const <String>[];
+    final tags = _stringList(data['tags'] ?? json['tags']);
+    final alt = _stringList(data['alternate_greetings']);
     final book = data['character_book'] is Map
         ? Map<String, dynamic>.from(data['character_book'] as Map)
         : null;
@@ -1053,3 +1047,11 @@ const demoStats = <DemoStat>[
     colors: [Color(0xFF4A4658), Color(0xFFA9A3BF)],
   ),
 ];
+
+List<String> _stringList(dynamic value) {
+  if (value is! List) return <String>[];
+  return [
+    for (final item in value)
+      if (item != null) item.toString(),
+  ];
+}

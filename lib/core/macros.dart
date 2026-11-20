@@ -53,9 +53,13 @@ class MacroEngine {
           case 'char':
             return character.name;
           case 'user':
-            return settings.userName;
+            return settings.userName.trim().isEmpty
+                ? 'User'
+                : settings.userName;
           case 'persona':
-            return settings.personaName;
+            return settings.personaName.trim().isEmpty
+                ? 'User'
+                : settings.personaName;
           case 'description':
             return character.description;
           case 'personality':

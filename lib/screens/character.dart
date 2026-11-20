@@ -6,6 +6,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/character_png.dart';
+import '../core/models.dart';
+import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/routes.dart';
@@ -169,7 +171,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                           blur: 20,
                           shadow: false,
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          onTap: () {},
+                          onTap: null,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -265,7 +267,17 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     iconSize: 18,
                     iconColor: p.amber,
                     tint: p.amber,
-                    onTap: () => showTavernToast(context, '已收藏 ${c.name}'),
+                    onTap: () async {
+                    await AppStore.instance.addCharacter(
+                      c.copyWith(favorite: !c.favorite),
+                    );
+                    if (context.mounted) {
+                      showTavernToast(
+                        context,
+                        c.favorite ? '已取消收藏' : '已收藏 ${c.name}',
+                      );
+                    }
+                  },
                   ),
                   const SizedBox(width: 8),
                   GlassCircleButton(
@@ -437,9 +449,15 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   icon: Icons.copy_rounded,
                   title: '复制角色',
                   iconColor: p.sage,
-                  onTap: () {
+                  onTap: () async {
                     Navigator.of(sheetContext).pop();
-                    showTavernToast(context, '已复制角色');
+                    final copy = widget.character.copyWith(
+                      name: '${widget.character.name} 副本',
+                    );
+                    await AppStore.instance.addCharacter(copy);
+                    if (context.mounted) {
+                      showTavernToast(context, '已复制角色');
+                    }
                   },
                 ),
                 const Hairline(indent: 56),
@@ -457,9 +475,31 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   icon: Icons.delete_outline_rounded,
                   title: '删除角色',
                   iconColor: p.danger,
-                  onTap: () {
+                  onTap: () async {
                     Navigator.of(sheetContext).pop();
-                    showTavernToast(context, '删除需要二次确认');
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('删除角色'),
+                        content: Text('删除「${widget.character.name}」及其全部聊天？'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('取消'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('删除'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok != true) return;
+                    await AppStore.instance.deleteCharacter(
+                      widget.character,
+                      deleteChats: true,
+                    );
+                    if (context.mounted) Navigator.of(context).maybePop();
                   },
                 ),
               ],
@@ -472,6 +512,21 @@ class _CharacterScreenState extends State<CharacterScreen> {
 
   Widget _tabContent(BuildContext context, DemoCharacter c, double width) {
     final p = AppPalette.of(context);
+    Lorebook? book;
+    for (final b in AppStore.instance.lorebooks) {
+      if (b.name == c.lorebook) book = b;
+    }
+    final loreEntries = book?.entries ?? const <LoreEntry>[];
+    final activePreset = AppStore.instance.activePreset;
+    final charRegex = AppStore.instance.regexScripts
+        .where((r) => r.scope == c.name)
+        .length;
+    final descTokens = (c.description.length / 2).round();
+    final exampleTokens = (c.exampleDialogue.length / 2).round();
+    final scenarioTokens = ((c.personality.length + c.scenario.length) / 2).round();
+    final greetingTokens = (c.greeting.length / 2).round();
+    final maxTokens = [descTokens, exampleTokens, scenarioTokens, greetingTokens]
+        .fold<int>(1, (a, b) => b > a ? b : a);
     switch (_tab) {
       case 1:
         return Column(
@@ -483,7 +538,10 @@ class _CharacterScreenState extends State<CharacterScreen> {
               radius: 22,
               blur: 22,
               padding: const EdgeInsets.all(13),
-              onTap: () {},
+              onTap: () => showTavernToast(
+                context,
+                book == null ? '未绑定世界书' : '已绑定：${book.name}',
+              ),
               child: Row(
                 children: [
                   Container(
@@ -515,7 +573,9 @@ class _CharacterScreenState extends State<CharacterScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '24 条 · 更新于 2 天前 · 12.4k tokens',
+                          book == null
+                              ? '未绑定或已删除'
+                              : '${loreEntries.length} 条 · 本地世界书',
                           style: appText(9.5, FontWeight.w400, p.textTertiary),
                         ),
                       ],
@@ -530,31 +590,27 @@ class _CharacterScreenState extends State<CharacterScreen> {
               ),
             ),
             SettingsGroup(
-              title: '常驻条目',
-              children: const [
-                _LoreEntryRow(name: '王都的雨', keys: '王都 · 雨 · 预言'),
-                Hairline(indent: 12),
-                _LoreEntryRow(name: '星图与占星院', keys: '星图 · 占星 · 塔顶'),
-                Hairline(indent: 12),
-                _LoreEntryRow(name: '王都人物志', keys: '国王 · 公爵 · 使节'),
+              title: '世界书条目',
+              children: [
+                if (loreEntries.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: Text('没有条目'),
+                  )
+                else
+                  for (var i = 0; i < loreEntries.take(4).length; i++) ...[
+                    _LoreEntryRow(
+                      name: loreEntries[i].name.isEmpty
+                          ? loreEntries[i].keys.join(' · ')
+                          : loreEntries[i].name,
+                      keys: loreEntries[i].keys.join(' · '),
+                    ),
+                    if (i != loreEntries.take(4).length - 1)
+                      const Hairline(indent: 12),
+                  ],
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: const [
-                GlassPill(
-                  label: '打开世界书',
-                  icon: Icons.menu_book_rounded,
-                  height: 36,
-                ),
-                SizedBox(width: 8),
-                GlassPill(
-                  label: '更换绑定',
-                  icon: Icons.swap_horiz_rounded,
-                  height: 36,
-                ),
-              ],
-            ),
+
           ],
         );
       case 2:
@@ -568,52 +624,37 @@ class _CharacterScreenState extends State<CharacterScreen> {
                 SettingRow(
                   icon: Icons.layers_outlined,
                   title: '默认预设',
-                  value: c.preset,
+                  value: activePreset?.name ?? '默认',
                   iconColor: p.violet,
-                  onTap: () {},
+                  onTap: null,
                 ),
                 const Hairline(indent: 56),
                 SettingRow(
                   icon: Icons.subject_rounded,
                   title: '主提示词覆盖',
-                  value: '已设置',
+                  value: c.systemPrompt.trim().isEmpty ? '未设置' : '已设置',
                   iconColor: p.amber,
-                  onTap: () {},
+                  onTap: null,
                 ),
                 const Hairline(indent: 56),
                 SettingRow(
                   icon: Icons.gavel_rounded,
                   title: 'Post-History Instructions',
-                  value: '已设置',
+                  value: c.postHistoryInstructions.trim().isEmpty ? '未设置' : '已设置',
                   iconColor: p.rose,
-                  onTap: () {},
+                  onTap: null,
                 ),
-                const Hairline(indent: 56),
-                SettingRow(
-                  icon: Icons.vertical_align_bottom_rounded,
-                  title: '@Depth 注入',
-                  value: '深度 4 · 系统',
-                  iconColor: p.sage,
-                  onTap: () {},
-                ),
+
               ],
             ),
             SettingsGroup(
               title: '角色正则',
-              children: const [
+              children: [
                 SettingRow(
                   icon: Icons.find_replace_rounded,
-                  title: '名字修正',
-                  value: '2 条脚本',
-                  iconColor: Color(0xFFA9A0E8),
-                  onTap: null,
-                ),
-                Hairline(indent: 56),
-                SettingRow(
-                  icon: Icons.add_rounded,
-                  title: '添加角色正则',
-                  value: '仅对当前角色生效',
-                  iconColor: Color(0xFFF0B36A),
+                  title: '角色正则',
+                  value: '$charRegex 条脚本',
+                  iconColor: const Color(0xFFA9A0E8),
                   onTap: null,
                 ),
               ],
@@ -631,14 +672,14 @@ class _CharacterScreenState extends State<CharacterScreen> {
               blur: 22,
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
               child: Column(
-                children: const [
-                  _TokenBar(label: '描述', value: 186, ratio: .52, color: Color(0xFFF0B36A)),
-                  SizedBox(height: 12),
-                  _TokenBar(label: '示例对话', value: 640, ratio: .9, color: Color(0xFFA9A0E8)),
-                  SizedBox(height: 12),
-                  _TokenBar(label: '性格 + 场景', value: 116, ratio: .32, color: Color(0xFF8FD0BE)),
-                  SizedBox(height: 12),
-                  _TokenBar(label: '开场白', value: 64, ratio: .18, color: Color(0xFFEE9AA8)),
+                children: [
+                  _TokenBar(label: '描述', value: descTokens, ratio: descTokens / maxTokens, color: const Color(0xFFF0B36A)),
+                  const SizedBox(height: 12),
+                  _TokenBar(label: '示例对话', value: exampleTokens, ratio: exampleTokens / maxTokens, color: const Color(0xFFA9A0E8)),
+                  const SizedBox(height: 12),
+                  _TokenBar(label: '性格 + 场景', value: scenarioTokens, ratio: scenarioTokens / maxTokens, color: const Color(0xFF8FD0BE)),
+                  const SizedBox(height: 12),
+                  _TokenBar(label: '开场白', value: greetingTokens, ratio: greetingTokens / maxTokens, color: const Color(0xFFEE9AA8)),
                 ],
               ),
             ),
@@ -664,7 +705,13 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   title: '复制角色',
                   value: '含聊天目录',
                   iconColor: p.sage,
-                  onTap: () {},
+                  onTap: () async {
+                    final copy = c.copyWith(name: '${c.name} 副本');
+                    await AppStore.instance.addCharacter(copy);
+                    if (context.mounted) {
+                      showTavernToast(context, '已复制角色');
+                    }
+                  },
                 ),
                 const Hairline(indent: 56),
                 SettingRow(
@@ -678,9 +725,30 @@ class _CharacterScreenState extends State<CharacterScreen> {
                 SettingRow(
                   icon: Icons.delete_outline_rounded,
                   title: '删除角色',
-                  value: '可选删除聊天',
+                  value: '同时删除其聊天',
                   iconColor: p.danger,
-                  onTap: () {},
+                  onTap: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('删除角色'),
+                        content: Text('删除「${c.name}」及其全部聊天？'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('取消'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('删除'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok != true) return;
+                    await AppStore.instance.deleteCharacter(c, deleteChats: true);
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
                 ),
               ],
             ),
@@ -757,24 +825,17 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     title: '世界书',
                     value: c.lorebook,
                     iconColor: p.sage,
-                    onTap: () {},
+                    onTap: null,
                   ),
                   const Hairline(indent: 56),
                   SettingRow(
                     icon: Icons.tune_rounded,
                     title: '预设',
-                    value: c.preset,
+                    value: activePreset?.name ?? '默认',
                     iconColor: p.violet,
-                    onTap: () {},
+                    onTap: null,
                   ),
-                  const Hairline(indent: 56),
-                  SettingRow(
-                    icon: Icons.record_voice_over_rounded,
-                    title: '语音',
-                    value: 'Aurora · ElevenLabs',
-                    iconColor: p.rose,
-                    onTap: () {},
-                  ),
+
                 ],
               ),
             ),

@@ -31,6 +31,17 @@ class SettingsScreen extends StatelessWidget {
     final p = AppPalette.of(context);
     final api = AppStore.instance.settings.api;
     final preset = AppStore.instance.activePreset;
+    final promptCount = preset?.entries.length ?? 0;
+    final loreCount = AppStore.instance.lorebooks.fold<int>(
+      0,
+      (sum, book) => sum + book.entries.length,
+    );
+    final summaryCount =
+        AppStore.instance.sessions.where((s) => s.summary.trim().isNotEmpty).length;
+    final messageCount = AppStore.instance.sessions.fold<int>(
+      0,
+      (sum, s) => sum + s.messages.length,
+    );
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -161,7 +172,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.subject_rounded,
                   title: '提示词',
-                  value: '12 条 · 3.4k tokens',
+                  value: '$promptCount 条提示词',
                   iconColor: p.amber,
                   onTap: () => _open(context, const PromptManagerPage()),
                 ),
@@ -169,7 +180,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.auto_stories_rounded,
                   title: '世界书',
-                  value: '4 本 · 50 条',
+                  value: '${AppStore.instance.lorebooks.length} 本 · $loreCount 条',
                   iconColor: p.sage,
                   onTap: () => _open(context, const LoreScreen()),
                 ),
@@ -177,7 +188,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.psychology_alt_outlined,
                   title: '记忆与知识',
-                  value: '摘要 · 向量 · Data Bank',
+                  value: '$summaryCount 段摘要',
                   iconColor: p.violet,
                   onTap: () => _open(context, const MemoryPage()),
                 ),
@@ -185,7 +196,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.format_align_left_rounded,
                   title: '上下文与格式',
-                  value: 'Instruct · 模板',
+                  value: '温度 ${api.temperature.toStringAsFixed(2)}',
                   iconColor: p.rose,
                   onTap: () => _open(context, const GenerationPage()),
                 ),
@@ -202,7 +213,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.face_retouching_natural_rounded,
                   title: '人格与快捷回复',
-                  value: '3 个人格 · 3 组按钮',
+                  value: '${AppStore.instance.quickReplySets.length} 组快捷回复',
                   iconColor: p.amber,
                   onTap: () => _open(context, const InteractionPage()),
                 ),
@@ -210,7 +221,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.find_replace_rounded,
                   title: '正则与宏',
-                  value: '4 个正则 · 120+ 宏',
+                  value: '${AppStore.instance.regexScripts.length} 个正则',
                   iconColor: p.violet,
                   onTap: () => _open(context, const AutomationPage()),
                 ),
@@ -218,7 +229,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.insights_rounded,
                   title: '统计',
-                  value: '1,102 条消息',
+                  value: '$messageCount 条消息',
                   iconColor: p.sage,
                   onTap: () => _open(context, const StatsPage()),
                 ),
@@ -235,7 +246,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.record_voice_over_rounded,
                   title: '语音、图像与翻译',
-                  value: 'TTS · 绘图 · 表情',
+                  value: '未启用',
                   iconColor: p.rose,
                   onTap: () => _open(context, const MediaPage()),
                 ),
@@ -251,7 +262,7 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.palette_outlined,
               title: '外观与显示',
               subtitle: '主题 · 液态玻璃 · 字号与气泡',
-              value: '深色 · 标准',
+              value: '默认外观',
               iconColor: p.amber,
               onTap: () => _open(context, const AppearancePage()),
             ),
@@ -266,7 +277,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.file_download_outlined,
                   title: '导入角色',
-                  value: 'PNG · JSON · CHARX',
+                  value: 'PNG · JSON',
                   iconColor: p.amber,
                   onTap: () => _open(context, const DataPage()),
                 ),
@@ -274,7 +285,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.archive_outlined,
                   title: '数据与备份',
-                  value: '上次 2 天前',
+                  value: '手动导入 / 导出',
                   iconColor: p.sage,
                   onTap: () => _open(context, const DataPage()),
                 ),
@@ -282,7 +293,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.storage_rounded,
                   title: '存储空间',
-                  value: '128 MB',
+                  value: '本地目录',
                   iconColor: p.violet,
                   onTap: () => _open(context, const DataPage()),
                 ),
@@ -299,7 +310,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.science_outlined,
                   title: '实验室与关于',
-                  value: '工具调用 · 插件',
+                  value: '版本与说明',
                   iconColor: p.amber,
                   onTap: () => _open(context, const AboutPage()),
                 ),
@@ -307,7 +318,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.info_outline_rounded,
                   title: '版本',
-                  value: '1.0.0 (1)',
+                  value: '1.0.0',
                   iconColor: p.textTertiary,
                   chevron: false,
                 ),

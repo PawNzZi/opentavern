@@ -242,18 +242,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         color: p.sage,
                         onTap: () => _pickFile(context),
                       ),
-                      _AttachAction(
-                        icon: Icons.photo_camera_outlined,
-                        label: '拍照',
-                        color: p.violet,
-                        onTap: () => _toast('已打开相机'),
-                      ),
-                      _AttachAction(
-                        icon: Icons.brush_rounded,
-                        label: '绘图',
-                        color: p.rose,
-                        onTap: () => _toast('图像生成已就绪'),
-                      ),
+
                     ],
                   ),
                 ],
@@ -318,17 +307,11 @@ class _ChatScreenState extends State<ChatScreen> {
       case '分支':
         final branch = _chat.branchAt(message);
         _toast(branch == null ? '无法创建分支' : '已创建分支：${branch.title}');
-      case '朗读':
-        _toast('正在朗读…');
-      case '翻译':
-        _toast('已翻译为中文');
       case '删除后续':
         _confirmDeleteAfter(message);
       case '从此重写':
         _chat.regenerateFrom(message);
         _toast('将从这条消息重新生成');
-      case '查看推理':
-        _toast('展开推理内容');
     }
   }
 
@@ -1433,17 +1416,6 @@ class _Composer extends StatelessWidget {
               ),
             ),
             Pressable(
-              onTap: onVoice,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 10, right: 8),
-                child: Icon(
-                  Icons.graphic_eq_rounded,
-                  size: 19,
-                  color: p.textTertiary,
-                ),
-              ),
-            ),
-            Pressable(
               onTap: generating ? onStop : (hasText ? onSend : null),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
@@ -1559,8 +1531,6 @@ class _MessageMenu extends StatelessWidget {
       (Icons.call_split_rounded, '分支', p.textPrimary),
       (Icons.restart_alt_rounded, '从此重写', p.amber),
       (Icons.playlist_remove_rounded, '删除后续', p.danger),
-      (Icons.volume_up_rounded, '朗读', p.textPrimary),
-      (Icons.translate_rounded, '翻译', p.textPrimary),
       (Icons.auto_awesome_rounded, '查看推理', p.amber),
     ];
     return SafeArea(

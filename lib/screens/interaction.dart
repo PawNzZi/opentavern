@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../core/models.dart';
 import '../core/store.dart';
-import '../data/demo.dart';
 import '../design/glass.dart';
+import '../design/routes.dart';
 import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
-import '../design/routes.dart';
 import '../design/theme.dart';
 import 'editors.dart';
 
@@ -16,60 +15,33 @@ class InteractionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final settings = AppStore.instance.settings;
     final quick = AppStore.instance.activeQuickSet;
+    final personaName = settings.personaName.trim();
+    final personaDesc = settings.personaDescription.trim();
+    final note = settings.authorNote.trim();
     return DetailPage(
       eyebrow: 'IDENTITY & COMMANDS',
       title: '交互',
-      subtitle: '你是谁、怎么快捷操作、有哪些命令。',
+      subtitle: '你是谁、怎么快捷操作。',
       children: [
         SettingsGroup(
           title: '人格（Persona）',
-          footnote: '人格决定 {{user}} 的名字、头像与描述，也可以绑定独立的世界书。',
+          footnote: '人格名字与描述会替换 Prompt 中的 {{user}} 相关内容。',
           trailing: Text(
-            '3 个',
+            personaName.isEmpty ? '未设置' : '1 个',
             style: appText(11, FontWeight.w400, p.textTertiary),
           ),
           children: [
-            for (var i = 0; i < demoPersonas.length; i++) ...[
-              _PersonaRow(
-                persona: demoPersonas[i],
-                onTap: () => openGlassPage(
-                  context,
-                  PersonaEditorSheet(persona: demoPersonas[i]),
-                ),
-              ),
-              if (i != demoPersonas.length - 1) const Hairline(indent: 66),
-            ],
-            const Hairline(indent: 66),
             SettingRow(
-              icon: Icons.add_rounded,
-              title: '新建人格',
-              value: '头像 + 描述',
+              icon: Icons.person_outline_rounded,
+              title: personaName.isEmpty ? '未设置人格' : personaName,
+              subtitle: personaDesc.isEmpty ? '点击编辑名字与描述' : personaDesc,
               iconColor: p.amber,
               onTap: () => openGlassPage(
                 context,
                 const PersonaEditorSheet(),
               ),
-            ),
-          ],
-        ),
-        SettingsGroup(
-          title: '人格描述注入',
-          children: const [
-            SegmentLine(
-              title: '位置',
-              options: ['提示词内', '作者笔记上', '深度'],
-              index: 0,
-            ),
-            StepperRow(
-              title: '注入深度',
-              subtitle: '仅「深度」模式生效',
-              value: '4',
-            ),
-            SwitchLine(
-              title: '切换人格时提示',
-              subtitle: '避免误用其他人格说话',
-              value: true,
             ),
           ],
         ),
@@ -88,7 +60,7 @@ class InteractionPage extends StatelessWidget {
                     style: appText(15, FontWeight.w600, p.textPrimary),
                   ),
                   const SizedBox(width: 7),
-                  TagBadge(quick?.name ?? '快捷回复'),
+                  TagBadge(quick?.name ?? '未选择'),
                   const Spacer(),
                   Text(
                     '${quick?.replies.length ?? 0} 个按钮',
@@ -97,31 +69,50 @@ class InteractionPage extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 11),
-              Wrap(
-                spacing: 7,
-                runSpacing: 7,
-                children: [
-                  for (final reply in quick?.replies ?? const <QuickReply>[])
-                    GlassPill(label: reply.label, height: 32),
-                ],
-              ),
+              if (quick == null || quick.replies.isEmpty)
+                Text(
+                  '还没有快捷回复集合',
+                  style: appText(11.5, FontWeight.w400, p.textTertiary),
+                )
+              else
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    for (final reply in quick.replies)
+                      GlassPill(label: reply.label, height: 32),
+                  ],
+                ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   GlassPill(
-                    label: '编辑按钮',
+                    label: quick == null ? '新建集合' : '编辑按钮',
                     icon: Icons.edit_outlined,
                     height: 32,
-                    onTap: () => openGlassPage(
-                      context,
-                      QuickReplyEditorSheet(quickSet: quick),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const GlassPill(
-                    label: '管理集合',
-                    icon: Icons.layers_outlined,
-                    height: 32,
+                    onTap: () async {
+                      if (quick == null) {
+                        final set = QuickReplySet(
+                          id: 'qr-${DateTime.now().microsecondsSinceEpoch}',
+                          name: '新集合 1',
+                          replies: [
+                            QuickReply(
+                              id: 'qr-${DateTime.now().microsecondsSinceEpoch}-1',
+                              label: '继续',
+                              message: '继续',
+                            ),
+                          ],
+                        );
+                        AppStore.instance.quickReplySets.add(set);
+                        AppStore.instance.activeQuickSetId = set.id;
+                        await AppStore.instance.saveQuickReplies();
+                        return;
+                      }
+                      await openGlassPage(
+                        context,
+                        QuickReplyEditorSheet(quickSet: quick),
+                      );
+                    },
                   ),
                   const Spacer(),
                   Text(
@@ -138,17 +129,18 @@ class InteractionPage extends StatelessWidget {
           builder: (context, _) => SettingsGroup(
             title: '快捷回复集合',
             children: [
-              for (var i = 0; i < AppStore.instance.quickReplySets.length; i++) ...[
+              for (var i = 0;
+                  i < AppStore.instance.quickReplySets.length;
+                  i++) ...[
                 SettingRow(
                   icon: Icons.bolt_rounded,
                   title: AppStore.instance.quickReplySets[i].name,
                   subtitle:
                       '${AppStore.instance.quickReplySets[i].replies.length} 个按钮',
-                  value:
-                      AppStore.instance.quickReplySets[i].id ==
-                              AppStore.instance.activeQuickSetId
-                          ? '当前'
-                          : '',
+                  value: AppStore.instance.quickReplySets[i].id ==
+                          AppStore.instance.activeQuickSetId
+                      ? '当前'
+                      : '',
                   iconColor: p.amber,
                   onTap: () async {
                     AppStore.instance.activeQuickSetId =
@@ -171,7 +163,8 @@ class InteractionPage extends StatelessWidget {
                 if (i != AppStore.instance.quickReplySets.length - 1)
                   const Hairline(indent: 56),
               ],
-              const Hairline(indent: 56),
+              if (AppStore.instance.quickReplySets.isNotEmpty)
+                const Hairline(indent: 56),
               SettingRow(
                 icon: Icons.add_rounded,
                 title: '新建集合',
@@ -180,7 +173,8 @@ class InteractionPage extends StatelessWidget {
                 onTap: () async {
                   final set = QuickReplySet(
                     id: 'qr-${DateTime.now().microsecondsSinceEpoch}',
-                    name: '新集合 ${AppStore.instance.quickReplySets.length + 1}',
+                    name:
+                        '新集合 ${AppStore.instance.quickReplySets.length + 1}',
                     replies: [
                       QuickReply(
                         id: 'qr-${DateTime.now().microsecondsSinceEpoch}-1',
@@ -198,204 +192,22 @@ class InteractionPage extends StatelessWidget {
           ),
         ),
         SettingsGroup(
-          title: '命令与脚本',
+          title: '作者笔记',
           children: [
             SettingRow(
-              icon: Icons.terminal_rounded,
-              title: '斜杠命令',
-              value: '150+ 个',
-              iconColor: p.amber,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.data_object_rounded,
-              title: '宏浏览器',
-              value: '120+ 个',
+              icon: Icons.sticky_note_2_outlined,
+              title: '默认内容',
+              subtitle: note.isEmpty ? '未设置' : note,
               iconColor: p.violet,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.code_rounded,
-              title: 'STscript 脚本',
-              value: '3 个',
-              iconColor: p.sage,
-              onTap: () {},
-            ),
-            const Hairline(indent: 56),
-            SettingRow(
-              icon: Icons.bug_report_outlined,
-              title: '调试控制台',
-              value: '事件与命令',
-              iconColor: p.rose,
-              onTap: () {},
-            ),
-          ],
-        ),
-        SettingsGroup(
-          title: '作者笔记默认值',
-          children: [
-            const FieldBlock(
-              label: '默认内容',
-              value: '保持叙事节奏，多描写环境与身体语言，避免替用户做决定。',
-              multiline: true,
-            ),
-            const SizedBox(height: 8),
-            const StepperRow(
-              title: '插入间隔',
-              subtitle: '每 N 条消息注入一次',
-              value: '3 条',
-            ),
-            const SegmentLine(
-              title: '位置',
-              options: ['作者笔记上', '作者笔记下', '深度'],
-              index: 2,
-            ),
-            const StepperRow(
-              title: '深度',
-              value: '4',
+              onTap: () => openGlassPage(context, const AuthorNoteSheet()),
             ),
           ],
         ),
         const SizedBox(height: 18),
         const HintCard(
-          text: '这些默认值只影响新聊天。单个聊天里的作者笔记、人格锁定和快捷回复，可以在聊天信息里单独修改。',
+          text: '作者笔记会进入每次请求的 Prompt；人格和快捷回复只保存在本机。',
         ),
       ],
-    );
-  }
-}
-
-class _PersonaRow extends StatelessWidget {
-  const _PersonaRow({required this.persona, this.onTap});
-
-  final DemoPersona persona;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return Pressable(
-      onTap: onTap,
-      child: Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 42,
-            height: 42,
-            child: Portrait(
-              initial: persona.initial,
-              colors: persona.colors,
-              radius: 13,
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      persona.name,
-                      style: appText(13.5, FontWeight.w500, p.textPrimary),
-                    ),
-                    if (persona.isDefault) ...[
-                      const SizedBox(width: 6),
-                      const TagBadge('默认'),
-                    ],
-                    if (persona.lockedTo != null) ...[
-                      const SizedBox(width: 6),
-                      TagBadge(
-                        '锁定 ${persona.lockedTo}',
-                        color: p.violet,
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  persona.description,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: appText(10, FontWeight.w400, p.textTertiary),
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            Icons.chevron_right_rounded,
-            size: 17,
-            color: p.textTertiary,
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-}
-
-class _QuickSetRow extends StatelessWidget {
-  const _QuickSetRow({required this.set});
-
-  final DemoQuickSet set;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(11),
-              color: (set.active ? p.amber : p.textTertiary).withValues(
-                alpha: .14,
-              ),
-            ),
-            child: Icon(
-              Icons.bolt_rounded,
-              size: 17,
-              color: set.active ? p.amber : p.textTertiary,
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      set.name,
-                      style: appText(13, FontWeight.w500, p.textPrimary),
-                    ),
-                    if (set.active) ...[
-                      const SizedBox(width: 6),
-                      const TagBadge('启用中'),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  set.description,
-                  style: appText(9.5, FontWeight.w400, p.textTertiary),
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            Icons.chevron_right_rounded,
-            size: 17,
-            color: p.textTertiary,
-          ),
-        ],
-      ),
     );
   }
 }

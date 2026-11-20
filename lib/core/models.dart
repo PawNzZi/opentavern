@@ -277,9 +277,9 @@ class APISettings {
 class AppSettings {
   const AppSettings({
     this.api = const APISettings(),
-    this.userName = '旅人',
-    this.personaName = '旅人',
-    this.personaDescription = '一个在各地旅行的记录者，习惯先观察再开口。',
+    this.userName = '',
+    this.personaName = '',
+    this.personaDescription = '',
     this.mainPrompt =
         '你正在扮演 {{char}}。请始终以 {{char}} 的身份、语气和视角回复，'
         '不要替 {{user}} 说话，不要跳出角色。用自然、具体、有画面感的叙述推进场景。',

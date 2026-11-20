@@ -13,200 +13,70 @@ class AppearancePage extends StatelessWidget {
     final p = AppPalette.of(context);
     return DetailPage(
       eyebrow: 'APPEARANCE',
-      title: '外观与交互',
-      subtitle: '玻璃、字体、气泡与背景，都可以按你的方式调。',
+      title: '外观',
+      subtitle: '当前版本使用固定的液态玻璃视觉。',
       children: [
-        const SettingsGroup(
-          title: '主题',
-          children: [
-            SegmentLine(
-              title: '模式',
-              options: ['深色', '浅色', '跟随系统'],
-              index: 0,
-            ),
-            SegmentLine(
-              title: '玻璃强度',
-              options: ['标准', '减弱', '关闭'],
-              index: 0,
-            ),
-            SliderLine(
-              title: '模糊半径',
-              value: 26,
-              min: 0,
-              max: 40,
-              divisions: 40,
-              display: '26px',
-            ),
-            SliderLine(
-              title: '字号',
-              value: 1,
-              min: .85,
-              max: 1.15,
-              display: '100%',
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
         Glass(
-          radius: 24,
-          blur: 24,
-          padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-          child: Row(
-            children: [
-              Text(
-                '强调色',
-                style: appText(13.5, FontWeight.w500, p.textPrimary),
-              ),
-              const Spacer(),
-              _AccentDot(color: p.amber, selected: true),
-              const SizedBox(width: 9),
-              _AccentDot(color: p.rose),
-              const SizedBox(width: 9),
-              _AccentDot(color: p.sage),
-              const SizedBox(width: 9),
-              _AccentDot(color: p.violet),
-            ],
-          ),
-        ),
-        SettingsGroup(
-          title: '聊天显示',
-          children: const [
-            SwitchLine(
-              title: '气泡样式',
-              subtitle: '关闭后使用无气泡的纯文本排版',
-              value: true,
-            ),
-            SwitchLine(
-              title: '显示头像',
-              subtitle: '角色消息左侧的小头像',
-              value: true,
-            ),
-            SwitchLine(
-              title: '显示时间戳',
-              subtitle: '每条消息下方的发送时间',
-              value: true,
-            ),
-            SliderLine(
-              title: '消息宽度',
-              value: .74,
-              min: .5,
-              max: .9,
-              display: '74%',
-            ),
-          ],
-        ),
-        Glass(
-          radius: 24,
-          blur: 24,
-          padding: const EdgeInsets.all(12),
+          radius: 28,
+          blur: 30,
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                '液态玻璃',
+                style: appText(17, FontWeight.w600, p.textPrimary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '半透明卡片、细描边与柔和阴影；打开聊天时会自动降低模糊开销。',
+                style: appText(11.5, FontWeight.w400, p.textTertiary, height: 1.5),
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
-                  Text(
-                    '聊天背景',
-                    style: appText(14, FontWeight.w500, p.textPrimary),
-                  ),
-                  const Spacer(),
-                  const TagBadge('仅当前聊天', color: Color(0xFF8FD0BE)),
+                  _AccentDot(color: p.amber, selected: true),
+                  const SizedBox(width: 9),
+                  _AccentDot(color: p.rose),
+                  const SizedBox(width: 9),
+                  _AccentDot(color: p.sage),
+                  const SizedBox(width: 9),
+                  _AccentDot(color: p.violet),
                 ],
-              ),
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: SizedBox(
-                  height: 108,
-                  width: double.infinity,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF8C4A3F),
-                              Color(0xFFD98E5F),
-                              Color(0xFF2A1A20),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 12,
-                        bottom: 10,
-                        child: Text(
-                          '王都的雨夜.jpg',
-                          style: appText(
-                            10,
-                            FontWeight.w500,
-                            Colors.white70,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 10,
-                        bottom: 10,
-                        child: GlassPill(
-                          label: '更换',
-                          height: 30,
-                          onTap: () {},
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const SliderLine(
-                title: '背景模糊',
-                value: 12,
-                min: 0,
-                max: 40,
-                divisions: 40,
-                display: '12px',
-              ),
-              const SliderLine(
-                title: '暗化',
-                value: .35,
-                display: '35%',
               ),
             ],
           ),
         ),
         SettingsGroup(
-          title: '动效与布局',
+          title: '当前行为',
           children: const [
-            SwitchLine(
-              title: '减弱动态效果',
-              subtitle: '关闭位移与缩放，只保留淡入',
-              value: false,
-            ),
-            SwitchLine(
-              title: '可视化小说模式',
-              subtitle: '全屏立绘 + 底部文本框',
-              value: false,
-            ),
-            SwitchLine(
-              title: '可移动 UI',
-              subtitle: '长按面板拖动位置',
-              value: false,
-            ),
             SettingRow(
-              icon: Icons.keyboard_rounded,
-              title: '快捷键',
-              value: '8 个',
+              icon: Icons.dark_mode_outlined,
+              title: '深浅色',
+              value: '跟随系统',
+              iconColor: Color(0xFFD98E5F),
+            ),
+            Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.blur_on_rounded,
+              title: '玻璃模糊',
+              value: '标准',
+              iconColor: Color(0xFF7FA893),
+            ),
+            Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.chat_bubble_outline_rounded,
+              title: '消息气泡',
+              value: '头像 + 时间',
               iconColor: Color(0xFFA9A0E8),
-              onTap: null,
             ),
           ],
         ),
-        const SizedBox(height: 18),
-        const HintCard(
-          text: '玻璃效果越强，GPU 开销越高。低电量模式或旧设备建议使用「减弱」；「关闭」会改用实色卡片，最省电。',
-          color: Color(0xFF8FD0BE),
+        const SizedBox(height: 16),
+        Text(
+          '字号、玻璃强度、强调色与聊天布局的自定义尚未接入；当前版本只提供这套固定外观。',
+          style: appText(11, FontWeight.w400, p.textTertiary, height: 1.6),
         ),
       ],
     );
@@ -224,19 +94,21 @@ class _AccentDot extends StatelessWidget {
     return Container(
       width: 26,
       height: 26,
-      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
+        color: color,
         shape: BoxShape.circle,
         border: Border.all(
-          color: selected ? Colors.white : Colors.transparent,
-          width: 1.2,
+          color: selected ? Colors.white : Colors.white.withValues(alpha: .35),
+          width: selected ? 2 : 1,
         ),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color,
-        ),
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: color.withValues(alpha: .35),
+                  blurRadius: 12,
+                ),
+              ]
+            : null,
       ),
     );
   }
