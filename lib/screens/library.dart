@@ -146,7 +146,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 final c = characters[i];
                 return _CharacterTile(
                   character: c,
-                  onTap: () => widget.onOpenChat(c),
+                  onTap: () => c.alternateGreetings.isNotEmpty
+                      ? widget.onOpenCharacter(c)
+                      : widget.onOpenChat(c),
                   onOpenDetails: () => widget.onOpenCharacter(c),
                 );
               },
