@@ -69,7 +69,15 @@ class PromptBuilder {
         .take(8)
         .map((m) => m.text)
         .join('\n');
-    final loreEntries = _activatedLore(character, recentText);
+    final promptBudget = settings.maxContext -
+        settings.api.maxTokens -
+        settings.tokenPadding;
+    final loreBudget = (promptBudget * .35).round().clamp(256, 8000).toInt();
+    final loreEntries = _activatedLore(
+      character,
+      recentText,
+      maxTokens: loreBudget,
+    );
     final loreBefore = loreEntries
         .where((e) => e.position != 'after')
         .map((e) => e.content.trim())
@@ -241,7 +249,11 @@ class PromptBuilder {
     );
   }
 
-  static List<LoreEntry> _activatedLore(DemoCharacter character, String text) {
+  static List<LoreEntry> _activatedLore(
+    DemoCharacter character,
+    String text, {
+    int maxTokens = 2400,
+  }) {
     final lower = text.toLowerCase();
     final selected = <LoreEntry>[];
 
@@ -306,7 +318,16 @@ class PromptBuilder {
     }
 
     selected.sort((a, b) => b.order.compareTo(a.order));
-    return selected.take(20).toList();
+    final result = <LoreEntry>[];
+    var used = 0;
+    for (final entry in selected) {
+      final cost = estimateTokens(entry.content) + 2;
+      if (result.isNotEmpty && used + cost > maxTokens) break;
+      result.add(entry);
+      used += cost;
+      if (result.length >= 20) break;
+    }
+    return result;
   }
 }
 

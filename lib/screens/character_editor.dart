@@ -195,7 +195,14 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
       lorebook: _lorebook,
       avatarBase64: _avatarBase64,
     );
-    await AppStore.instance.addCharacter(updated);
+    if (widget.character == null) {
+      await AppStore.instance.addCharacter(updated);
+    } else {
+      await AppStore.instance.replaceCharacter(
+        updated,
+        previousName: widget.character!.name,
+      );
+    }
     if (!mounted) return;
     showTavernToast(context, '角色已保存');
     Navigator.of(context).maybePop();

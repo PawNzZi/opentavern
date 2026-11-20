@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../core/models.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
-import '../design/routes.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
-import 'search.dart';
 
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({

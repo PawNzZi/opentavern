@@ -214,7 +214,7 @@ class ChatInfoSheet extends StatelessWidget {
               icon: Icons.search_rounded,
               label: '搜索',
               color: p.rose,
-              onTap: () => openGlassPage(context, const SearchPage()),
+              onTap: () => openGlassPage(context, SearchPage(sessionId: session.id)),
             ),
           ],
         ),
@@ -296,7 +296,7 @@ class ChatInfoSheet extends StatelessWidget {
               title: '聊天统计',
               value: '$messageCount 条 · $charCount 字',
               iconColor: p.sage,
-              onTap: () => openGlassPage(context, const StatsPage()),
+              onTap: () => openGlassPage(context, StatsPage(sessionId: session.id)),
             ),
             const Hairline(indent: 56),
             SettingRow(

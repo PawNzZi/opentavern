@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'core/store.dart';
-import 'data/demo.dart';
 import 'design/glass.dart';
 import 'design/scaffold.dart';
 import 'design/theme.dart';
@@ -298,32 +297,6 @@ class _RootShellState extends State<RootShell> {
     );
   }
 
-  Widget _body() {
-    switch (_index) {
-      case 1:
-        return ChatsScreen(
-          onOpenChat: (chat) => _push(
-            ChatScreen(
-              character: chat.character,
-              sessionId: chat.sessionId,
-            ),
-          ),
-          onSearch: () => _push(const SearchPage()),
-        );
-      case 2:
-        return SettingsScreen(
-          onOpenConnect: () => _push(const ConnectSheetScreen()),
-        );
-      case 0:
-      default:
-        return LibraryScreen(
-          onOpenCharacter: (c) => _push(CharacterScreen(character: c)),
-          onOpenChat: (c) => _push(ChatScreen(character: c)),
-          onImport: () => _push(const ImportSheetScreen()),
-        );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
@@ -358,7 +331,7 @@ class _RootShellState extends State<RootShell> {
             onSearch: () => _push(const SearchPage()),
           ),
           SettingsScreen(
-            onOpenConnect: () => _push(const ConnectSheetScreen()),
+            onOpenConnect: () => _push(const ConnectionPage()),
           ),
         ],
       ),

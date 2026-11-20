@@ -12,7 +12,9 @@ import 'character.dart';
 import 'chat.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key});
+  const SearchPage({super.key, this.sessionId});
+
+  final String? sessionId;
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -52,15 +54,22 @@ class _SearchPageState extends State<SearchPage> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final q = _query.trim().toLowerCase();
-    final characters = AppStore.instance.characters.where((c) {
+    final scopedSessions = widget.sessionId == null
+        ? AppStore.instance.sessions
+        : AppStore.instance.sessions
+            .where((s) => s.id == widget.sessionId)
+            .toList();
+    final characters = widget.sessionId == null
+        ? AppStore.instance.characters.where((c) {
       if (q.isEmpty) return false;
       return c.name.toLowerCase().contains(q) ||
           c.title.toLowerCase().contains(q) ||
           c.description.toLowerCase().contains(q) ||
           c.tags.any((t) => t.toLowerCase().contains(q));
-    }).toList();
+    }).toList()
+        : <DemoCharacter>[];
 
-    final sessions = AppStore.instance.sessions.where((s) {
+    final sessions = scopedSessions.where((s) {
       if (q.isEmpty) return false;
       if (s.title.toLowerCase().contains(q)) return true;
       if (s.characterName.toLowerCase().contains(q)) return true;
@@ -69,7 +78,7 @@ class _SearchPageState extends State<SearchPage> {
 
     final hits = <(ChatSession, ChatMessage)>[];
     if (q.isNotEmpty) {
-      for (final session in AppStore.instance.sessions) {
+      for (final session in scopedSessions) {
         for (final message in session.messages) {
           if (message.text.toLowerCase().contains(q)) {
             hits.add((session, message));

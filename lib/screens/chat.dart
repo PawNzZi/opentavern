@@ -64,12 +64,17 @@ class _ChatScreenState extends State<ChatScreen> {
             : null;
     _chat = ChatController(character: widget.character, session: session);
     _chat.addListener(_onChatChanged);
+    AppStore.instance.addListener(_onStoreChanged);
     if (widget.autoDemo) {
       Timer(const Duration(milliseconds: 900), () {
         if (!mounted) return;
         _chat.send('如果我说，我就是那个坏消息呢？');
       });
     }
+  }
+
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onChatChanged() {
@@ -87,6 +92,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _chat.removeListener(_onChatChanged);
+    AppStore.instance.removeListener(_onStoreChanged);
     _chat.dispose();
     _input.dispose();
     _scroll.dispose();
@@ -738,36 +744,6 @@ class _ChatTopBar extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _MessageView extends StatelessWidget {
-  const _MessageView({
-    required this.message,
-    required this.character,
-    required this.isLastCharacter,
-  });
-
-  final ChatMessage message;
-  final DemoCharacter character;
-  final bool isLastCharacter;
-
-  @override
-  Widget build(BuildContext context) {
-    if (message.isUser) {
-      return _UserMessage(message: message);
-    }
-    return _CharacterMessage(
-      message: message,
-      character: character,
-      isLast: isLastCharacter,
-      streaming: false,
-      onLongPress: () {},
-      onSwipe: (_) {},
-      onContinue: () {},
-      onRegenerate: () {},
-      onSpeak: () {},
     );
   }
 }

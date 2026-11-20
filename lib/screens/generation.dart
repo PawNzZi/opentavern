@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/store.dart';
 import '../design/glass.dart';
-import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';

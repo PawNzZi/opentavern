@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../core/store.dart';
 import '../design/glass.dart';
-import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
 
 class StatsPage extends StatefulWidget {
-  const StatsPage({super.key});
+  const StatsPage({super.key, this.sessionId});
+
+  final String? sessionId;
 
   @override
   State<StatsPage> createState() => _StatsPageState();
@@ -27,6 +28,7 @@ class _StatsPageState extends State<StatsPage> {
         : now.subtract(Duration(days: _days!)).millisecondsSinceEpoch;
     final allSessions = store.sessions
         .where((s) => s.updatedAt >= cutoff)
+        .where((s) => widget.sessionId == null || s.id == widget.sessionId)
         .toList();
     final sessions = _selected == null
         ? allSessions

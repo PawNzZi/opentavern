@@ -153,7 +153,7 @@ class ChatSession {
         updatedAt = updatedAt ?? DateTime.now().millisecondsSinceEpoch;
 
   final String id;
-  final String characterName;
+  String characterName;
   String title;
   final List<ChatMessage> messages;
   bool pinned;

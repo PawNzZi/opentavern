@@ -668,38 +668,6 @@ class _Stepper extends StatelessWidget {
   }
 }
 
-class _ImportOption extends StatelessWidget {
-  const _ImportOption({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return Glass(
-      radius: 18,
-      blur: 18,
-      shadow: false,
-      padding: const EdgeInsets.symmetric(vertical: 13),
-      onTap: () {},
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(icon, size: 21, color: p.textPrimary),
-            const SizedBox(height: 7),
-            Text(
-              label,
-              style: appText(11.5, FontWeight.w500, p.textSecondary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _DashedRRectPainter extends CustomPainter {
   _DashedRRectPainter({required this.color, required this.radius});
 

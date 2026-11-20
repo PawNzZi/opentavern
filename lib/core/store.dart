@@ -158,55 +158,6 @@ class AppStore extends ChangeNotifier {
     }
   }
 
-  Future<void> _seedSessions() async {
-    for (final chat in demoChats) {
-      final character = characters.firstWhere(
-        (c) => c.name == chat.character.name,
-        orElse: () => chat.character,
-      );
-      final messages = <ChatMessage>[];
-      if (character.greeting.trim().isNotEmpty) {
-        messages.add(
-          ChatMessage(
-            id: 'greet-${character.name}',
-            text: character.greeting,
-            time: chat.time,
-          ),
-        );
-      }
-      sessions.add(
-        ChatSession(
-          id: 'seed-${character.name}',
-          characterName: character.name,
-          title: '${character.name} · ${chat.time}',
-          messages: messages,
-          pinned: chat.pinned,
-        ),
-      );
-    }
-  }
-
-  void _seedLorebooks() {
-    for (final book in demoLorebooks) {
-      lorebooks.add(
-        Lorebook(
-          id: 'seed-lore-${book.name}',
-          name: book.name,
-          isGlobal: book.isGlobal,
-          linked: book.linked,
-          entries: [
-            LoreEntry(
-              id: 'seed-entry-${book.name}',
-              name: book.name,
-              keys: [book.name.split(' ').first],
-              content: '${book.name} 的设定条目。命中关键词时会注入当前对话。',
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
   Future<void> _seedMissingQuickReplies() async {
     var added = false;
     for (final set in demoQuickSets) {
@@ -246,27 +197,6 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _seedRegexes() {
-    for (final item in demoRegexes) {
-      final placement = item.placement.contains('仅显示')
-          ? 'display'
-          : item.placement.contains('输入')
-              ? 'prompt'
-              : 'both';
-      regexScripts.add(
-        RegexScript(
-          id: 'seed-regex-${item.name}',
-          name: item.name,
-          find: item.find,
-          replace: item.replace,
-          enabled: item.enabled,
-          placement: placement,
-          scope: item.scope,
-        ),
-      );
-    }
-  }
-
   Future<void> saveRegexes() async {
     await _writeJson(
       'regex.json',
@@ -282,31 +212,6 @@ class AppStore extends ChangeNotifier {
     return presets.isEmpty ? null : presets.first;
   }
 
-  void _seedPresets() {
-    final preset = PromptPreset(
-      id: 'preset-default',
-      name: '长夜 · 叙事',
-      mainPrompt: settings.mainPrompt,
-      entries: [
-        PromptEntry(
-          id: 'entry-jailbreak',
-          name: 'Jailbreak',
-          role: 'system',
-          content: '保持角色口吻，不要替 {{user}} 行动，不要跳出角色。',
-          order: 10,
-        ),
-        PromptEntry(
-          id: 'entry-style',
-          name: '文风要求',
-          role: 'system',
-          content: '多写具体动作、环境与感官细节；避免空泛总结。',
-          order: 20,
-        ),
-      ],
-    );
-    presets.add(preset);
-    activePresetId = preset.id;
-  }
 
   Future<void> savePresets() async {
     await _writeJson('presets.json', {
@@ -580,6 +485,33 @@ class AppStore extends ChangeNotifier {
     characters.removeWhere((c) => c.name == character.name);
     if (deleteChats) {
       sessions.removeWhere((s) => s.characterName == character.name);
+      await saveSessions();
+    }
+    await saveCharacters();
+    notifyListeners();
+  }
+
+  Future<void> replaceCharacter(
+    DemoCharacter character, {
+    required String previousName,
+  }) async {
+    final index = characters.indexWhere((c) => c.name == previousName);
+    if (index >= 0) {
+      characters[index] = character;
+    } else {
+      final fallback = characters.indexWhere((c) => c.name == character.name);
+      if (fallback >= 0) {
+        characters[fallback] = character;
+      } else {
+        characters.add(character);
+      }
+    }
+    if (previousName != character.name) {
+      for (final session in sessions) {
+        if (session.characterName == previousName) {
+          session.characterName = character.name;
+        }
+      }
       await saveSessions();
     }
     await saveCharacters();
