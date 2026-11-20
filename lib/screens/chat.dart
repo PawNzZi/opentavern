@@ -108,26 +108,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _openInfo() {
     Navigator.of(context).push(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 320),
-        pageBuilder: (_, animation, __) => ChatInfoSheet(
+      MaterialPageRoute(
+        builder: (_) => ChatInfoSheet(
           session: _chat.session,
           character: widget.character,
           onSummarize: _chat.summarizeNow,
         ),
-        transitionsBuilder: (_, animation, __, child) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-          );
-          return SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, .04),
-              end: Offset.zero,
-            ).animate(curved),
-            child: FadeTransition(opacity: curved, child: child),
-          );
-        },
       ),
     );
   }

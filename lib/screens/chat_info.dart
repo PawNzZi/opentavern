@@ -130,22 +130,13 @@ class ChatInfoSheet extends StatelessWidget {
     String createdText() => created == null
         ? '暂无消息'
         : '${created.year}-${created.month.toString().padLeft(2, '0')}-${created.day.toString().padLeft(2, '0')} ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}';
-    return SheetStage(
+    return DetailPage(
+      eyebrow: 'CHAT INFO',
       title: '聊天信息',
       subtitle: '${c.name} · ${session.title}',
-      heightFactor: .95,
-      leading: SizedBox(
-        width: 40,
-        height: 40,
-        child: Portrait(
-          initial: c.initial,
-          colors: c.colors,
-          radius: 12,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      children: [
+        Column(
+          children: [
           ActionGrid(
             items: [
               ActionSpec(
@@ -326,7 +317,8 @@ class ChatInfoSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-      ),
+        ),
+      ],
     );
   }
 }
