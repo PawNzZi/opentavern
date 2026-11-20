@@ -452,8 +452,6 @@ class _SheetStageState extends State<SheetStage>
                     children: [
                       GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onVerticalDragUpdate: _onDragUpdate,
-                        onVerticalDragEnd: _onDragEnd,
                         child: Column(
                           children: [
                             const SizedBox(height: 10),

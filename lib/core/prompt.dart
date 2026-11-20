@@ -64,7 +64,7 @@ class PromptBuilder {
         .join('\n');
     final lore = _activateLore(character, recentText);
 
-    final system = StringBuffer();
+    final sections = <String, String>{};
     final preset = AppStore.instance.activePreset;
     final main = character.systemPrompt.trim().isNotEmpty
         ? character.systemPrompt
@@ -72,35 +72,46 @@ class PromptBuilder {
             ? preset!.mainPrompt
             : settings.mainPrompt);
     if (main.trim().isNotEmpty) {
-      system.writeln(macro(main).trim());
+      sections['main'] = macro(main).trim();
     }
-    system.writeln('\n[瑙掕壊]\n鍚嶅瓧锛?{character.name}');
+    final characterSection = StringBuffer();
+    characterSection.writeln('\n[角色]\n名字：${character.name}');
     if (character.description.trim().isNotEmpty) {
-      system.writeln('璁惧畾锛?{macro(character.description).trim()}');
+      characterSection.writeln('设定：${macro(character.description).trim()}');
     }
     if (character.personality.trim().isNotEmpty) {
-      system.writeln('鎬ф牸锛?{macro(character.personality).trim()}');
+      characterSection.writeln('性格：${macro(character.personality).trim()}');
     }
     if (character.scenario.trim().isNotEmpty) {
-      system.writeln('鍦烘櫙锛?{macro(character.scenario).trim()}');
+      characterSection.writeln('场景：${macro(character.scenario).trim()}');
     }
+    sections['character'] = characterSection.toString().trim();
     if (session.summary.trim().isNotEmpty) {
-      system.writeln('\n[鍓嶆儏鎻愯]\n${session.summary.trim()}');
+      sections['summary'] = '\n[前情提要]\n${session.summary.trim()}';
     }
-    if (lore.isNotEmpty) system.writeln('\n[涓栫晫璁惧畾]\n$lore');
+    if (lore.isNotEmpty) sections['lore'] = '\n[世界设定]\n$lore';
     if (settings.personaDescription.trim().isNotEmpty) {
-      system.writeln(
-        '\n[鐢ㄦ埛]\n鍚嶅瓧锛?{settings.userName}\n'
-        '${macro(settings.personaDescription).trim()}',
-      );
+      sections['persona'] =
+          '\n[用户]\n名字：${settings.userName}\n'
+          '${macro(settings.personaDescription).trim()}';
     }
     if (character.exampleDialogue.trim().isNotEmpty) {
-      system.writeln(
-        '\n[瀵硅瘽绀轰緥]\n${macro(character.exampleDialogue).trim()}',
-      );
+      sections['examples'] =
+          '\n[对话示例]\n${macro(character.exampleDialogue).trim()}';
     }
     if (settings.authorNote.trim().isNotEmpty) {
-      system.writeln('\n[浣滆€呯瑪璁癩\n${macro(settings.authorNote).trim()}');
+      sections['authorNote'] =
+          '\n[作者笔记]\n${macro(settings.authorNote).trim()}';
+    }
+    final system = StringBuffer();
+    for (final key in settings.promptOrder) {
+      final section = sections.remove(key);
+      if (section != null && section.trim().isNotEmpty) {
+        system.writeln(section);
+      }
+    }
+    for (final section in sections.values) {
+      if (section.trim().isNotEmpty) system.writeln(section);
     }
 
     final extra = <Map<String, String>>[];

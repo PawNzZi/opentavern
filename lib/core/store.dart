@@ -384,6 +384,7 @@ class AppStore extends ChangeNotifier {
   ChatSession createSession(
     DemoCharacter character, {
     String? title,
+    String? greeting,
     List<ChatMessage>? messages,
   }) {
     final session = ChatSession(
@@ -392,10 +393,10 @@ class AppStore extends ChangeNotifier {
       title: title ?? '${character.name} · 新对话',
       messages: messages ??
           [
-            if (character.greeting.trim().isNotEmpty)
+            if ((greeting ?? character.greeting).trim().isNotEmpty)
               ChatMessage(
                 id: 'greet-${DateTime.now().microsecondsSinceEpoch}',
-                text: character.greeting,
+                text: greeting ?? character.greeting,
                 time: _timeLabel(),
               ),
           ],

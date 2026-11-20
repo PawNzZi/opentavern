@@ -14,6 +14,7 @@ import 'lore.dart';
 import 'media.dart';
 import 'memory.dart';
 import 'presets.dart';
+import 'prompt_preview.dart';
 import 'prompts.dart';
 import 'stats.dart';
 
@@ -175,6 +176,14 @@ class SettingsScreen extends StatelessWidget {
                   value: '$promptCount 条提示词',
                   iconColor: p.amber,
                   onTap: () => _open(context, const PromptManagerPage()),
+                ),
+                const Hairline(indent: 56),
+                SettingRow(
+                  icon: Icons.account_tree_outlined,
+                  title: 'Prompt 构建预览',
+                  value: '顺序 · Token',
+                  iconColor: p.sage,
+                  onTap: () => _open(context, const PromptPreviewPage()),
                 ),
                 const Hairline(indent: 56),
                 SettingRow(

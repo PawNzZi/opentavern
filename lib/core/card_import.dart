@@ -120,14 +120,16 @@ Lorebook? parseCharacterBook(Map<String, dynamic>? raw, {String? linked}) {
             .toList() ??
         [];
     final content = (entry['content'] ?? '').toString().trim();
-    if (keys.isEmpty || content.isEmpty) continue;
+    final constant = entry['constant'] == true;
+    if ((keys.isEmpty && !constant) || content.isEmpty) continue;
     final ext = entry['extensions'] is Map
         ? Map<String, dynamic>.from(entry['extensions'] as Map)
         : const <String, dynamic>{};
     result.add(
       LoreEntry(
         id: 'lore-${DateTime.now().microsecondsSinceEpoch}-${result.length}',
-        name: (entry['name'] ?? entry['comment'] ?? keys.first).toString(),
+        name: (entry['name'] ?? entry['comment'] ?? (keys.isEmpty ? '常驻条目' : keys.first))
+            .toString(),
         keys: keys,
         secondaryKeys: (entry['secondary_keys'] as List?)
                 ?.map((e) => e.toString())
@@ -135,7 +137,7 @@ Lorebook? parseCharacterBook(Map<String, dynamic>? raw, {String? linked}) {
             const [],
         content: content,
         enabled: entry['enabled'] != false,
-        constant: entry['constant'] == true,
+        constant: constant,
         selective: entry['selective'] == true,
         order: (entry['insertion_order'] as num?)?.toInt() ??
             (entry['order'] as num?)?.toInt() ??

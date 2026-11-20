@@ -25,8 +25,15 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  static const _tags = ['全部', '最近', '收藏', '奇幻', '科幻', '治愈'];
   String _tag = '全部';
+
+  List<String> get _tags {
+    final tags = <String>{'全部', '最近', '收藏'};
+    for (final character in AppStore.instance.characters) {
+      tags.addAll(character.tags.where((t) => t.trim().isNotEmpty));
+    }
+    return tags.toList();
+  }
 
   @override
   void initState() {
@@ -67,7 +74,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         physics: const BouncingScrollPhysics(),
         children: [
           PageHeader(
-            eyebrow: 'WEDNESDAY · 18 NOV',
+            eyebrow: _todayLabel(),
             title: '酒馆',
             subtitle: '挑一个角色，继续今晚的故事。',
             trailing: GlassCircleButton(
@@ -117,7 +124,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
               padding: const EdgeInsets.symmetric(vertical: 30),
               child: Center(
                 child: Text(
-                  '没有“$_tag”标签的角色',
+                  AppStore.instance.characters.isEmpty
+                      ? '还没有角色，点右上角导入角色卡'
+                      : '没有“$_tag”标签的角色',
                   style: appText(13, FontWeight.w400, p.textTertiary),
                 ),
               ),
@@ -137,7 +146,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 final c = characters[i];
                 return _CharacterTile(
                   character: c,
-                  onTap: () => widget.onOpenCharacter(c),
+                  onTap: () => widget.onOpenChat(c),
+                  onOpenDetails: () => widget.onOpenCharacter(c),
                 );
               },
             ),
@@ -169,6 +179,7 @@ class _ContinueCard extends StatelessWidget {
             child: Portrait(
               initial: character.initial,
               colors: character.colors,
+              avatarBase64: character.avatarBase64,
               radius: 18,
             ),
           ),
@@ -244,10 +255,15 @@ class _ContinueCard extends StatelessWidget {
 }
 
 class _CharacterTile extends StatelessWidget {
-  const _CharacterTile({required this.character, required this.onTap});
+  const _CharacterTile({
+    required this.character,
+    required this.onTap,
+    required this.onOpenDetails,
+  });
 
   final DemoCharacter character;
   final VoidCallback onTap;
+  final VoidCallback onOpenDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +276,7 @@ class _CharacterTile extends StatelessWidget {
           Portrait(
             initial: character.initial,
             colors: character.colors,
+            avatarBase64: character.avatarBase64,
             radius: 26,
           ),
           Positioned(
@@ -271,7 +288,7 @@ class _CharacterTile extends StatelessWidget {
               shadow: false,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Text(
-                character.tags.first,
+                character.tags.isEmpty ? '角色' : character.tags.first,
                 style: appText(9.5, FontWeight.w600, p.textPrimary),
               ),
             ),
@@ -279,15 +296,30 @@ class _CharacterTile extends StatelessWidget {
           Positioned(
             top: 8,
             right: 8,
-            child: GlassCircleButton(
-              icon: character.favorite
-                  ? Icons.star_rounded
-                  : Icons.star_outline_rounded,
-              size: 31,
-              iconSize: 15,
-              iconColor: character.favorite ? p.amber : p.textPrimary,
-              tint: character.favorite ? p.amber : null,
-              onTap: () {},
+            child: Row(
+              children: [
+                GlassCircleButton(
+                  icon: Icons.info_outline_rounded,
+                  size: 31,
+                  iconSize: 15,
+                  onTap: onOpenDetails,
+                ),
+                const SizedBox(width: 6),
+                GlassCircleButton(
+                  icon: character.favorite
+                      ? Icons.star_rounded
+                      : Icons.star_outline_rounded,
+                  size: 31,
+                  iconSize: 15,
+                  iconColor: character.favorite ? p.amber : p.textPrimary,
+                  tint: character.favorite ? p.amber : null,
+                  onTap: () async {
+                    await AppStore.instance.addCharacter(
+                      character.copyWith(favorite: !character.favorite),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
           Positioned(
@@ -344,4 +376,32 @@ class _CharacterTile extends StatelessWidget {
       ),
     );
   }
+}
+
+String _todayLabel() {
+  const weekdays = [
+    'MONDAY',
+    'TUESDAY',
+    'WEDNESDAY',
+    'THURSDAY',
+    'FRIDAY',
+    'SATURDAY',
+    'SUNDAY',
+  ];
+  const months = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
+  ];
+  final now = DateTime.now();
+  return '${weekdays[now.weekday - 1]} · ${now.day} ${months[now.month - 1]}';
 }

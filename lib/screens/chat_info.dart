@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
+import '../core/prompt.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
@@ -14,6 +15,7 @@ import '../design/routes.dart';
 import '../design/theme.dart';
 import 'editors.dart';
 import 'search.dart';
+import 'prompt_preview.dart';
 import 'stats.dart';
 import '../design/toast.dart';
 
@@ -116,6 +118,15 @@ class ChatInfoSheet extends StatelessWidget {
     final settings = AppStore.instance.settings;
     final messageCount = session.messages.length;
     final charCount = session.messages.fold<int>(0, (n, m) => n + m.text.length);
+    final built = PromptBuilder.build(
+      character: character,
+      session: session,
+      settings: settings,
+    );
+    final systemPrompt = built.messages
+            .where((m) => m['role'] == 'system')
+            .map((m) => m['content']?.toString() ?? '')
+            .join('\n\n');
     final created = session.messages.isEmpty
         ? null
         : DateTime.fromMillisecondsSinceEpoch(session.messages.first.createdAt);
@@ -233,6 +244,26 @@ class ChatInfoSheet extends StatelessWidget {
                 value: settings.personaName.trim().isEmpty ? '未设置' : settings.personaName,
                 iconColor: p.amber,
                 onTap: () => showTavernToast(context, '人格在「交互」里修改'),
+              ),
+            ],
+          ),
+          SettingsGroup(
+            title: '当前 System Prompt',
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                child: SelectableText(
+                  systemPrompt.isEmpty ? '（空）' : systemPrompt,
+                  style: appText(11, FontWeight.w400, p.textSecondary, height: 1.55),
+                ),
+              ),
+              const Hairline(indent: 14),
+              SettingRow(
+                icon: Icons.account_tree_outlined,
+                title: '查看完整构建',
+                value: '顺序与 Token',
+                iconColor: p.sage,
+                onTap: () => openGlassPage(context, const PromptPreviewPage()),
               ),
             ],
           ),

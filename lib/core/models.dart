@@ -290,6 +290,15 @@ class AppSettings {
     this.summaryInterval = 20,
     this.summaryPrompt =
         '请用简洁的中文总结以下角色对话的剧情、人物关系、当前场景与未解决的线索。只输出摘要，不要续写对话。',
+    this.promptOrder = const [
+      'main',
+      'character',
+      'summary',
+      'lore',
+      'persona',
+      'examples',
+      'authorNote',
+    ],
   });
 
   final APISettings api;
@@ -303,6 +312,7 @@ class AppSettings {
   final bool memoryEnabled;
   final int summaryInterval;
   final String summaryPrompt;
+  final List<String> promptOrder;
 
   AppSettings copyWith({
     APISettings? api,
@@ -316,6 +326,7 @@ class AppSettings {
     bool? memoryEnabled,
     int? summaryInterval,
     String? summaryPrompt,
+    List<String>? promptOrder,
   }) {
     return AppSettings(
       api: api ?? this.api,
@@ -329,6 +340,7 @@ class AppSettings {
       memoryEnabled: memoryEnabled ?? this.memoryEnabled,
       summaryInterval: summaryInterval ?? this.summaryInterval,
       summaryPrompt: summaryPrompt ?? this.summaryPrompt,
+      promptOrder: promptOrder ?? List.of(this.promptOrder),
     );
   }
 
@@ -344,6 +356,7 @@ class AppSettings {
         'memoryEnabled': memoryEnabled,
         'summaryInterval': summaryInterval,
         'summaryPrompt': summaryPrompt,
+        'promptOrder': promptOrder,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -353,10 +366,9 @@ class AppSettings {
             ? Map<String, dynamic>.from(json['api'] as Map)
             : const {},
       ),
-      userName: (json['userName'] ?? '旅人').toString(),
-      personaName: (json['personaName'] ?? '旅人').toString(),
-      personaDescription:
-          (json['personaDescription'] ?? '一个在各地旅行的记录者，习惯先观察再开口。').toString(),
+      userName: (json['userName'] ?? '').toString(),
+      personaName: (json['personaName'] ?? '').toString(),
+      personaDescription: (json['personaDescription'] ?? '').toString(),
       mainPrompt: (json['mainPrompt'] ??
               '你正在扮演 {{char}}。请始终以 {{char}} 的身份、语气和视角回复。')
           .toString(),
@@ -368,6 +380,18 @@ class AppSettings {
       summaryPrompt: (json['summaryPrompt'] ??
               '请用简洁的中文总结以下角色对话的剧情、人物关系、当前场景与未解决的线索。只输出摘要，不要续写对话。')
           .toString(),
+      promptOrder: (json['promptOrder'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [
+            'main',
+            'character',
+            'summary',
+            'lore',
+            'persona',
+            'examples',
+            'authorNote',
+          ],
     );
   }
 

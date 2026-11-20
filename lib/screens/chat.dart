@@ -28,6 +28,7 @@ class ChatScreen extends StatefulWidget {
     this.autoDemo = false,
     this.sessionId,
     this.newSession = false,
+    this.initialGreeting,
   });
 
   final DemoCharacter character;
@@ -36,6 +37,7 @@ class ChatScreen extends StatefulWidget {
   final bool autoDemo;
   final String? sessionId;
   final bool newSession;
+  final String? initialGreeting;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -54,7 +56,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final session = widget.sessionId != null
         ? AppStore.instance.sessionById(widget.sessionId)
         : widget.newSession
-            ? AppStore.instance.createSession(widget.character)
+            ? AppStore.instance.createSession(
+                widget.character,
+                greeting: widget.initialGreeting,
+              )
             : null;
     _chat = ChatController(character: widget.character, session: session);
     _chat.addListener(_onChatChanged);
@@ -768,7 +773,11 @@ class _ChatTopBar extends StatelessWidget {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      generating ? '正在生成…' : '在线',
+                      generating
+                          ? '正在生成…'
+                          : (AppStore.instance.settings.api.configured
+                              ? '已配置'
+                              : '未配置'),
                       style: appText(10, FontWeight.w500, p.amber),
                     ),
                   ],
@@ -786,9 +795,16 @@ class _ChatTopBar extends StatelessWidget {
               children: [
                 Icon(Icons.auto_awesome_rounded, size: 11, color: p.amber),
                 const SizedBox(width: 5),
-                Text(
-                  'Sonnet 4.5',
-                  style: appText(10, FontWeight.w600, p.textSecondary),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 112),
+                  child: Text(
+                    AppStore.instance.settings.api.model.trim().isEmpty
+                        ? '未配置模型'
+                        : AppStore.instance.settings.api.model,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: appText(10, FontWeight.w600, p.textSecondary),
+                  ),
                 ),
               ],
             ),

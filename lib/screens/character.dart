@@ -154,13 +154,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   GlassPrimaryButton(
                     label: '开始新对话',
                     icon: Icons.chat_bubble_outline_rounded,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(character: c, newSession: true),
-                        ),
-                      );
-                    },
+                    onTap: () => _startChat(context, c),
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -505,6 +499,77 @@ class _CharacterScreenState extends State<CharacterScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startChat(BuildContext context, DemoCharacter c) async {
+    final p = AppPalette.of(context);
+    final greetings = <String>[
+      if (c.greeting.trim().isNotEmpty) c.greeting,
+      ...c.alternateGreetings.where((g) => g.trim().isNotEmpty),
+    ];
+    String? chosen;
+    if (greetings.length > 1) {
+      final index = await showModalBottomSheet<int>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: Glass(
+              radius: 26,
+              blur: 30,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                    child: Text(
+                      '选择开场白',
+                      style: appText(15, FontWeight.w600, p.textPrimary),
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: greetings.length,
+                      itemBuilder: (context, i) => ListTile(
+                        title: Text(
+                          greetings[i],
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: appText(13, FontWeight.w400, p.textPrimary),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: p.textTertiary,
+                        ),
+                        onTap: () => Navigator.pop(context, i),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      if (index == null) return;
+      chosen = greetings[index];
+    } else if (greetings.isNotEmpty) {
+      chosen = greetings.first;
+    }
+    if (!context.mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          character: c,
+          newSession: true,
+          initialGreeting: chosen,
         ),
       ),
     );

@@ -7,6 +7,7 @@ import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
+import 'prompt_preview.dart';
 
 class PromptManagerPage extends StatefulWidget {
   const PromptManagerPage({super.key, this.preset});
@@ -18,8 +19,20 @@ class PromptManagerPage extends StatefulWidget {
 }
 
 class _PromptManagerPageState extends State<PromptManagerPage> {
-  PromptPreset get _preset =>
-      widget.preset ?? AppStore.instance.activePreset!;
+  PromptPreset get _preset {
+    final active = widget.preset ?? AppStore.instance.activePreset;
+    if (active != null) return active;
+    final preset = PromptPreset(
+      id: 'preset-${DateTime.now().microsecondsSinceEpoch}',
+      name: '默认预设',
+      mainPrompt: AppStore.instance.settings.mainPrompt,
+      entries: [],
+    );
+    AppStore.instance.presets.add(preset);
+    AppStore.instance.activePresetId = preset.id;
+    AppStore.instance.savePresets();
+    return preset;
+  }
 
   @override
   void initState() {
@@ -89,6 +102,18 @@ class _PromptManagerPageState extends State<PromptManagerPage> {
       ),
       children: [
         const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerRight,
+          child: GlassPill(
+            label: '构建预览',
+            icon: Icons.account_tree_outlined,
+            height: 32,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PromptPreviewPage()),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
         Glass(
           radius: 24,
           blur: 24,

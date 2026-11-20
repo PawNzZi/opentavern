@@ -41,18 +41,20 @@ LoreEntry? _entry(Map<String, dynamic> map, String fallbackId) {
   final content = (map['content'] ?? '').toString().trim();
   if (content.isEmpty) return null;
   final keys = _keys(map['key'] ?? map['keys']);
-  if (keys.isEmpty) return null;
+  final constant = map['constant'] == true;
+  if (keys.isEmpty && !constant) return null;
   final secondary = _keys(map['keysecondary'] ?? map['secondary_keys']);
   final position = map['position'];
   final depth = (map['depth'] as num?)?.toInt() ?? 4;
   return LoreEntry(
     id: 'entry-${DateTime.now().microsecondsSinceEpoch}-$fallbackId',
-    name: (map['comment'] ?? map['name'] ?? keys.first).toString(),
+    name: (map['comment'] ?? map['name'] ?? (keys.isEmpty ? '常驻条目' : keys.first))
+        .toString(),
     keys: keys,
     secondaryKeys: secondary,
     content: content,
     enabled: map['disable'] != true,
-    constant: map['constant'] == true,
+    constant: constant,
     selective: map['selective'] != false,
     order: (map['order'] as num?)?.toInt() ?? 100,
     position: (position == 1 || position == 'after' || position == 'after_char')
