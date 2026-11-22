@@ -416,8 +416,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     size: 40,
                     iconSize: 18,
                     iconColor: c.favorite ? p.amber : p.textPrimary,
-                    tint: c.favorite ? p.amber : null,
-                    onTap: () async {
+                      onTap: () async {
                       final latest = _resolveCharacter();
                       await AppStore.instance.addCharacter(
                         latest.copyWith(favorite: !latest.favorite),
