@@ -205,6 +205,17 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  PromptPreset? presetForCharacter(DemoCharacter character) {
+    if (character.preset.trim().isNotEmpty) {
+      for (final preset in presets) {
+        if (preset.name == character.preset || preset.id == character.preset) {
+          return preset;
+        }
+      }
+    }
+    return activePreset;
+  }
+
   PromptPreset? get activePreset {
     for (final preset in presets) {
       if (preset.id == activePresetId) return preset;
@@ -341,6 +352,12 @@ class AppStore extends ChangeNotifier {
       characterName: source.characterName,
       title: title ?? '${source.title} · 分支',
       messages: copied,
+      parentId: source.id,
+      mainChatId: source.mainChatId ?? source.id,
+      summary: source.summary,
+      summaryUpTo: source.summaryUpTo,
+      authorNote: source.authorNote,
+      authorNoteOverride: source.authorNoteOverride,
     );
     sessions.add(session);
     saveSessions();
@@ -381,11 +398,104 @@ class AppStore extends ChangeNotifier {
     return lines.join('\n');
   }
 
+  Future<ChatSession?> importChatText(
+    String characterName,
+    String raw, {
+    bool jsonl = true,
+  }) async {
+    final messages = <ChatMessage>[];
+    if (jsonl) {
+      for (final line in raw.split('\n')) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty) continue;
+        try {
+          final decoded = jsonDecode(trimmed);
+          if (decoded is! Map) continue;
+          final map = Map<String, dynamic>.from(decoded);
+          if (map.containsKey('mes')) {
+            messages.add(ChatMessage(
+              id: 'import-${messages.length}-${DateTime.now().microsecondsSinceEpoch}',
+              text: (map['mes'] ?? '').toString(),
+              isUser: map['is_user'] == true,
+              isSystem: map['is_system'] == true,
+              swipes: (map['swipes'] as List?)?.map((e) => e.toString()).toList(),
+              swipeIndex: (map['swipe_id'] as num?)?.toInt() ?? 0,
+              bookmarked: (map['extra'] is Map && map['extra']['bookmarked'] == true),
+              hidden: (map['extra'] is Map && map['extra']['hidden'] == true),
+            ));
+          }
+        } catch (_) {}
+      }
+    } else {
+      for (final line in raw.split('\n')) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty) continue;
+        final split = trimmed.indexOf(': ');
+        if (split <= 0) {
+          messages.add(ChatMessage(
+            id: 'import-txt-${messages.length}',
+            text: trimmed,
+          ));
+          continue;
+        }
+        final speaker = trimmed.substring(0, split).trim();
+        final text = trimmed.substring(split + 2).trim();
+        if (text.isEmpty) continue;
+        messages.add(ChatMessage(
+          id: 'import-txt-${messages.length}',
+          text: text,
+          isUser: speaker ==
+              (settings.userName.trim().isEmpty
+                  ? 'User'
+                  : settings.userName),
+        ));
+      }
+    }
+    if (messages.isEmpty) return null;
+    final session = ChatSession(
+      id: 'import-${DateTime.now().microsecondsSinceEpoch}',
+      characterName: characterName,
+      title: '$characterName · 导入',
+      messages: messages,
+    );
+    sessions.add(session);
+    await saveSessions();
+    notifyListeners();
+    return session;
+  }
+
+  Future<void> deletePreset(String id) async {
+    presets.removeWhere((p) => p.id == id);
+    if (activePresetId == id) {
+      activePresetId = presets.isEmpty ? '' : presets.first.id;
+    }
+    await savePresets();
+    notifyListeners();
+  }
+
+  Future<void> recordSearch(String query) async {
+    final value = query.trim();
+    if (value.isEmpty) return;
+    final next = [value, ...settings.recentSearches.where((e) => e != value)]
+        .take(8)
+        .toList();
+    settings = settings.copyWith(recentSearches: next);
+    await saveSettings();
+  }
+
+  Future<void> clearSearches() async {
+    settings = settings.copyWith(recentSearches: const []);
+    await saveSettings();
+  }
+
   String exportChatTxt(ChatSession session) {
     final buffer = StringBuffer();
     for (final m in session.messages) {
       if (m.isSystem || m.hidden) continue;
-      buffer.writeln('${m.isUser ? settings.userName : session.characterName}: ${m.text}');
+      final userName = settings.userName.trim().isEmpty
+          ? 'User'
+          : settings.userName;
+      buffer.writeln('${m.isUser ? userName : session.characterName}: ${m.text}');
       buffer.writeln();
     }
     return buffer.toString();

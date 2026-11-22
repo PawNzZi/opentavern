@@ -26,15 +26,25 @@ class LLMClient {
     if (api.baseUrl.trim().isEmpty || api.model.trim().isEmpty) {
       throw LLMException('请先在设置中填写 API 地址与模型');
     }
+    Stream<String> source;
     switch (api.provider) {
       case 'anthropic':
-        yield* _anthropic(api, messages);
+        source = _anthropic(api, messages);
       case 'gemini':
-        yield* _gemini(api, messages);
+        source = _gemini(api, messages);
       case 'ollama':
-        yield* _ollama(api, messages);
+        source = _ollama(api, messages);
       default:
-        yield* _openAI(api, messages);
+        source = _openAI(api, messages);
+    }
+    if (api.streaming) {
+      yield* source;
+    } else {
+      final buffer = StringBuffer();
+      await for (final chunk in source) {
+        buffer.write(chunk);
+      }
+      yield buffer.toString();
     }
   }
 

@@ -296,12 +296,64 @@ class _ChatScreenState extends State<ChatScreen> {
       case '分支':
         final branch = _chat.branchAt(message);
         _toast(branch == null ? '无法创建分支' : '已创建分支：${branch.title}');
+      case '从书签继续':
+        _continueFromBookmark(message);
       case '删除后续':
         _confirmDeleteAfter(message);
       case '从此重写':
         _chat.regenerateFrom(message);
         _toast('将从这条消息重新生成');
+      case '查看推理':
+        _showReasoning(message);
     }
+  }
+
+  /// Branches the session at [message] and opens the new branch chat.
+  void _continueFromBookmark(ChatMessage message) {
+    if (!message.bookmarked) {
+      _toast('该消息还不是书签');
+      return;
+    }
+    final branch = _chat.branchAt(message);
+    if (branch == null) {
+      _toast('无法创建分支');
+      return;
+    }
+    _toast('已创建分支：${branch.title}');
+    Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => ChatScreen(
+          character: widget.character,
+          sessionId: branch.id,
+        ),
+      ),
+    );
+  }
+
+  /// Shows the model reasoning behind [message], or explains that there is none.
+  void _showReasoning(ChatMessage message) {
+    final reasoning = message.reasoning?.trim() ?? '';
+    if (reasoning.isEmpty) {
+      _toast('没有推理内容');
+      return;
+    }
+    final p = AppPalette.of(context);
+    showTavernSheet<void>(
+      context,
+      title: '推理过程',
+      subtitle: '${widget.character.name} · ${message.time ?? '刚刚'}',
+      heightFactor: .72,
+      child: Glass(
+        radius: 18,
+        blur: 18,
+        shadow: false,
+        padding: const EdgeInsets.all(14),
+        child: SelectableText(
+          reasoning,
+          style: appText(13, FontWeight.w400, p.textSecondary, height: 1.6),
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmDeleteAfter(ChatMessage message) async {
@@ -421,6 +473,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       isLast: isLast,
                       streaming: _chat.streamingMessage == message,
                       onLongPress: () => _showMessageMenu(message),
+                      onReasoning: () => _showReasoning(message),
                       onSwipe: _chat.swipe,
                       onContinue: _chat.continueLast,
                       onRegenerate: _chat.regenerate,
@@ -755,6 +808,7 @@ class _CharacterMessage extends StatefulWidget {
     required this.isLast,
     required this.streaming,
     required this.onLongPress,
+    required this.onReasoning,
     required this.onSwipe,
     required this.onContinue,
     required this.onRegenerate,
@@ -766,6 +820,7 @@ class _CharacterMessage extends StatefulWidget {
   final bool isLast;
   final bool streaming;
   final VoidCallback onLongPress;
+  final VoidCallback onReasoning;
   final ValueChanged<int> onSwipe;
   final VoidCallback onContinue;
   final VoidCallback onRegenerate;
@@ -785,6 +840,7 @@ class _CharacterMessageState extends State<_CharacterMessage> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final message = widget.message;
+    final meta = _messageMetaLine(message);
     return Opacity(
       opacity: message.hidden ? .38 : 1,
       child: Column(
@@ -816,38 +872,41 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                         ),
                       ),
                     if (message.reasoning != null) ...[
-                      Glass(
-                        radius: 13,
-                        blur: 18,
-                        shadow: false,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 6,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.auto_awesome_rounded,
-                              size: 11,
-                              color: p.amber,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              '思考了 8 秒',
-                              style: appText(
-                                10,
-                                FontWeight.w500,
-                                p.textSecondary,
+                      Pressable(
+                        onTap: widget.onReasoning,
+                        child: Glass(
+                          radius: 13,
+                          blur: 18,
+                          shadow: false,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 6,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.auto_awesome_rounded,
+                                size: 11,
+                                color: p.amber,
                               ),
-                            ),
-                            const SizedBox(width: 3),
-                            Icon(
-                              Icons.expand_more_rounded,
-                              size: 12,
-                              color: p.textTertiary,
-                            ),
-                          ],
+                              const SizedBox(width: 5),
+                              Text(
+                                '思考了 8 秒',
+                                style: appText(
+                                  10,
+                                  FontWeight.w500,
+                                  p.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Icon(
+                                Icons.expand_more_rounded,
+                                size: 12,
+                                color: p.textTertiary,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -972,6 +1031,20 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                         ],
                       ],
                     ),
+                    if (meta != null) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        meta,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: appText(
+                          8.5,
+                          FontWeight.w400,
+                          p.textTertiary.withValues(alpha: .9),
+                          letterSpacing: .1,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1448,6 +1521,8 @@ class _MessageMenu extends StatelessWidget {
       (Icons.visibility_off_outlined, '隐藏', p.textPrimary),
       (Icons.delete_outline_rounded, '删除', p.danger),
       (Icons.bookmark_add_outlined, '书签', p.textPrimary),
+      if (message.bookmarked)
+        (Icons.bookmark_added_rounded, '从书签继续', p.amber),
       (Icons.call_split_rounded, '分支', p.textPrimary),
       (Icons.restart_alt_rounded, '从此重写', p.amber),
       (Icons.playlist_remove_rounded, '删除后续', p.danger),
@@ -1632,6 +1707,33 @@ void _showImage(BuildContext context, String data) {
       ),
     ),
   );
+}
+
+/// Compact assistant metadata: `model · prompt+completion tokens · duration`.
+///
+/// Old messages (and user messages) have no metadata, so this returns null and
+/// the line is omitted instead of rendering placeholders.
+String? _messageMetaLine(ChatMessage message) {
+  if (message.isUser) return null;
+  final parts = <String>[];
+  final model = message.model?.trim() ?? '';
+  if (model.isNotEmpty) parts.add(model);
+  final prompt = message.promptTokens;
+  final completion = message.completionTokens;
+  if (prompt != null && completion != null) {
+    parts.add('$prompt+$completion tok');
+  } else if (prompt != null || completion != null) {
+    parts.add('${prompt ?? completion} tok');
+  }
+  final duration = message.durationMs;
+  if (duration != null) {
+    parts.add(
+      duration >= 1000
+          ? '${(duration / 1000).toStringAsFixed(duration >= 10000 ? 0 : 1)}s'
+          : '${duration}ms',
+    );
+  }
+  return parts.isEmpty ? null : parts.join(' · ');
 }
 
 class _EditMessageSheet extends StatefulWidget {

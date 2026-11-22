@@ -34,7 +34,28 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
   late final TextEditingController _postHistory;
   late final TextEditingController _tags;
   late String _lorebook;
+  late String _presetBinding;
   String? _avatarBase64;
+
+  /// 角色卡里保存预设名；空字符串表示跟随全局当前预设。
+  /// 旧数据也可能存的是预设 id，这里统一解析成名字展示与保存。
+  String get _resolvedPresetBinding {
+    final raw = _presetBinding.trim();
+    if (raw.isEmpty) return '';
+    for (final preset in AppStore.instance.presets) {
+      if (preset.id == raw) return preset.name;
+    }
+    return raw;
+  }
+
+  String get _presetLabel {
+    final name = _resolvedPresetBinding;
+    if (name.isEmpty) return '跟随全局预设';
+    final exists = AppStore.instance.presets.any(
+      (preset) => preset.name == name,
+    );
+    return exists ? name : '$name（未找到）';
+  }
 
   DemoCharacter get _base =>
       widget.character ??
@@ -77,6 +98,7 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
     );
     _tags = TextEditingController(text: c?.tags.join(', ') ?? '');
     _lorebook = c?.lorebook ?? '未绑定';
+    _presetBinding = c?.preset ?? '';
     _avatarBase64 = c?.avatarBase64;
   }
 
@@ -172,6 +194,84 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
     if (picked != null && mounted) setState(() => _lorebook = picked);
   }
 
+  Future<void> _pickPreset() async {
+    final presets = AppStore.instance.presets;
+    final bound = _resolvedPresetBinding;
+    final activeName = AppStore.instance.activePreset?.name ?? '默认';
+    final missingBound =
+        bound.isNotEmpty && !presets.any((preset) => preset.name == bound);
+    final picked = await showTavernSheet<String>(
+      context,
+      title: '绑定预设',
+      subtitle: '绑定后该角色优先使用此预设的温度、maxTokens 与提示词',
+      heightFactor: .74,
+      child: Builder(
+        builder: (sheetContext) {
+          final p = AppPalette.of(sheetContext);
+          Widget check(bool selected) => selected
+              ? Icon(Icons.check_rounded, size: 17, color: p.amber)
+              : const SizedBox.shrink();
+          return Glass(
+            radius: 22,
+            blur: 22,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                SettingRow(
+                  icon: Icons.public_rounded,
+                  title: '跟随全局预设',
+                  subtitle: '当前全局：$activeName',
+                  iconColor: bound.isEmpty ? p.amber : p.textTertiary,
+                  chevron: false,
+                  trailing: check(bound.isEmpty),
+                  onTap: () => Navigator.of(sheetContext).pop(''),
+                ),
+                const Hairline(indent: 56),
+                for (var i = 0; i < presets.length; i++) ...[
+                  SettingRow(
+                    icon: Icons.layers_outlined,
+                    title: presets[i].name,
+                    subtitle:
+                        '温度 ${presets[i].temperature.toStringAsFixed(2)} · 最大 ${presets[i].maxTokens} tokens',
+                    iconColor: bound == presets[i].name
+                        ? p.amber
+                        : p.textTertiary,
+                    chevron: false,
+                    trailing: check(bound == presets[i].name),
+                    onTap: () =>
+                        Navigator.of(sheetContext).pop(presets[i].name),
+                  ),
+                  if (i != presets.length - 1) const Hairline(indent: 56),
+                ],
+                if (presets.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    child: Text(
+                      '还没有预设，可在「预设」页新建或导入 JSON。',
+                      style: appText(11.5, FontWeight.w400, p.textTertiary),
+                    ),
+                  ),
+                if (missingBound) ...[
+                  if (presets.isNotEmpty) const Hairline(indent: 56),
+                  SettingRow(
+                    icon: Icons.link_off_rounded,
+                    title: bound,
+                    subtitle: '该预设已不存在，保存后按全局预设生效',
+                    iconColor: p.danger,
+                    chevron: false,
+                    trailing: check(true),
+                    onTap: null,
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    if (picked != null && mounted) setState(() => _presetBinding = picked);
+  }
+
   Future<void> _save() async {
     final name = _name.text.trim().isEmpty ? '未命名' : _name.text.trim();
     final updated = _base.copyWith(
@@ -193,6 +293,7 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
           .where((e) => e.isNotEmpty)
           .toList(),
       lorebook: _lorebook,
+      preset: _resolvedPresetBinding,
       avatarBase64: _avatarBase64,
     );
     if (widget.character == null) {
@@ -276,6 +377,13 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
           iconColor: p.amber,
           onTap: _pickLorebook,
         ),
+        SettingRow(
+          icon: Icons.layers_outlined,
+          title: '绑定预设',
+          subtitle: '当前：$_presetLabel · 决定温度、maxTokens 与提示词条目',
+          iconColor: p.violet,
+          onTap: _pickPreset,
+        ),
         const SectionLabel('人设'),
         _EditField(
           label: '描述（Description）',
@@ -317,7 +425,8 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          '角色专属提示词会覆盖全局预设；留空则跟随预设。',
+          '角色专属提示词会覆盖全局预设；留空则跟随预设。'
+          '绑定预设后，温度与 maxTokens 优先使用绑定预设的值。',
           style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.45),
         ),
         const SizedBox(height: 18),

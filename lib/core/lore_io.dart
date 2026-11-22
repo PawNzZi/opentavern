@@ -115,12 +115,23 @@ LoreEntry? loreEntryFromMap(
             ? !_asBool(map['disable'])
             : true,
     constant: constant,
-    selective: _asBool(map['selective']),
+    selective: _asBool(map['selective'], fallback: true),
     order: _asInt(map['insertion_order']) ?? _asInt(map['order']) ?? 100,
     position: _position(map['position'] ?? extensions['position']),
     depth: _asInt(extensions['depth']) ?? _asInt(map['depth']) ?? 4,
     role: _role(extensions['role'] ?? map['role']),
     comment: comment,
+    probability: _asInt(map['probability'] ?? extensions['probability']) ?? 100,
+    group: _text(map['group'] ?? extensions['group']),
+    groupWeight: _asInt(map['group_weight'] ?? extensions['group_weight']) ?? 100,
+    sticky: _asInt(map['sticky'] ?? extensions['sticky']) ?? 0,
+    cooldown: _asInt(map['cooldown'] ?? extensions['cooldown']) ?? 0,
+    delay: _asInt(map['delay'] ?? extensions['delay']) ?? 0,
+    caseSensitive: _asBool(map['case_sensitive'] ?? extensions['case_sensitive']),
+    matchWholeWords: _asBool(map['match_whole_words'] ?? extensions['match_whole_words']),
+    selectiveLogic: _selectiveLogic(map['selectiveLogic'] ?? map['selective_logic']),
+    excludeRecursion: _asBool(map['exclude_recursion'] ?? extensions['exclude_recursion']),
+    preventRecursion: _asBool(map['prevent_recursion'] ?? extensions['prevent_recursion']),
   );
 }
 
@@ -144,10 +155,25 @@ Map<String, dynamic> lorebookToWorldJson(Lorebook book) {
       'constant': e.constant,
       'selective': e.selective,
       'order': e.order,
-      'position': e.position == 'after' ? 1 : 0,
+      'position': e.position == 'at_depth'
+          ? 4
+          : e.position == 'after'
+              ? 1
+              : 0,
       'disable': !e.enabled,
       'depth': e.depth,
       'role': _roleIndex(e.role),
+      'probability': e.probability,
+      'group': e.group,
+      'group_weight': e.groupWeight,
+      'sticky': e.sticky,
+      'cooldown': e.cooldown,
+      'delay': e.delay,
+      'case_sensitive': e.caseSensitive,
+      'match_whole_words': e.matchWholeWords,
+      'selectiveLogic': e.selectiveLogic,
+      'exclude_recursion': e.excludeRecursion,
+      'prevent_recursion': e.preventRecursion,
     };
   }
   return {
@@ -221,11 +247,19 @@ bool _asBool(dynamic value, {bool fallback = false}) {
 /// The app only distinguishes before/after, so every non-zero value maps to
 /// `after` (closest to ST's behaviour) instead of being dropped.
 String _position(dynamic value) {
-  if (value is num) return value.toInt() <= 0 ? 'before' : 'after';
+  if (value is num) {
+    final n = value.toInt();
+    if (n == 4) return 'at_depth';
+    return n <= 0 ? 'before' : 'after';
+  }
   final text = _text(value).toLowerCase();
   if (text.isEmpty) return 'before';
+  if (text == 'at_depth' || text == 'depth') return 'at_depth';
   final number = int.tryParse(text);
-  if (number != null) return number <= 0 ? 'before' : 'after';
+  if (number != null) {
+    if (number == 4) return 'at_depth';
+    return number <= 0 ? 'before' : 'after';
+  }
   if (text.startsWith('before')) return 'before';
   return 'after';
 }
@@ -256,4 +290,23 @@ int _roleIndex(String role) {
     default:
       return 0;
   }
+}
+
+String _selectiveLogic(dynamic value) {
+  if (value is num) {
+    switch (value.toInt()) {
+      case 1:
+        return 'AND_ALL';
+      case 2:
+        return 'NOT_ANY';
+      case 3:
+        return 'NOT_ALL';
+    }
+    return 'AND_ANY';
+  }
+  final text = _text(value).toUpperCase();
+  if (text == '1' || text == 'AND_ALL') return 'AND_ALL';
+  if (text == '2' || text == 'NOT_ANY') return 'NOT_ANY';
+  if (text == '3' || text == 'NOT_ALL') return 'NOT_ALL';
+  return 'AND_ANY';
 }

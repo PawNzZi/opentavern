@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/models.dart';
 import '../core/store.dart';
@@ -50,10 +51,40 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
+  /// Persist the current query into the shared recent-search history.
+  void _rememberQuery(String value) {
+    final query = value.trim();
+    if (query.isEmpty) return;
+    AppStore.instance.recordSearch(query).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  /// Enter / numpad-enter on the search field also records the query.
+  void _submitQuery() {
+    _rememberQuery(_query);
+  }
+
+  /// Tapping a recent-search chip fills the field and searches again.
+  void _applyRecent(String value) {
+    _controller.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+    setState(() => _query = value);
+    _rememberQuery(value);
+  }
+
+  Future<void> _clearRecents() async {
+    await AppStore.instance.clearSearches();
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final q = _query.trim().toLowerCase();
+    final recent = AppStore.instance.settings.recentSearches;
     final scopedSessions = widget.sessionId == null
         ? AppStore.instance.sessions
         : AppStore.instance.sessions
@@ -95,15 +126,25 @@ class _SearchPageState extends State<SearchPage> {
       subtitle: '角色、对话与消息，一次找全。',
       children: [
         const SizedBox(height: 16),
-        SearchField(
-          controller: _controller,
-          autofocus: true,
-          hint: '搜索角色、对话或消息',
-          onChanged: (v) => setState(() => _query = v),
-          trailing: Icon(
-            Icons.mic_none_rounded,
-            size: 17,
-            color: p.textTertiary,
+        Focus(
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent &&
+                (event.logicalKey == LogicalKeyboardKey.enter ||
+                    event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+              _submitQuery();
+            }
+            return KeyEventResult.ignored;
+          },
+          child: SearchField(
+            controller: _controller,
+            autofocus: true,
+            hint: '搜索角色、对话或消息',
+            onChanged: (v) => setState(() => _query = v),
+            trailing: Icon(
+              Icons.mic_none_rounded,
+              size: 17,
+              color: p.textTertiary,
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -139,7 +180,10 @@ class _SearchPageState extends State<SearchPage> {
                   for (var i = 0; i < characters.length; i++) ...[
                     _CharacterResult(
                       character: characters[i],
-                      onTap: () => _openCharacter(characters[i]),
+                      onTap: () {
+                        _rememberQuery(_query);
+                        _openCharacter(characters[i]);
+                      },
                     ),
                     if (i != characters.length - 1)
                       const Hairline(indent: 66),
@@ -163,7 +207,10 @@ class _SearchPageState extends State<SearchPage> {
                       subtitle:
                           '${sessions[i].characterName} · ${sessions[i].messages.length} 条消息',
                       iconColor: p.amber,
-                      onTap: () => _openSession(sessions[i]),
+                      onTap: () {
+                        _rememberQuery(_query);
+                        _openSession(sessions[i]);
+                      },
                     ),
                     if (i != sessions.length - 1)
                       const Hairline(indent: 56),
@@ -185,7 +232,10 @@ class _SearchPageState extends State<SearchPage> {
                       session: hits[i].$1,
                       message: hits[i].$2,
                       query: _query,
-                      onTap: () => _openSession(hits[i].$1),
+                      onTap: () {
+                        _rememberQuery(_query);
+                        _openSession(hits[i].$1);
+                      },
                     ),
                     if (i != hits.length - 1) const Hairline(indent: 56),
                   ],
@@ -207,20 +257,41 @@ class _SearchPageState extends State<SearchPage> {
               ),
             ),
             const Spacer(),
-            Text('清除', style: appText(10.5, FontWeight.w400, p.amber)),
+            if (recent.isNotEmpty)
+              Pressable(
+                onTap: _clearRecents,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 2,
+                  ),
+                  child: Text(
+                    '清除',
+                    style: appText(10.5, FontWeight.w400, p.amber),
+                  ),
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 7,
-          runSpacing: 7,
-          children: const [
-            GlassPill(label: '王都', height: 30),
-            GlassPill(label: '星图', height: 30),
-            GlassPill(label: '坏消息', height: 30),
-            GlassPill(label: '沉砚', height: 30),
-          ],
-        ),
+        if (recent.isEmpty)
+          Text(
+            '搜索过的关键词会保存在这里',
+            style: appText(10.5, FontWeight.w400, p.textTertiary),
+          )
+        else
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              for (final entry in recent)
+                GlassPill(
+                  label: entry,
+                  height: 30,
+                  onTap: () => _applyRecent(entry),
+                ),
+            ],
+          ),
       ],
     );
   }

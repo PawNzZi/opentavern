@@ -36,6 +36,40 @@ class _StatsPageState extends State<StatsPage> {
     final messages = sessions.expand((s) => s.messages).toList();
     final chars = messages.fold<int>(0, (sum, m) => sum + m.text.length);
 
+    // Aggregated usage from real assistant replies. Only messages that carry
+    // metadata (model / tokens / duration / provider) contribute to these.
+    final assistantMessages =
+        messages.where((m) => !m.isUser && !m.isSystem).toList();
+    final usageMessages = assistantMessages
+        .where((m) =>
+            m.promptTokens != null ||
+            m.completionTokens != null ||
+            m.durationMs != null ||
+            (m.model?.trim().isNotEmpty ?? false) ||
+            (m.apiProvider?.trim().isNotEmpty ?? false))
+        .toList();
+    final totalPromptTokens = usageMessages.fold<int>(
+      0,
+      (sum, m) => sum + (m.promptTokens ?? 0),
+    );
+    final totalCompletionTokens = usageMessages.fold<int>(
+      0,
+      (sum, m) => sum + (m.completionTokens ?? 0),
+    );
+    final durations =
+        usageMessages.map((m) => m.durationMs).whereType<int>().toList();
+    final averageDurationMs = durations.isEmpty
+        ? null
+        : (durations.reduce((a, b) => a + b) / durations.length).round();
+    final models = <String>{};
+    final providers = <String>{};
+    for (final m in usageMessages) {
+      final model = m.model?.trim();
+      if (model != null && model.isNotEmpty) models.add(model);
+      final provider = m.apiProvider?.trim();
+      if (provider != null && provider.isNotEmpty) providers.add(provider);
+    }
+
     final week = List<int>.filled(7, 0);
     for (final m in messages) {
       final d = DateTime.fromMillisecondsSinceEpoch(m.createdAt);
@@ -111,6 +145,78 @@ class _StatsPageState extends State<StatsPage> {
               ),
             ],
           ),
+        ),
+        const SectionLabel('模型用量'),
+        Glass(
+          radius: 24,
+          blur: 24,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+          child: usageMessages.isEmpty
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '还没有模型用量数据',
+                      style: appText(13, FontWeight.w500, p.textSecondary),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '新的回复会自动记录 tokens、耗时、模型与 API 提供商；'
+                      '旧消息没有这些信息，不会计入。',
+                      style: appText(
+                        10.5,
+                        FontWeight.w400,
+                        p.textTertiary,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: MiniStat(
+                            value: _formatTokenCount(totalPromptTokens),
+                            label: '输入 tokens',
+                          ),
+                        ),
+                        Expanded(
+                          child: MiniStat(
+                            value: _formatTokenCount(totalCompletionTokens),
+                            label: '输出 tokens',
+                          ),
+                        ),
+                        Expanded(
+                          child: MiniStat(
+                            value: _formatDurationMs(averageDurationMs),
+                            label: '平均耗时',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Hairline(),
+                    const SizedBox(height: 10),
+                    _UsageInfoRow(
+                      label: '消息数',
+                      value:
+                          '${usageMessages.length} 条（共 ${assistantMessages.length} 条回复）',
+                    ),
+                    if (models.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _UsageInfoRow(label: '模型', value: models.join(' · ')),
+                    ],
+                    if (providers.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _UsageInfoRow(
+                        label: 'API 提供商',
+                        value: providers.join(' · '),
+                      ),
+                    ],
+                  ],
+                ),
         ),
         const SectionLabel('最近 7 天'),
         Glass(
@@ -282,6 +388,47 @@ class _StatsPageState extends State<StatsPage> {
         Text(
           '统计来自本地会话；删除会话后数字会同步减少。',
           style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
+        ),
+      ],
+    );
+  }
+}
+
+String _formatTokenCount(int value) {
+  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}k';
+  return '$value';
+}
+
+String _formatDurationMs(int? value) {
+  if (value == null) return '—';
+  if (value < 1000) return '${value}ms';
+  return '${(value / 1000).toStringAsFixed(1)}s';
+}
+
+class _UsageInfoRow extends StatelessWidget {
+  const _UsageInfoRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: appText(10.5, FontWeight.w400, p.textTertiary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: appText(10.5, FontWeight.w500, p.textSecondary),
+          ),
         ),
       ],
     );

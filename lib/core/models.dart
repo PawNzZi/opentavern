@@ -44,6 +44,11 @@ class ChatMessage {
     this.isSystem = false,
     this.time,
     this.reasoning,
+    this.model,
+    this.apiProvider,
+    this.promptTokens,
+    this.completionTokens,
+    this.durationMs,
     List<String>? swipes,
     this.swipeIndex = 0,
     this.hidden = false,
@@ -60,6 +65,11 @@ class ChatMessage {
   bool isSystem;
   String? time;
   String? reasoning;
+  String? model;
+  String? apiProvider;
+  int? promptTokens;
+  int? completionTokens;
+  int? durationMs;
   List<String> swipes;
   int swipeIndex;
   bool hidden;
@@ -76,6 +86,11 @@ class ChatMessage {
     String? text,
     String? time,
     String? reasoning,
+    String? model,
+    String? apiProvider,
+    int? promptTokens,
+    int? completionTokens,
+    int? durationMs,
     List<String>? swipes,
     int? swipeIndex,
     bool? hidden,
@@ -89,6 +104,11 @@ class ChatMessage {
       isSystem: isSystem,
       time: time ?? this.time,
       reasoning: reasoning ?? this.reasoning,
+      model: model ?? this.model,
+      apiProvider: apiProvider ?? this.apiProvider,
+      promptTokens: promptTokens ?? this.promptTokens,
+      completionTokens: completionTokens ?? this.completionTokens,
+      durationMs: durationMs ?? this.durationMs,
       swipes: swipes ?? List.of(this.swipes),
       swipeIndex: swipeIndex ?? this.swipeIndex,
       hidden: hidden ?? this.hidden,
@@ -105,6 +125,11 @@ class ChatMessage {
         'isSystem': isSystem,
         'time': time,
         'reasoning': reasoning,
+        'model': model,
+        'apiProvider': apiProvider,
+        'promptTokens': promptTokens,
+        'completionTokens': completionTokens,
+        'durationMs': durationMs,
         'swipes': swipes,
         'swipeIndex': swipeIndex,
         'hidden': hidden,
@@ -121,6 +146,11 @@ class ChatMessage {
       isSystem: json['isSystem'] == true || json['is_system'] == true,
       time: json['time']?.toString() ?? json['send_date']?.toString(),
       reasoning: json['reasoning']?.toString(),
+      model: json['model']?.toString(),
+      apiProvider: json['apiProvider']?.toString(),
+      promptTokens: (json['promptTokens'] as num?)?.toInt(),
+      completionTokens: (json['completionTokens'] as num?)?.toInt(),
+      durationMs: (json['durationMs'] as num?)?.toInt(),
       swipes: (json['swipes'] as List?)?.map((e) => e.toString()).toList(),
       swipeIndex: (json['swipeIndex'] as num?)?.toInt() ??
           (json['swipe_id'] as num?)?.toInt() ??
@@ -148,6 +178,10 @@ class ChatSession {
     Map<String, String>? variables,
     this.summary = '',
     this.summaryUpTo = 0,
+    this.authorNote = '',
+    this.authorNoteOverride = false,
+    this.parentId,
+    this.mainChatId,
   })  : messages = messages ?? [],
         variables = variables ?? {},
         updatedAt = updatedAt ?? DateTime.now().millisecondsSinceEpoch;
@@ -161,6 +195,10 @@ class ChatSession {
   final Map<String, String> variables;
   String summary;
   int summaryUpTo;
+  String authorNote;
+  bool authorNoteOverride;
+  String? parentId;
+  String? mainChatId;
 
   ChatMessage? get lastMessage {
     for (var i = messages.length - 1; i >= 0; i--) {
@@ -185,6 +223,10 @@ class ChatSession {
         'variables': variables,
         'summary': summary,
         'summaryUpTo': summaryUpTo,
+        'authorNote': authorNote,
+        'authorNoteOverride': authorNoteOverride,
+        'parentId': parentId,
+        'mainChatId': mainChatId,
         'messages': messages.map((m) => m.toJson()).toList(),
       };
 
@@ -201,6 +243,10 @@ class ChatSession {
           {},
       summary: (json['summary'] ?? '').toString(),
       summaryUpTo: (json['summaryUpTo'] as num?)?.toInt() ?? 0,
+      authorNote: (json['authorNote'] ?? '').toString(),
+      authorNoteOverride: json['authorNoteOverride'] == true,
+      parentId: json['parentId']?.toString(),
+      mainChatId: json['mainChatId']?.toString(),
       messages: (json['messages'] as List?)
               ?.whereType<Map>()
               .map((e) => ChatMessage.fromJson(Map<String, dynamic>.from(e)))
@@ -311,6 +357,10 @@ class AppSettings {
     this.maxContext = 8192,
     this.tokenPadding = 64,
     this.loreMaxTokens = 0,
+    this.summaryPosition = 'in_prompt',
+    this.summaryRole = 'system',
+    this.summaryDepth = 4,
+    this.recentSearches = const [],
     this.memoryEnabled = true,
     this.summaryInterval = 20,
     this.summaryPrompt =
@@ -327,6 +377,10 @@ class AppSettings {
   final int maxContext;
   final int tokenPadding;
   final int loreMaxTokens;
+  final String summaryPosition;
+  final String summaryRole;
+  final int summaryDepth;
+  final List<String> recentSearches;
   final bool memoryEnabled;
   final int summaryInterval;
   final String summaryPrompt;
@@ -342,6 +396,10 @@ class AppSettings {
     int? maxContext,
     int? tokenPadding,
     int? loreMaxTokens,
+    String? summaryPosition,
+    String? summaryRole,
+    int? summaryDepth,
+    List<String>? recentSearches,
     bool? memoryEnabled,
     int? summaryInterval,
     String? summaryPrompt,
@@ -357,6 +415,10 @@ class AppSettings {
       maxContext: maxContext ?? this.maxContext,
       tokenPadding: tokenPadding ?? this.tokenPadding,
       loreMaxTokens: loreMaxTokens ?? this.loreMaxTokens,
+      summaryPosition: summaryPosition ?? this.summaryPosition,
+      summaryRole: summaryRole ?? this.summaryRole,
+      summaryDepth: summaryDepth ?? this.summaryDepth,
+      recentSearches: recentSearches ?? List.of(this.recentSearches),
       memoryEnabled: memoryEnabled ?? this.memoryEnabled,
       summaryInterval: summaryInterval ?? this.summaryInterval,
       summaryPrompt: summaryPrompt ?? this.summaryPrompt,
@@ -374,6 +436,10 @@ class AppSettings {
         'maxContext': maxContext,
         'tokenPadding': tokenPadding,
         'loreMaxTokens': loreMaxTokens,
+        'summaryPosition': summaryPosition,
+        'summaryRole': summaryRole,
+        'summaryDepth': summaryDepth,
+        'recentSearches': recentSearches,
         'memoryEnabled': memoryEnabled,
         'summaryInterval': summaryInterval,
         'summaryPrompt': summaryPrompt,
@@ -401,6 +467,10 @@ class AppSettings {
       maxContext: (json['maxContext'] as num?)?.toInt() ?? 8192,
       tokenPadding: (json['tokenPadding'] as num?)?.toInt() ?? 64,
       loreMaxTokens: (json['loreMaxTokens'] as num?)?.toInt() ?? 0,
+      summaryPosition: (json['summaryPosition'] ?? 'in_prompt').toString(),
+      summaryRole: (json['summaryRole'] ?? 'system').toString(),
+      summaryDepth: (json['summaryDepth'] as num?)?.toInt() ?? 4,
+      recentSearches: (json['recentSearches'] as List?)?.map((e) => e.toString()).toList() ?? const [],
       memoryEnabled: json['memoryEnabled'] != false,
       summaryInterval: (json['summaryInterval'] as num?)?.toInt() ?? 20,
       summaryPrompt: (json['summaryPrompt'] ??
@@ -430,6 +500,17 @@ class LoreEntry {
     this.depth = 4,
     this.role = 'system',
     this.comment = '',
+    this.probability = 100,
+    this.group = '',
+    this.groupWeight = 100,
+    this.sticky = 0,
+    this.cooldown = 0,
+    this.delay = 0,
+    this.caseSensitive = false,
+    this.matchWholeWords = false,
+    this.selectiveLogic = 'AND_ANY',
+    this.excludeRecursion = false,
+    this.preventRecursion = false,
   });
 
   final String id;
@@ -445,6 +526,17 @@ class LoreEntry {
   int depth;
   String role;
   String comment;
+  int probability;
+  String group;
+  int groupWeight;
+  int sticky;
+  int cooldown;
+  int delay;
+  bool caseSensitive;
+  bool matchWholeWords;
+  String selectiveLogic;
+  bool excludeRecursion;
+  bool preventRecursion;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -460,6 +552,17 @@ class LoreEntry {
         'depth': depth,
         'role': role,
         'comment': comment,
+        'probability': probability,
+        'group': group,
+        'groupWeight': groupWeight,
+        'sticky': sticky,
+        'cooldown': cooldown,
+        'delay': delay,
+        'caseSensitive': caseSensitive,
+        'matchWholeWords': matchWholeWords,
+        'selectiveLogic': selectiveLogic,
+        'excludeRecursion': excludeRecursion,
+        'preventRecursion': preventRecursion,
       };
 
   factory LoreEntry.fromJson(Map<String, dynamic> json) {
@@ -477,6 +580,17 @@ class LoreEntry {
       depth: (json['depth'] as num?)?.toInt() ?? 4,
       role: (json['role'] ?? 'system').toString(),
       comment: (json['comment'] ?? '').toString(),
+      probability: (json['probability'] as num?)?.toInt() ?? 100,
+      group: (json['group'] ?? '').toString(),
+      groupWeight: (json['groupWeight'] as num?)?.toInt() ?? 100,
+      sticky: (json['sticky'] as num?)?.toInt() ?? 0,
+      cooldown: (json['cooldown'] as num?)?.toInt() ?? 0,
+      delay: (json['delay'] as num?)?.toInt() ?? 0,
+      caseSensitive: json['caseSensitive'] == true,
+      matchWholeWords: json['matchWholeWords'] == true,
+      selectiveLogic: (json['selectiveLogic'] ?? 'AND_ANY').toString(),
+      excludeRecursion: json['excludeRecursion'] == true,
+      preventRecursion: json['preventRecursion'] == true,
     );
   }
 }

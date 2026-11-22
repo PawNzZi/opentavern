@@ -76,7 +76,12 @@ class SystemPromptPage extends StatelessWidget {
               icon: Icons.account_tree_outlined,
               height: 34,
               onTap: () => Navigator.of(context).push(
-                CupertinoPageRoute(builder: (_) => const PromptPreviewPage()),
+                CupertinoPageRoute(
+                  builder: (_) => PromptPreviewPage(
+                    character: character,
+                    session: session,
+                  ),
+                ),
               ),
             ),
           ],

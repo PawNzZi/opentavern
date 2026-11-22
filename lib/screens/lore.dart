@@ -334,7 +334,57 @@ class _LorebookPageState extends State<LorebookPage> {
     );
     if (ok != true) return;
     await AppStore.instance.deleteLorebook(widget.book.id);
-    if (context.mounted) Navigator.of(context).pop();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _setBookEnabled(bool value) async {
+    widget.book.enabled = value;
+    widget.book.updatedAt = DateTime.now().millisecondsSinceEpoch;
+    setState(() {});
+    await AppStore.instance.saveLorebooks();
+  }
+
+  Future<void> _setBookGlobal(bool value) async {
+    widget.book.isGlobal = value;
+    widget.book.updatedAt = DateTime.now().millisecondsSinceEpoch;
+    setState(() {});
+    await AppStore.instance.saveLorebooks();
+  }
+
+  Future<void> _pickLinkedCharacter() async {
+    final names = AppStore.instance.characters
+        .map((c) => c.name.trim())
+        .where((n) => n.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('绑定角色'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, ''),
+            child: const Text('不绑定（全局世界书对所有角色生效）'),
+          ),
+          for (final name in names)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, name),
+              child: Text(name),
+            ),
+          if (names.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 8, 24, 16),
+              child: Text('还没有角色，可先在角色页创建角色。'),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return;
+    widget.book.linked = picked.trim().isEmpty ? null : picked.trim();
+    widget.book.updatedAt = DateTime.now().millisecondsSinceEpoch;
+    setState(() {});
+    await AppStore.instance.saveLorebooks();
   }
 
   Future<void> _moveEntry(LoreEntry entry, int delta) async {
@@ -452,6 +502,38 @@ class _LorebookPageState extends State<LorebookPage> {
               subtitle:
                   '${book.entries.length} 条 · ${book.linked ?? (book.isGlobal ? "全局" : "未绑定")}',
             ),
+            const SizedBox(height: 14),
+            SettingsGroup(
+              title: '世界书设置',
+              footnote: '关闭「启用」后，整本书不会参与关键词匹配；'
+                  '「全局」世界书对所有角色生效，非全局时只对绑定的角色或角色卡上绑定的世界书生效。'
+                  '这里的修改会立即保存。',
+              children: [
+                SwitchLine(
+                  title: '启用世界书',
+                  subtitle: '关闭后本书所有条目都不会进入 Prompt',
+                  value: book.enabled,
+                  onChanged: _setBookEnabled,
+                ),
+                SwitchLine(
+                  title: '全局世界书',
+                  subtitle: '开启后所有角色的对话都会扫描本书',
+                  value: book.isGlobal,
+                  onChanged: _setBookGlobal,
+                ),
+                SettingRow(
+                  icon: Icons.person_outline_rounded,
+                  title: '绑定角色',
+                  subtitle: book.isGlobal
+                      ? '全局世界书无需绑定；这里仅记录关联角色'
+                      : '仅该角色的对话会额外扫描本书',
+                  value: (book.linked ?? '').trim().isEmpty
+                      ? '未绑定'
+                      : book.linked,
+                  onTap: _pickLinkedCharacter,
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -499,45 +581,47 @@ class _LorebookPageState extends State<LorebookPage> {
                 child: Column(
                   children: [
                     for (var i = 0; i < entryList.length; i++) ...[
-                      SettingRow(
-                        icon: Icons.article_outlined,
-                        title: _entryTitle(entryList[i]),
-                        subtitle: _entrySubtitle(entryList[i]),
-                        value: _entryStatus(entryList[i]),
-                        chevron: false,
-                        iconColor: entryList[i].enabled
-                            ? p.amber
-                            : p.textTertiary,
-                        onTap: () async {
-                          await openGlassPage(
-                            context,
-                            LoreEntryEditorPage(
-                              book: book,
-                              entry: entryList[i],
-                            ),
-                          );
-                          if (mounted) setState(() {});
-                        },
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            GlassCircleButton(
-                              icon: Icons.keyboard_arrow_up_rounded,
-                              size: 28,
-                              iconSize: 15,
-                              blur: 0,
-                              onTap: () => _moveEntry(entryList[i], -1),
-                            ),
-                            const SizedBox(width: 2),
-                            GlassCircleButton(
-                              icon: Icons.keyboard_arrow_down_rounded,
-                              size: 28,
-                              iconSize: 15,
-                              blur: 0,
-                              onTap: () => _moveEntry(entryList[i], 1),
-                            ),
-
-                          ],
+                      GestureDetector(
+                        onLongPress: () => _deleteEntry(entryList[i]),
+                        child: SettingRow(
+                          icon: Icons.article_outlined,
+                          title: _entryTitle(entryList[i]),
+                          subtitle: _entrySubtitle(entryList[i]),
+                          value: _entryStatus(entryList[i]),
+                          chevron: false,
+                          iconColor: entryList[i].enabled
+                              ? p.amber
+                              : p.textTertiary,
+                          onTap: () async {
+                            await openGlassPage(
+                              context,
+                              LoreEntryEditorPage(
+                                book: book,
+                                entry: entryList[i],
+                              ),
+                            );
+                            if (mounted) setState(() {});
+                          },
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GlassCircleButton(
+                                icon: Icons.keyboard_arrow_up_rounded,
+                                size: 28,
+                                iconSize: 15,
+                                blur: 0,
+                                onTap: () => _moveEntry(entryList[i], -1),
+                              ),
+                              const SizedBox(width: 2),
+                              GlassCircleButton(
+                                icon: Icons.keyboard_arrow_down_rounded,
+                                size: 28,
+                                iconSize: 15,
+                                blur: 0,
+                                onTap: () => _moveEntry(entryList[i], 1),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       if (i != entryList.length - 1)
@@ -557,7 +641,7 @@ class _LorebookPageState extends State<LorebookPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              '条目内容会按关键词自动进入上下文；「常驻」条目每次都会注入。',
+              '条目内容会按关键词自动进入上下文；「常驻」条目每次都会注入。长按条目可删除。',
               style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
             ),
           ],
@@ -577,15 +661,37 @@ class LoreEntryEditorPage extends StatefulWidget {
 }
 
 class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
+  static const _logicValues = ['AND_ANY', 'AND_ALL', 'NOT_ANY', 'NOT_ALL'];
+  static const _roles = ['system', 'user', 'assistant'];
+
   late final TextEditingController _name;
   late final TextEditingController _keys;
   late final TextEditingController _content;
   late final TextEditingController _secondary;
+  late final TextEditingController _group;
   late bool _constant;
   late bool _enabled;
   late bool _selective;
   late String _position;
   late int _order;
+  late int _probability;
+  late int _groupWeight;
+  late int _sticky;
+  late int _cooldown;
+  late int _delay;
+  late bool _caseSensitive;
+  late bool _matchWholeWords;
+  late String _selectiveLogic;
+  late bool _excludeRecursion;
+  late bool _preventRecursion;
+  late int _depth;
+  late String _role;
+
+  int get _logicIndex =>
+      _logicValues.indexOf(_selectiveLogic).clamp(0, _logicValues.length - 1).toInt();
+
+  int get _roleIndex =>
+      _roles.indexOf(_role).clamp(0, _roles.length - 1).toInt();
 
   @override
   void initState() {
@@ -595,11 +701,25 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
     _keys = TextEditingController(text: e?.keys.join(', ') ?? '');
     _content = TextEditingController(text: e?.content ?? '');
     _secondary = TextEditingController(text: e?.secondaryKeys.join(', ') ?? '');
+    _group = TextEditingController(text: e?.group ?? '');
     _constant = e?.constant ?? false;
     _enabled = e?.enabled ?? true;
     _selective = e?.selective ?? false;
     _position = e?.position ?? 'before';
     _order = e?.order ?? 100;
+    _probability = (e?.probability ?? 100).clamp(0, 100).toInt();
+    _groupWeight = (e?.groupWeight ?? 100).clamp(0, 1000).toInt();
+    _sticky = (e?.sticky ?? 0).clamp(0, 999).toInt();
+    _cooldown = (e?.cooldown ?? 0).clamp(0, 999).toInt();
+    _delay = (e?.delay ?? 0).clamp(0, 999).toInt();
+    _caseSensitive = e?.caseSensitive ?? false;
+    _matchWholeWords = e?.matchWholeWords ?? false;
+    _selectiveLogic =
+        _logicValues.contains(e?.selectiveLogic) ? e!.selectiveLogic : 'AND_ANY';
+    _excludeRecursion = e?.excludeRecursion ?? false;
+    _preventRecursion = e?.preventRecursion ?? false;
+    _depth = (e?.depth ?? 4).clamp(0, 999).toInt();
+    _role = _roles.contains(e?.role) ? e!.role : 'system';
   }
 
   @override
@@ -608,6 +728,7 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
     _keys.dispose();
     _content.dispose();
     _secondary.dispose();
+    _group.dispose();
     super.dispose();
   }
 
@@ -644,6 +765,19 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
       ..selective = _selective
       ..position = _position
       ..order = _order
+      ..probability = _probability.clamp(0, 100).toInt()
+      ..group = _group.text.trim()
+      ..groupWeight = _groupWeight.clamp(0, 1000).toInt()
+      ..sticky = _sticky.clamp(0, 999).toInt()
+      ..cooldown = _cooldown.clamp(0, 999).toInt()
+      ..delay = _delay.clamp(0, 999).toInt()
+      ..caseSensitive = _caseSensitive
+      ..matchWholeWords = _matchWholeWords
+      ..selectiveLogic = _logicValues[_logicIndex]
+      ..excludeRecursion = _excludeRecursion
+      ..preventRecursion = _preventRecursion
+      ..depth = _depth.clamp(0, 999).toInt()
+      ..role = _roles[_roleIndex]
       ..comment = resolvedName;
     if (widget.entry == null) widget.book.entries.add(entry);
     widget.book.updatedAt = DateTime.now().millisecondsSinceEpoch;
@@ -675,7 +809,7 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
     if (ok != true) return;
     widget.book.entries.removeWhere((e) => e.id == entry.id);
     await AppStore.instance.saveLorebooks();
-    if (context.mounted) Navigator.of(context).pop();
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -734,6 +868,11 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
           controller: _secondary,
           hint: '启用选择性匹配时使用',
         ),
+        _LoreField(
+          label: '分组名（可选）',
+          controller: _group,
+          hint: '同组条目只保留组内权重最高的一条，例如：天气',
+        ),
         const SizedBox(height: 16),
         SettingsGroup(
           title: '条目设置',
@@ -761,10 +900,19 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
             const Hairline(indent: 14),
             SegmentLine(
               title: '注入位置',
-              options: const ['角色前', '角色后'],
-              index: _position == 'after' ? 1 : 0,
-              onChanged: (i) =>
-                  setState(() => _position = i == 1 ? 'after' : 'before'),
+              options: const ['角色前', '角色后', '按深度'],
+              index: _position == 'at_depth'
+                  ? 2
+                  : _position == 'after'
+                      ? 1
+                      : 0,
+              onChanged: (i) => setState(
+                () => _position = i == 2
+                    ? 'at_depth'
+                    : i == 1
+                        ? 'after'
+                        : 'before',
+              ),
             ),
             const Hairline(indent: 14),
             StepperRow(
@@ -773,6 +921,144 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
               value: '$_order',
               onMinus: () => setState(() => _order--),
               onPlus: () => setState(() => _order++),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SettingsGroup(
+          title: '触发设置',
+          footnote: '概率 0 = 永不触发，100 = 必定触发，中间值按对话内容生成稳定随机结果。'
+              '选择性逻辑仅在开启「选择性匹配」且有次要关键词时生效：'
+              '任一 = 命中任一次要词；全部 = 全部命中；均不 = 一个都不命中；非全 = 未全部命中。',
+          children: [
+            SliderLine(
+              title: '触发概率',
+              value: _probability.toDouble(),
+              display: '$_probability%',
+              min: 0,
+              max: 100,
+              divisions: 100,
+              onChanged: (v) => setState(() => _probability = v.round()),
+            ),
+            if (_selective) ...[
+              SegmentLine(
+                title: '选择性逻辑',
+                options: const ['任一', '全部', '均不', '非全'],
+                index: _logicIndex,
+                onChanged: (i) =>
+                    setState(() => _selectiveLogic = _logicValues[i]),
+              ),
+            ],
+            SwitchLine(
+              title: '区分大小写',
+              subtitle: '关闭时忽略英文大小写；/正则/ 关键词同样遵循此设置',
+              value: _caseSensitive,
+              onChanged: (v) => setState(() => _caseSensitive = v),
+            ),
+            SwitchLine(
+              title: '全词匹配',
+              subtitle: '关键词必须是独立单词，避免命中更长单词的一部分',
+              value: _matchWholeWords,
+              onChanged: (v) => setState(() => _matchWholeWords = v),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SettingsGroup(
+          title: '分组与递归',
+          footnote: '同组只保留组内权重最高的一条；'
+              '「排除递归」= 该条目内容不会再去触发其他条目；'
+              '「阻止递归」= 该条目不会被其他条目的内容再次激活。',
+          children: [
+            StepperRow(
+              title: '分组权重',
+              subtitle: '同组中权重高者优先进入 Prompt（默认 100）',
+              value: '$_groupWeight',
+              onMinus: () => setState(
+                () => _groupWeight = (_groupWeight - 10).clamp(0, 1000).toInt(),
+              ),
+              onPlus: () => setState(
+                () => _groupWeight = (_groupWeight + 10).clamp(0, 1000).toInt(),
+              ),
+            ),
+            SwitchLine(
+              title: '排除递归',
+              subtitle: '该条目的内容不再参与递归扫描',
+              value: _excludeRecursion,
+              onChanged: (v) => setState(() => _excludeRecursion = v),
+            ),
+            SwitchLine(
+              title: '阻止递归',
+              subtitle: '其他条目触发的内容不会再次激活本条',
+              value: _preventRecursion,
+              onChanged: (v) => setState(() => _preventRecursion = v),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SettingsGroup(
+          title: '深度注入',
+          footnote: '「注入角色」的三个选项分别保存为 system / user / assistant，'
+              '「注入深度」对应 ST 的 depth 字段；当前版本会保存并导出这两个值，'
+              '注入位置选「按深度」时会按深度和角色插入历史；角色前 / 后仍合并为 system 段。',
+          children: [
+            StepperRow(
+              title: '注入深度',
+              subtitle: '从对话末尾往前计数的消息条数（ST depth，0 = 末尾）',
+              value: '$_depth',
+              onMinus: () => setState(
+                () => _depth = (_depth - 1).clamp(0, 999).toInt(),
+              ),
+              onPlus: () => setState(
+                () => _depth = (_depth + 1).clamp(0, 999).toInt(),
+              ),
+            ),
+            SegmentLine(
+              title: '注入角色',
+              options: const ['系统', '用户', '助手'],
+              index: _roleIndex,
+              onChanged: (i) => setState(() => _role = _roles[i]),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SettingsGroup(
+          title: '时序控制',
+          footnote: '与 SillyTavern 保持字段兼容：数值会随条目保存与导出，'
+              '当前版本的触发判定尚未使用 sticky / cooldown / delay（单位：对话轮次）。',
+          children: [
+            StepperRow(
+              title: '粘滞轮数',
+              subtitle: '激活后保持注入的轮数（0 = 关闭）',
+              value: '$_sticky',
+              onMinus: () => setState(
+                () => _sticky = (_sticky - 1).clamp(0, 999).toInt(),
+              ),
+              onPlus: () => setState(
+                () => _sticky = (_sticky + 1).clamp(0, 999).toInt(),
+              ),
+            ),
+            StepperRow(
+              title: '冷却轮数',
+              subtitle: '触发后冷却、不再触发的轮数（0 = 关闭）',
+              value: '$_cooldown',
+              onMinus: () => setState(
+                () => _cooldown = (_cooldown - 1).clamp(0, 999).toInt(),
+              ),
+              onPlus: () => setState(
+                () => _cooldown = (_cooldown + 1).clamp(0, 999).toInt(),
+              ),
+            ),
+            StepperRow(
+              title: '延迟轮数',
+              subtitle: '对话达到该轮数后才允许触发（0 = 关闭）',
+              value: '$_delay',
+              onMinus: () => setState(
+                () => _delay = (_delay - 1).clamp(0, 999).toInt(),
+              ),
+              onPlus: () => setState(
+                () => _delay = (_delay + 1).clamp(0, 999).toInt(),
+              ),
             ),
           ],
         ),

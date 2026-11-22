@@ -56,6 +56,98 @@ String _formatDate(int? timestamp) {
   return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 }
 
+String _formatDateTime(int? timestamp) {
+  if (timestamp == null) return '未知';
+  final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+  final month = date.month.toString().padLeft(2, '0');
+  final day = date.day.toString().padLeft(2, '0');
+  final hour = date.hour.toString().padLeft(2, '0');
+  final minute = date.minute.toString().padLeft(2, '0');
+  return '${date.year}-$month-$day $hour:$minute';
+}
+
+String _formatTokenCount(int value) {
+  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}k';
+  return '$value';
+}
+
+/// Aggregated real usage metadata recorded on assistant replies for a character.
+class _CharacterUsage {
+  const _CharacterUsage({
+    this.promptTokens = 0,
+    this.completionTokens = 0,
+    this.replyCount = 0,
+    this.models = const [],
+    this.providers = const [],
+    this.lastUsedAt,
+  });
+
+  final int promptTokens;
+  final int completionTokens;
+  final int replyCount;
+  final List<String> models;
+  final List<String> providers;
+  final int? lastUsedAt;
+
+  bool get hasData =>
+      promptTokens > 0 ||
+      completionTokens > 0 ||
+      replyCount > 0 ||
+      models.isNotEmpty ||
+      providers.isNotEmpty ||
+      lastUsedAt != null;
+
+  int get totalTokens => promptTokens + completionTokens;
+}
+
+_CharacterUsage _usageForCharacter(String characterName) {
+  var promptTokens = 0;
+  var completionTokens = 0;
+  var replyCount = 0;
+  int? lastUsedAt;
+  final models = <String>[];
+  final providers = <String>[];
+  for (final session in AppStore.instance.sessions) {
+    if (session.characterName != characterName) continue;
+    for (final message in session.messages) {
+      if (message.isUser || message.isSystem) continue;
+      final model = message.model?.trim();
+      final provider = message.apiProvider?.trim();
+      final hasModel = model != null && model.isNotEmpty;
+      final hasProvider = provider != null && provider.isNotEmpty;
+      final hasUsage = message.promptTokens != null ||
+          message.completionTokens != null ||
+          message.durationMs != null ||
+          hasModel ||
+          hasProvider;
+      if (!hasUsage) continue;
+      replyCount++;
+      promptTokens += message.promptTokens ?? 0;
+      completionTokens += message.completionTokens ?? 0;
+      if (model != null && model.isNotEmpty && !models.contains(model)) {
+        models.add(model);
+      }
+      if (provider != null &&
+          provider.isNotEmpty &&
+          !providers.contains(provider)) {
+        providers.add(provider);
+      }
+      if (lastUsedAt == null || message.createdAt > lastUsedAt) {
+        lastUsedAt = message.createdAt;
+      }
+    }
+  }
+  return _CharacterUsage(
+    promptTokens: promptTokens,
+    completionTokens: completionTokens,
+    replyCount: replyCount,
+    models: models,
+    providers: providers,
+    lastUsedAt: lastUsedAt,
+  );
+}
+
 class CharacterScreen extends StatefulWidget {
   const CharacterScreen({
     super.key,
@@ -115,6 +207,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
     final chatCount = AppStore.instance.sessions
         .where((s) => s.characterName == c.name)
         .length;
+    final usage = _usageForCharacter(c.name);
     return TavernScaffold(
       intensity: 1.2,
       child: Stack(
@@ -215,7 +308,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  _Stats(character: c, chatCount: chatCount),
+                  _Stats(character: c, chatCount: chatCount, usage: usage),
                   const SizedBox(height: 16),
                   GlassPrimaryButton(
                     label: '开始新对话',
@@ -277,7 +370,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                     },
                   ),
                   const SizedBox(height: 6),
-                  _tabContent(context, c, width),
+                  _tabContent(context, c, width, usage),
                   const SizedBox(height: 28),
                   Center(
                     child: Text(
@@ -464,14 +557,19 @@ class _CharacterScreenState extends State<CharacterScreen> {
     );
   }
 
-  Widget _tabContent(BuildContext context, DemoCharacter c, double width) {
+  Widget _tabContent(
+    BuildContext context,
+    DemoCharacter c,
+    double width,
+    _CharacterUsage usage,
+  ) {
     final p = AppPalette.of(context);
     Lorebook? book;
     for (final b in AppStore.instance.lorebooks) {
       if (b.name == c.lorebook) book = b;
     }
     final loreEntries = book?.entries ?? const <LoreEntry>[];
-    final activePreset = AppStore.instance.activePreset;
+    final activePreset = AppStore.instance.presetForCharacter(c);
     final charRegex = AppStore.instance.regexScripts
         .where((r) => r.scope == c.name)
         .length;
@@ -659,6 +757,90 @@ class _CharacterScreenState extends State<CharacterScreen> {
                   _TokenBar(label: '开场白', value: greetingTokens, ratio: greetingTokens / maxTokens, color: const Color(0xFFEE9AA8)),
                 ],
               ),
+            ),
+            const SectionLabel('API 用量'),
+            Glass(
+              radius: 22,
+              blur: 22,
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+              child: usage.hasData
+                  ? Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: MiniStat(
+                                value: _formatTokenCount(usage.promptTokens),
+                                label: '输入 tokens',
+                              ),
+                            ),
+                            Expanded(
+                              child: MiniStat(
+                                value:
+                                    _formatTokenCount(usage.completionTokens),
+                                label: '输出 tokens',
+                              ),
+                            ),
+                            Expanded(
+                              child: MiniStat(
+                                value: '${usage.replyCount}',
+                                label: '条 AI 回复',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Hairline(),
+                        const SizedBox(height: 10),
+                        _UsageInfoRow(
+                          label: '模型',
+                          value: usage.models.isEmpty
+                              ? '—'
+                              : usage.models.join(' · '),
+                        ),
+                        const SizedBox(height: 8),
+                        _UsageInfoRow(
+                          label: 'API 提供商',
+                          value: usage.providers.isEmpty
+                              ? '—'
+                              : usage.providers.join(' · '),
+                        ),
+                        const SizedBox(height: 8),
+                        _UsageInfoRow(
+                          label: '最后使用',
+                          value: _formatDateTime(usage.lastUsedAt),
+                        ),
+                        const SizedBox(height: 8),
+                        _UsageInfoRow(
+                          label: '累计 tokens',
+                          value: _formatTokenCount(usage.totalTokens),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '还没有 API 用量记录',
+                          style: appText(
+                            12.5,
+                            FontWeight.w500,
+                            p.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '与该角色新的对话回复会自动记录 tokens、模型、'
+                          'API 提供商与耗时。',
+                          style: appText(
+                            10.5,
+                            FontWeight.w400,
+                            p.textTertiary,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
             SettingsGroup(
               title: '管理',
@@ -886,10 +1068,15 @@ class _DetailTabs extends StatelessWidget {
 }
 
 class _Stats extends StatelessWidget {
-  const _Stats({required this.character, required this.chatCount});
+  const _Stats({
+    required this.character,
+    required this.chatCount,
+    required this.usage,
+  });
 
   final DemoCharacter character;
   final int chatCount;
+  final _CharacterUsage usage;
 
   @override
   Widget build(BuildContext context) {
@@ -920,11 +1107,48 @@ class _Stats extends StatelessWidget {
         children: [
           cell('$chatCount', '段对话'),
           Container(width: .6, height: 24, color: p.divider),
-          cell(character.tokens, 'tokens'),
+          cell(
+            usage.hasData
+                ? _formatTokenCount(usage.totalTokens)
+                : character.tokens,
+            usage.hasData ? '已用 tokens' : 'tokens',
+          ),
           Container(width: .6, height: 24, color: p.divider),
           cell('${character.tags.length}', '个标签'),
         ],
       ),
+    );
+  }
+}
+
+class _UsageInfoRow extends StatelessWidget {
+  const _UsageInfoRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 72,
+          child: Text(
+            label,
+            style: appText(10.5, FontWeight.w400, p.textTertiary),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: appText(10.5, FontWeight.w500, p.textSecondary),
+          ),
+        ),
+      ],
     );
   }
 }

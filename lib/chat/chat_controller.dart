@@ -40,6 +40,9 @@ class ChatController extends ChangeNotifier {
   bool _regenerating = false;
   bool _continuing = false;
   bool _summarizing = false;
+  DateTime? _generationStartedAt;
+  int _promptTokens = 0;
+  late AppSettings _activeSettings;
 
   String _time() {
     final now = DateTime.now();
@@ -72,6 +75,17 @@ class ChatController extends ChangeNotifier {
     isGenerating = true;
     _regenerating = regenerate;
     _continuing = continuation;
+    _generationStartedAt = DateTime.now();
+    final baseSettings = AppStore.instance.settings;
+    final preset = AppStore.instance.presetForCharacter(character);
+    _activeSettings = preset == null
+        ? baseSettings
+        : baseSettings.copyWith(
+            api: baseSettings.api.copyWith(
+              temperature: preset.temperature,
+              maxTokens: preset.maxTokens,
+            ),
+          );
 
     if (!regenerate && !continuation) {
       final message = ChatMessage(
@@ -100,11 +114,12 @@ class ChatController extends ChangeNotifier {
       final prompt = PromptBuilder.build(
         character: character,
         session: _session,
-        settings: AppStore.instance.settings,
+        settings: _activeSettings,
       );
+      _promptTokens = prompt.approxTokens;
       final client = LLMClient();
       final stream = client.stream(
-        settings: AppStore.instance.settings,
+        settings: _activeSettings,
         messages: prompt.messages,
       );
       _sub = stream.timeout(const Duration(seconds: 60), onTimeout: (sink) {
@@ -138,6 +153,15 @@ class ChatController extends ChangeNotifier {
           ? '⚠️ $readable'
           : '${message.text}\n\n⚠️ $readable';
       message.time = _time();
+      message.model = _activeSettings.api.model;
+      message.apiProvider = _activeSettings.api.provider;
+      message.promptTokens = _promptTokens;
+      message.completionTokens = estimateTokens(message.text);
+      message.durationMs = _generationStartedAt == null
+          ? null
+          : DateTime.now()
+              .difference(_generationStartedAt!)
+              .inMilliseconds;
     }
     _finishStream();
   }
@@ -154,6 +178,15 @@ class ChatController extends ChangeNotifier {
       );
       message.text = cleaned;
       message.time = _time();
+      message.model = _activeSettings.api.model;
+      message.apiProvider = _activeSettings.api.provider;
+      message.promptTokens = _promptTokens;
+      message.completionTokens = estimateTokens(cleaned);
+      message.durationMs = _generationStartedAt == null
+          ? null
+          : DateTime.now()
+              .difference(_generationStartedAt!)
+              .inMilliseconds;
       if (_regenerating) {
         if (message.swipes.isEmpty ||
             message.swipes.every((s) => s.trim().isEmpty)) {
@@ -320,27 +353,33 @@ class ChatController extends ChangeNotifier {
     _summarizing = true;
     try {
       final settings = AppStore.instance.settings;
-      final interval = settings.summaryInterval.clamp(4, 100);
-      final recent = _session.messages
+      final unsummarized = _session.messages
+          .skip(_session.summaryUpTo)
           .where((m) => !m.hidden && !m.isSystem && m.text.trim().isNotEmpty)
           .toList();
-      final start = (recent.length - interval).clamp(0, recent.length);
-      final transcript = recent
-          .sublist(start)
+      if (unsummarized.isEmpty) return;
+      final batch = unsummarized;
+      final transcript = batch
           .map((m) => '${m.isUser ? settings.userName : character.name}: ${m.text}')
           .join('\n\n');
+      final previous = _session.summary.trim();
       if (transcript.trim().isEmpty) return;
       final buffer = StringBuffer();
       final stream = LLMClient().stream(
         settings: settings,
         messages: [
-          {'role': 'system', 'content': settings.summaryPrompt},
+          {
+            'role': 'system',
+            'content': settings.summaryPrompt +
+                (previous.isEmpty
+                    ? ''
+                    : '\n\n已有摘要（可合并更新）：\n$previous'),
+          },
           {'role': 'user', 'content': transcript},
         ],
       );
       await for (final chunk in stream) {
         buffer.write(chunk);
-        if (buffer.length > 8000) break;
       }
       if (_disposed) return;
       final summary = buffer.toString().trim();

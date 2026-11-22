@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import '../data/demo.dart';
 import 'regex.dart';
 import 'store.dart';
@@ -70,7 +72,7 @@ class PromptBuilder {
         .map((m) => m.text)
         .join('\n');
     final activatedLore = _activatedLore(character, recentText);
-    final preset = AppStore.instance.activePreset;
+    final preset = AppStore.instance.presetForCharacter(character);
     final main = preset?.mainPrompt.trim().isNotEmpty == true
         ? preset!.mainPrompt
         : settings.mainPrompt;
@@ -88,8 +90,8 @@ class PromptBuilder {
       character.scenario,
       character.exampleDialogue,
       settings.personaDescription,
-      session.summary,
-      settings.authorNote,
+      settings.summaryPosition == 'in_prompt' ? session.summary : '',
+      session.authorNoteOverride ? session.authorNote : settings.authorNote,
       postHistory,
     ];
     if (preset != null) {
@@ -107,8 +109,10 @@ class PromptBuilder {
         ? settings.loreMaxTokens.clamp(0, availableForLore).toInt()
         : availableForLore;
     final loreEntries = _applyLoreBudget(activatedLore, loreBudget);
+    final loreAtDepth =
+        loreEntries.where((e) => e.position == 'at_depth').toList();
     final loreBefore = loreEntries
-        .where((e) => e.position != 'after')
+        .where((e) => e.position != 'after' && e.position != 'at_depth')
         .map((e) => e.content.trim())
         .where((e) => e.isNotEmpty)
         .join('\n\n');
@@ -152,12 +156,16 @@ class PromptBuilder {
       sections['dialogueExamples'] =
           '\n[对话示例]\n${macro(character.exampleDialogue).trim()}';
     }
-    if (session.summary.trim().isNotEmpty) {
-      sections['summary'] = '\n[前情提要]\n${session.summary.trim()}';
+    final summaryText = session.summary.trim();
+    if (summaryText.isNotEmpty && settings.summaryPosition == 'in_prompt') {
+      sections['summary'] = '\n[前情提要]\n$summaryText';
     }
-    if (settings.authorNote.trim().isNotEmpty) {
+    final effectiveAuthorNote = session.authorNoteOverride
+        ? session.authorNote
+        : settings.authorNote;
+    if (effectiveAuthorNote.trim().isNotEmpty) {
       sections['authorsNote'] =
-          '\n[作者笔记]\n${macro(settings.authorNote).trim()}';
+          '\n[作者笔记]\n${macro(effectiveAuthorNote).trim()}';
     }
     final system = StringBuffer();
     final usedSections = <String, String>{};
@@ -247,12 +255,47 @@ class PromptBuilder {
       used += tokens;
     }
     history = history.reversed.toList();
+    for (final entry in loreAtDepth) {
+      final role = entry.role == 'user'
+          ? 'user'
+          : entry.role == 'assistant'
+              ? 'assistant'
+              : 'system';
+      final index =
+          (history.length - entry.depth).clamp(0, history.length);
+      history.insert(index, {
+        'role': role,
+        'content': entry.content.trim(),
+      });
+      used += estimateTokens(entry.content) + 4;
+    }
+    final summaryMessages = <Map<String, dynamic>>[];
+    if (summaryText.isNotEmpty && settings.summaryPosition != 'in_prompt') {
+      final role = settings.summaryRole == 'user'
+          ? 'user'
+          : settings.summaryRole == 'assistant'
+              ? 'assistant'
+              : 'system';
+      final summaryMessage = {
+        'role': role,
+        'content': '[前情提要]\n$summaryText',
+      };
+      if (settings.summaryPosition == 'at_depth') {
+        final depth = settings.summaryDepth.clamp(0, history.length);
+        final index = (history.length - depth).clamp(0, history.length);
+        history.insert(index, summaryMessage);
+      } else {
+        summaryMessages.add(summaryMessage);
+      }
+      used += estimateTokens(summaryText) + 4;
+    }
 
     return BuiltPrompt(
       messages: [
         {'role': 'system', 'content': system.toString().trim()},
         ...extra,
         ...history,
+        ...summaryMessages,
         // 与 SillyTavern 的 post-history instructions 一致：PHI 是历史之后
         // 的最后一条 system 消息，而不是混在开头那条 system 里。
         if (postHistory.trim().isNotEmpty)
@@ -271,38 +314,89 @@ class PromptBuilder {
     DemoCharacter character,
     String text,
   ) {
-    final lower = text.toLowerCase();
     final selected = <LoreEntry>[];
+    final selectedIds = <String>{};
 
-    void scanEntries(List<LoreEntry> entries, List<LoreEntry> out) {
-      for (final entry in entries) {
-        if (!entry.enabled || entry.content.trim().isEmpty) continue;
-        final primary = entry.constant ||
-            entry.keys.any(
-              (k) => k.trim().isNotEmpty && lower.contains(k.toLowerCase()),
-            );
-        if (!primary) continue;
-        if (entry.selective && entry.secondaryKeys.isNotEmpty) {
-          final secondary = entry.secondaryKeys.any(
-            (k) => k.trim().isNotEmpty && lower.contains(k.toLowerCase()),
+    bool containsKey(String haystack, LoreEntry entry, String key) {
+      final raw = key.trim();
+      if (raw.isEmpty) return false;
+      final ignoreCase = !entry.caseSensitive;
+      final source = ignoreCase ? haystack.toLowerCase() : haystack;
+      if (raw.length >= 2 && raw.startsWith('/') && raw.endsWith('/')) {
+        try {
+          final pattern = RegExp(
+            raw.substring(1, raw.length - 1),
+            caseSensitive: !ignoreCase,
           );
-          if (!secondary) continue;
+          return pattern.hasMatch(source);
+        } catch (_) {
+          return false;
         }
-        out.add(entry);
+      }
+      final needle = ignoreCase ? raw.toLowerCase() : raw;
+      if (!entry.matchWholeWords) return source.contains(needle);
+      final escaped = RegExp.escape(needle);
+      final pattern = RegExp(
+        '(?<![A-Za-z0-9_])$escaped(?![A-Za-z0-9_])',
+        caseSensitive: !ignoreCase,
+      );
+      return pattern.hasMatch(source);
+    }
+
+    bool primaryMatch(LoreEntry entry, String haystack) {
+      if (entry.constant) return true;
+      return entry.keys.any((key) => containsKey(haystack, entry, key));
+    }
+
+    bool secondaryMatch(LoreEntry entry, String haystack) {
+      if (!entry.selective || entry.secondaryKeys.isEmpty) return true;
+      final hits = entry.secondaryKeys
+          .where((key) => containsKey(haystack, entry, key))
+          .length;
+      switch (entry.selectiveLogic) {
+        case 'AND_ALL':
+          return hits == entry.secondaryKeys.length;
+        case 'NOT_ANY':
+          return hits == 0;
+        case 'NOT_ALL':
+          return hits != entry.secondaryKeys.length;
+        case 'AND_ANY':
+        default:
+          return hits > 0;
       }
     }
 
-    for (final book in AppStore.instance.lorebooks) {
-      if (!book.enabled) continue;
-      final boundByCard = character.lorebook.isNotEmpty &&
-          (character.lorebook == book.name || character.lorebook == book.id);
-      if (!book.isGlobal && book.linked != character.name && !boundByCard) {
-        continue;
-      }
-      scanEntries(book.entries, selected);
+    bool probabilityPass(LoreEntry entry) {
+      if (entry.probability >= 100) return true;
+      if (entry.probability <= 0) return false;
+      final seed = entry.id.hashCode ^ text.hashCode;
+      return Random(seed).nextInt(100) < entry.probability;
     }
 
-    // Fallback for cards that have not been imported into the lorebook store.
+    void scanBooks(String haystack, {required bool recursionPass}) {
+      for (final book in AppStore.instance.lorebooks) {
+        if (!book.enabled) continue;
+        final boundByCard = character.lorebook.isNotEmpty &&
+            (character.lorebook == book.name || character.lorebook == book.id);
+        if (!book.isGlobal && book.linked != character.name && !boundByCard) {
+          continue;
+        }
+        for (final entry in book.entries) {
+          if (!entry.enabled || entry.content.trim().isEmpty) continue;
+          if (selectedIds.contains(entry.id)) continue;
+          if (recursionPass && entry.preventRecursion) continue;
+          if (!primaryMatch(entry, haystack)) continue;
+          if (!secondaryMatch(entry, haystack)) continue;
+          if (!probabilityPass(entry)) continue;
+          selected.add(entry);
+          selectedIds.add(entry.id);
+        }
+      }
+    }
+
+    scanBooks(text, recursionPass: false);
+
+    // Card fallback when the embedded book was never materialised.
     final raw = character.rawJson;
     if (selected.isEmpty && raw != null) {
       final data = raw['data'] is Map ? raw['data'] as Map : raw;
@@ -310,36 +404,61 @@ class PromptBuilder {
       if (book is Map) {
         final entries = book['entries'];
         if (entries is List) {
-          for (final entry in entries.whereType<Map>()) {
-            if (entry['enabled'] == false) continue;
-            final keys = entry['keys'] is List
-                ? (entry['keys'] as List).map((e) => e.toString()).toList()
+          for (final item in entries.whereType<Map>()) {
+            if (item['enabled'] == false) continue;
+            final keys = item['keys'] is List
+                ? (item['keys'] as List).map((e) => e.toString()).toList()
                 : <String>[];
             if (keys.isEmpty) continue;
             final matched = keys.any(
-              (k) => k.trim().isNotEmpty && lower.contains(k.toLowerCase()),
+              (k) => k.trim().isNotEmpty && text.toLowerCase().contains(k.toLowerCase()),
             );
             if (!matched) continue;
-            final content = (entry['content'] ?? '').toString().trim();
-            if (content.isNotEmpty) {
-              selected.add(
-                LoreEntry(
-                  id: 'embedded-${selected.length}',
-                  name: entry['comment']?.toString() ?? '',
-                  keys: keys,
-                  content: content,
-                  constant: entry['constant'] == true,
-                  position: entry['position'] == 'after_char' ? 'after' : 'before',
-                ),
-              );
-            }
+            final content = (item['content'] ?? '').toString().trim();
+            if (content.isEmpty) continue;
+            final entry = LoreEntry(
+              id: 'embedded-${selected.length}',
+              name: item['comment']?.toString() ?? '',
+              keys: keys,
+              content: content,
+              constant: item['constant'] == true,
+              position: item['position'] == 'after_char' ? 'after' : 'before',
+            );
+            selected.add(entry);
+            selectedIds.add(entry.id);
           }
         }
       }
     }
 
-    selected.sort((a, b) => b.order.compareTo(a.order));
-    return selected;
+    // Recursive scan: activated content can trigger further entries.
+    for (var pass = 0; pass < 5; pass++) {
+      final recursionText = selected
+          .where((e) => !e.excludeRecursion)
+          .map((e) => e.content)
+          .join('\n');
+      if (recursionText.trim().isEmpty) break;
+      final before = selected.length;
+      scanBooks(recursionText, recursionPass: true);
+      if (selected.length == before) break;
+    }
+
+    // Grouped entries: keep the highest-weight entry from each group.
+    final grouped = <String, LoreEntry>{};
+    final result = <LoreEntry>[];
+    for (final entry in selected) {
+      if (entry.group.trim().isEmpty) {
+        result.add(entry);
+      } else {
+        final current = grouped[entry.group];
+        if (current == null || entry.groupWeight > current.groupWeight) {
+          grouped[entry.group] = entry;
+        }
+      }
+    }
+    result.addAll(grouped.values);
+    result.sort((a, b) => b.order.compareTo(a.order));
+    return result;
   }
 
   static List<LoreEntry> _applyLoreBudget(
