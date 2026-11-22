@@ -69,11 +69,43 @@ class PromptBuilder {
         .take(8)
         .map((m) => m.text)
         .join('\n');
-    final loreEntries = _activatedLore(
-      character,
-      recentText,
-      settings.loreMaxTokens,
-    );
+    final activatedLore = _activatedLore(character, recentText);
+    final preset = AppStore.instance.activePreset;
+    final main = preset?.mainPrompt.trim().isNotEmpty == true
+        ? preset!.mainPrompt
+        : settings.mainPrompt;
+    final postHistory = character.postHistoryInstructions.trim().isEmpty
+        ? ''
+        : '\n[越狱 / PHI]\n${macro(character.postHistoryInstructions).trim()}';
+    final maxPrompt =
+        settings.maxContext - settings.api.maxTokens - settings.tokenPadding;
+    final fixedParts = <String>[
+      main,
+      character.systemPrompt,
+      character.description,
+      character.personality,
+      character.scenario,
+      character.exampleDialogue,
+      settings.personaDescription,
+      session.summary,
+      settings.authorNote,
+      postHistory,
+    ];
+    if (preset != null) {
+      for (final entry in preset.entries.where((e) => e.enabled)) {
+        fixedParts.add(macro(entry.content));
+      }
+    }
+    final fixedTokens =
+        estimateTokens(fixedParts.join('\n')) + fixedParts.length * 8;
+    final historyReserve =
+        (maxPrompt * .25).round().clamp(512, 4096).toInt();
+    final availableForLore =
+        (maxPrompt - fixedTokens - historyReserve).clamp(0, maxPrompt).toInt();
+    final loreBudget = settings.loreMaxTokens > 0
+        ? settings.loreMaxTokens.clamp(0, availableForLore).toInt()
+        : availableForLore;
+    final loreEntries = _applyLoreBudget(activatedLore, loreBudget);
     final loreBefore = loreEntries
         .where((e) => e.position != 'after')
         .map((e) => e.content.trim())
@@ -86,10 +118,6 @@ class PromptBuilder {
         .join('\n\n');
 
     final sections = <String, String>{};
-    final preset = AppStore.instance.activePreset;
-    final main = preset?.mainPrompt.trim().isNotEmpty == true
-        ? preset!.mainPrompt
-        : settings.mainPrompt;
     if (main.trim().isNotEmpty) {
       sections['main'] = macro(main).trim();
     }
@@ -130,11 +158,6 @@ class PromptBuilder {
       sections['authorsNote'] =
           '\n[作者笔记]\n${macro(settings.authorNote).trim()}';
     }
-    // PHI（角色的 post_history_instructions）不参与 system 段落排序：
-    // 它固定作为历史消息之后的最后一条 system 消息发送，贴近 SillyTavern。
-    final postHistory = character.postHistoryInstructions.trim().isEmpty
-        ? ''
-        : '\n[越狱 / PHI]\n${macro(character.postHistoryInstructions).trim()}';
     final system = StringBuffer();
     final usedSections = <String, String>{};
     for (final key in settings.promptOrder) {
@@ -169,8 +192,6 @@ class PromptBuilder {
       }
     }
 
-    final maxPrompt =
-        settings.maxContext - settings.api.maxTokens - settings.tokenPadding;
     var used = estimateTokens(system.toString());
     // PHI 在历史之后发送，但同样占用上下文预算。
     if (postHistory.trim().isNotEmpty) used += estimateTokens(postHistory);
@@ -248,7 +269,6 @@ class PromptBuilder {
   static List<LoreEntry> _activatedLore(
     DemoCharacter character,
     String text,
-    int maxTokens,
   ) {
     final lower = text.toLowerCase();
     final selected = <LoreEntry>[];
@@ -314,15 +334,15 @@ class PromptBuilder {
     }
 
     selected.sort((a, b) => b.order.compareTo(a.order));
-    return _applyBookBudget(selected, maxTokens);
+    return selected;
   }
 
-  static List<LoreEntry> _applyBookBudget(
+  static List<LoreEntry> _applyLoreBudget(
     List<LoreEntry> entries,
     int maxTokens,
   ) {
+    if (maxTokens <= 0) return const <LoreEntry>[];
     final sorted = [...entries]..sort((a, b) => b.order.compareTo(a.order));
-    if (maxTokens <= 0) return sorted;
     final result = <LoreEntry>[];
     var used = 0;
     for (final entry in sorted) {

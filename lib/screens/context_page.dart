@@ -122,8 +122,9 @@ class _ContextPageState extends State<ContextPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
               child: Text(
-                '这是全局设置，对所有世界书生效。0 表示无限制；'
-                '设置上限后只截断世界书部分，不会改变聊天历史预算。',
+                '这是全局设置，对所有世界书生效。0 表示不单独限制世界书；'
+                '但总上下文仍然有效，并会优先预留最近对话的预算，'
+                '不会让世界书把其他内容全部挤掉。',
                 style: appText(11, FontWeight.w400, p.textTertiary, height: 1.55),
               ),
             ),
