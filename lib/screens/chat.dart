@@ -1413,7 +1413,7 @@ class _Composer extends StatelessWidget {
                     isDense: true,
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
-                    hintText: '对 ${character.name} 说点什么…  “发言”（环境）',
+                    hintText: '说点什么…',
                     hintStyle: appText(
                       14.5,
                       FontWeight.w400,

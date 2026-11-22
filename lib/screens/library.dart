@@ -347,7 +347,6 @@ class _CharacterTile extends StatelessWidget {
                   size: 31,
                   iconSize: 15,
                   iconColor: character.favorite ? p.amber : p.textPrimary,
-                  tint: character.favorite ? p.amber : null,
                   onTap: () async {
                     await AppStore.instance.addCharacter(
                       character.copyWith(favorite: !character.favorite),

@@ -323,6 +323,7 @@ class GlassTabBar extends StatelessWidget {
           currentIndex: index,
           onTabSelected: onChanged,
           height: 72,
+          iconSize: 22,
           selectedItemColor: p.amber,
           labelTextStyle: appText(10.5, FontWeight.w500, p.textTertiary),
           items: [
@@ -340,6 +341,7 @@ class GlassTabBar extends StatelessWidget {
           currentIndex: index,
           onTap: onChanged,
           height: 58,
+          iconSize: 22,
           backgroundColor:
               p.isDark ? const Color(0xF2151820) : const Color(0xF7FFFCF8),
           activeColor: p.amber,
