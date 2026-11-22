@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart' as cupertino;
 import 'package:flutter/material.dart';
+import 'package:native_liquid_glass/native_liquid_glass.dart';
 
 import 'theme.dart';
 
@@ -49,18 +50,17 @@ class Glass extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final br = BorderRadius.circular(radius);
+    final dark = p.isDark;
     final base = tint ??
-        (p.isDark ? const Color(0xFF171B24) : const Color(0xFFFFFCF8));
+        (dark ? const Color(0xFF141821) : const Color(0xFFFFFCF8));
     final top = Color.alphaBlend(
-      p.glassTop.withValues(
-        alpha: tint != null ? .08 : (p.isDark ? .34 : .52),
+      Colors.white.withValues(
+        alpha: tint != null ? (dark ? .05 : .10) : (dark ? .035 : .30),
       ),
       base,
     );
     final bottom = Color.alphaBlend(
-      p.glassBottom.withValues(
-        alpha: tint != null ? .04 : (p.isDark ? .18 : .32),
-      ),
+      Colors.white.withValues(alpha: dark ? .01 : .16),
       base,
     );
 
@@ -76,7 +76,9 @@ class Glass extends StatelessWidget {
         ),
         border: stroke
             ? Border.all(
-                color: p.glassStroke.withValues(alpha: p.isDark ? .55 : .7),
+                color: p.isDark
+                    ? Colors.white.withValues(alpha: .08)
+                    : Colors.black.withValues(alpha: .08),
                 width: .8,
               )
             : null,
@@ -316,6 +318,22 @@ class GlassTabBar extends StatelessWidget {
     // iOS uses the platform-style tab bar; on iOS 26 this is the system
     // bottom bar instead of a hand-built blur pane.
     if (Theme.of(context).platform == TargetPlatform.iOS) {
+      if (NativeLiquidGlassUtils.supportsLiquidGlass) {
+        return LiquidGlassTabBar(
+          currentIndex: index,
+          onTabSelected: onChanged,
+          height: 72,
+          selectedItemColor: p.amber,
+          labelTextStyle: appText(10.5, FontWeight.w500, p.textTertiary),
+          items: [
+            for (final tab in tabs)
+              LiquidGlassTabItem(
+                label: tab.label,
+                icon: NativeLiquidGlassIcon.iconData(tab.icon),
+              ),
+          ],
+        );
+      }
       return SafeArea(
         top: false,
         child: cupertino.CupertinoTabBar(
@@ -328,7 +346,9 @@ class GlassTabBar extends StatelessWidget {
           inactiveColor: p.textTertiary,
           border: Border(
             top: BorderSide(
-              color: p.glassStroke.withValues(alpha: .55),
+              color: p.isDark
+                  ? Colors.white.withValues(alpha: .08)
+                  : Colors.black.withValues(alpha: .08),
               width: .5,
             ),
           ),
@@ -354,7 +374,9 @@ class GlassTabBar extends StatelessWidget {
           color: p.isDark ? const Color(0xFF171B24) : const Color(0xFFFFFCF8),
           borderRadius: BorderRadius.circular(30),
           border: Border.all(
-            color: p.glassStroke.withValues(alpha: .55),
+            color: p.isDark
+                ? Colors.white.withValues(alpha: .08)
+                : Colors.black.withValues(alpha: .08),
             width: .8,
           ),
           boxShadow: [

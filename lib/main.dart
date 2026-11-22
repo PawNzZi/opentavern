@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:native_liquid_glass/native_liquid_glass.dart';
 
 import 'core/store.dart';
 import 'design/glass.dart';
@@ -61,6 +62,7 @@ class TavernApp extends StatelessWidget {
       theme: buildTavernTheme(dark: false),
       darkTheme: buildTavernTheme(dark: true),
       themeMode: light ? ThemeMode.light : ThemeMode.dark,
+      navigatorObservers: [LiquidGlassNavigatorObserver()],
       scrollBehavior: const _TavernScrollBehavior(),
       builder: (context, child) {
         final dark = Theme.of(context).brightness == Brightness.dark;

@@ -15,6 +15,7 @@ dependencies:
   file_picker: ^13.3.3
   archive: ^3.6.1
   xml: ^6.6.1
+  native_liquid_glass: ^0.3.1
 
 dev_dependencies:
   flutter_test:
