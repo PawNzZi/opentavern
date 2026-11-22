@@ -110,6 +110,52 @@ class _LoreScreenState extends State<LoreScreen> {
     openGlassPage(context, LorebookPage(book: book));
   }
 
+  Future<void> _editGlobalBudget() async {
+    final controller = TextEditingController(
+      text: AppStore.instance.settings.loreMaxTokens > 0
+          ? '${AppStore.instance.settings.loreMaxTokens}'
+          : '',
+    );
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('世界书 Token 上限'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('全局生效。0 或「无限制」表示不单独限制世界书；总数仍受上下文窗口约束。'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: '例如 2000',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, -1), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 0), child: const Text('无限制')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, int.tryParse(controller.text.trim()) ?? -1),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result < 0) return;
+    final settings = AppStore.instance.settings;
+    AppStore.instance.settings = settings.copyWith(loreMaxTokens: result);
+    await AppStore.instance.saveSettings();
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
@@ -168,6 +214,21 @@ class _LoreScreenState extends State<LoreScreen> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 8),
+            Glass(
+              radius: 20,
+              blur: 20,
+              shadow: false,
+              child: SettingRow(
+                icon: Icons.speed_rounded,
+                title: '世界书 Token 上限',
+                subtitle: '全局设置；0 表示不单独限制，仍受总上下文约束',
+                value: AppStore.instance.settings.loreMaxTokens > 0
+                    ? '${AppStore.instance.settings.loreMaxTokens}'
+                    : '无限制',
+                onTap: _editGlobalBudget,
+              ),
+            ),
+            const SizedBox(height: 14),
             const SectionLabel('全部世界书'),
             for (final book in books) ...[
               _LoreCard(

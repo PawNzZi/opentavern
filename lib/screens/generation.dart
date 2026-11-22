@@ -16,6 +16,8 @@ class GenerationPage extends StatefulWidget {
 class _GenerationPageState extends State<GenerationPage> {
   late double _temperature;
   late double _maxTokens;
+  late double _maxContext;
+  late double _tokenPadding;
   late bool _streaming;
 
   @override
@@ -24,12 +26,16 @@ class _GenerationPageState extends State<GenerationPage> {
     final api = AppStore.instance.settings.api;
     _temperature = api.temperature;
     _maxTokens = api.maxTokens.toDouble();
+    _maxContext = AppStore.instance.settings.maxContext.toDouble();
+    _tokenPadding = AppStore.instance.settings.tokenPadding.toDouble();
     _streaming = api.streaming;
   }
 
   Future<void> _save() async {
     final settings = AppStore.instance.settings;
     AppStore.instance.settings = settings.copyWith(
+      maxContext: _maxContext.round(),
+      tokenPadding: _tokenPadding.round(),
       api: settings.api.copyWith(
         temperature: _temperature,
         maxTokens: _maxTokens.round(),
@@ -99,6 +105,30 @@ class _GenerationPageState extends State<GenerationPage> {
               ),
             ],
           ),
+        ),
+        SettingsGroup(
+          title: '上下文',
+          footnote: '上下文 = 模型总窗口减去回复长度和预留 token；聊天历史从最新往旧填充。',
+          children: [
+            SliderLine(
+              title: '最大上下文',
+              value: _maxContext,
+              min: 2048,
+              max: 32768,
+              divisions: 30,
+              display: '${_maxContext.round()} tokens',
+              onChanged: (v) => setState(() => _maxContext = v),
+            ),
+            SliderLine(
+              title: '回复预留',
+              value: _tokenPadding,
+              min: 0,
+              max: 512,
+              divisions: 32,
+              display: '${_tokenPadding.round()} tokens',
+              onChanged: (v) => setState(() => _tokenPadding = v),
+            ),
+          ],
         ),
         SettingsGroup(
           title: '采样',
