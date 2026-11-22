@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../core/models.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
 import '../design/routes.dart';
 import '../design/theme.dart';
+import 'chat.dart';
 import 'search.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -67,6 +69,22 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final characters = _filtered;
+    ChatSession? latestSession;
+    for (final session in AppStore.instance.sessions) {
+      if (latestSession == null ||
+          session.updatedAt > latestSession.updatedAt) {
+        latestSession = session;
+      }
+    }
+    DemoCharacter? continueCharacter;
+    if (latestSession != null) {
+      for (final c in AppStore.instance.characters) {
+        if (c.name == latestSession!.characterName) {
+          continueCharacter = c;
+          break;
+        }
+      }
+    }
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -110,10 +128,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           ),
           const SizedBox(height: 22),
-          if (characters.isNotEmpty)
+          if (latestSession != null && continueCharacter != null)
             _ContinueCard(
-              character: characters.first,
-              onTap: () => widget.onOpenChat(characters.first),
+              character: continueCharacter,
+              session: latestSession,
+              onTap: () => openGlassPage(
+                context,
+                ChatScreen(
+                  character: continueCharacter!,
+                  sessionId: latestSession!.id,
+                ),
+              ),
             ),
           SectionLabel(
             '角色',
@@ -163,9 +188,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
 }
 
 class _ContinueCard extends StatelessWidget {
-  const _ContinueCard({required this.character, required this.onTap});
+  const _ContinueCard({
+    required this.character,
+    required this.session,
+    required this.onTap,
+  });
 
   final DemoCharacter character;
+  final ChatSession session;
   final VoidCallback onTap;
 
   @override
@@ -215,7 +245,7 @@ class _ContinueCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     Text(
-                      '21:40',
+                      _sessionTime(session.updatedAt),
                       style: appText(10.5, FontWeight.w400, p.textTertiary),
                     ),
                   ],
@@ -227,7 +257,7 @@ class _ContinueCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '“有些坏消息，只配在雨天说。”',
+                  session.snippet.isEmpty ? '继续这段对话' : session.snippet,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: appText(12, FontWeight.w400, p.textSecondary),
@@ -409,4 +439,13 @@ String _todayLabel() {
   ];
   final now = DateTime.now();
   return '${weekdays[now.weekday - 1]} · ${now.day} ${months[now.month - 1]}';
+}
+
+String _sessionTime(int millis) {
+  final d = DateTime.fromMillisecondsSinceEpoch(millis);
+  final now = DateTime.now();
+  if (d.year == now.year && d.month == now.month && d.day == now.day) {
+    return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  }
+  return '${d.month}/${d.day}';
 }

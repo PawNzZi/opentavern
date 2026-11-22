@@ -114,17 +114,19 @@ class Glass extends StatelessWidget {
       ),
     );
 
-    if (allowBlur) {
-      pane = ClipRRect(
-        borderRadius: br,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-          child: pane,
+    // Keep the widget tree stable while scrolling. Switching between a
+    // BackdropFilter and a plain ClipRRect recreates the subtree and can make
+    // a focused TextField lose focus when the keyboard opens.
+    pane = ClipRRect(
+      borderRadius: br,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: allowBlur ? blur : 0,
+          sigmaY: allowBlur ? blur : 0,
         ),
-      );
-    } else {
-      pane = ClipRRect(borderRadius: br, child: pane);
-    }
+        child: pane,
+      ),
+    );
 
     if (shadow) {
       pane = Container(

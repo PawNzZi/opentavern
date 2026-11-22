@@ -119,7 +119,7 @@ class SettingsGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SectionLabel(title, trailing: trailing),
         Glass(

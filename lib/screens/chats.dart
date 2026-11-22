@@ -152,18 +152,30 @@ class _ChatsScreenState extends State<ChatsScreen> {
               ),
             ),
           ],
-          const SectionLabel('最近'),
-          Glass(
-            radius: 26,
-            blur: 26,
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: _ChatGroup(
-              chats: recent,
-              onOpenChat: widget.onOpenChat,
-              onPin: _togglePin,
-              onDelete: _delete,
+          if (visible.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 60),
+              child: Center(
+                child: Text(
+                  _chats.isEmpty ? '还没有对话，去角色页开始一段故事' : '没有找到匹配的对话',
+                  style: appText(13, FontWeight.w400, p.textTertiary),
+                ),
+              ),
+            )
+          else if (recent.isNotEmpty) ...[
+            const SectionLabel('最近'),
+            Glass(
+              radius: 26,
+              blur: 26,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: _ChatGroup(
+                chats: recent,
+                onOpenChat: widget.onOpenChat,
+                onPin: _togglePin,
+                onDelete: _delete,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 18),
           Center(
             child: Row(
