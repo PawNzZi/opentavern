@@ -123,7 +123,7 @@ class _GenerationPageState extends State<GenerationPage> {
               title: '回复预留',
               value: _tokenPadding,
               min: 0,
-              max: 512,
+              max: 2048,
               divisions: 32,
               display: '${_tokenPadding.round()} tokens',
               onChanged: (v) => setState(() => _tokenPadding = v),
@@ -185,6 +185,7 @@ class _GenerationPageState extends State<GenerationPage> {
             ),
           ],
         ),
+        const SizedBox(height: 18),
         const HintCard(
           text: '生成的温度与最大长度会立即用于下一次请求；预设里的提示词内容不受影响。',
           color: Color(0xFFD9B48A),
