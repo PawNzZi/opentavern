@@ -69,15 +69,7 @@ class PromptBuilder {
         .take(8)
         .map((m) => m.text)
         .join('\n');
-    final promptBudget = settings.maxContext -
-        settings.api.maxTokens -
-        settings.tokenPadding;
-    final loreBudget = (promptBudget * .35).round().clamp(256, 8000).toInt();
-    final loreEntries = _activatedLore(
-      character,
-      recentText,
-      maxTokens: loreBudget,
-    );
+    final loreEntries = _activatedLore(character, recentText);
     final loreBefore = loreEntries
         .where((e) => e.position != 'after')
         .map((e) => e.content.trim())
@@ -251,13 +243,12 @@ class PromptBuilder {
 
   static List<LoreEntry> _activatedLore(
     DemoCharacter character,
-    String text, {
-    int maxTokens = 2400,
-  }) {
+    String text,
+  ) {
     final lower = text.toLowerCase();
     final selected = <LoreEntry>[];
 
-    void scanEntries(List<LoreEntry> entries) {
+    void scanEntries(List<LoreEntry> entries, List<LoreEntry> out) {
       for (final entry in entries) {
         if (!entry.enabled || entry.content.trim().isEmpty) continue;
         final primary = entry.constant ||
@@ -271,14 +262,16 @@ class PromptBuilder {
           );
           if (!secondary) continue;
         }
-        selected.add(entry);
+        out.add(entry);
       }
     }
 
     for (final book in AppStore.instance.lorebooks) {
       if (!book.enabled) continue;
       if (!book.isGlobal && book.linked != character.name) continue;
-      scanEntries(book.entries);
+      final candidates = <LoreEntry>[];
+      scanEntries(book.entries, candidates);
+      selected.addAll(_applyBookBudget(candidates, book.maxTokens));
     }
 
     // Fallback for cards that have not been imported into the lorebook store.
@@ -318,14 +311,22 @@ class PromptBuilder {
     }
 
     selected.sort((a, b) => b.order.compareTo(a.order));
+    return selected;
+  }
+
+  static List<LoreEntry> _applyBookBudget(
+    List<LoreEntry> entries,
+    int maxTokens,
+  ) {
+    final sorted = [...entries]..sort((a, b) => b.order.compareTo(a.order));
+    if (maxTokens <= 0) return sorted;
     final result = <LoreEntry>[];
     var used = 0;
-    for (final entry in selected) {
+    for (final entry in sorted) {
       final cost = estimateTokens(entry.content) + 2;
-      if (result.isNotEmpty && used + cost > maxTokens) break;
+      if (result.isNotEmpty && used + cost > maxTokens) continue;
       result.add(entry);
       used += cost;
-      if (result.length >= 20) break;
     }
     return result;
   }

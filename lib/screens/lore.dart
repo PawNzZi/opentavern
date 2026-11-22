@@ -259,6 +259,66 @@ class _LorebookPageState extends State<LorebookPage> {
     showTavernToast(context, uri == null ? '已取消导出' : '世界书已导出');
   }
 
+  Future<void> _deleteBook() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除世界书'),
+        content: Text('确定删除「${widget.book.name}」及其全部条目？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await AppStore.instance.deleteLorebook(widget.book.id);
+    if (context.mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _editBudget() async {
+    final controller = TextEditingController(
+      text: widget.book.maxTokens > 0 ? '${widget.book.maxTokens}' : '',
+    );
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('注入 Token 上限'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('留空或点「无限制」表示不裁剪；填写数字后按 Token 截断。'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: '例如 1200',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, -1), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 0), child: const Text('无限制')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, int.tryParse(controller.text.trim()) ?? -1),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result < 0) return;
+    widget.book.maxTokens = result;
+    await AppStore.instance.saveLorebooks();
+    if (mounted) setState(() {});
+  }
+
   Future<void> _moveEntry(LoreEntry entry, int delta) async {
     final index = widget.book.entries.indexOf(entry);
     final target = index + delta;
@@ -354,6 +414,13 @@ class _LorebookPageState extends State<LorebookPage> {
                 ),
                 const SizedBox(width: 8),
                 GlassCircleButton(
+                  icon: Icons.delete_outline_rounded,
+                  size: 40,
+                  iconSize: 17,
+                  onTap: _deleteBook,
+                ),
+                const SizedBox(width: 8),
+                GlassCircleButton(
                   icon: Icons.add_rounded,
                   size: 40,
                   onTap: _add,
@@ -391,6 +458,21 @@ class _LorebookPageState extends State<LorebookPage> {
                   style: appText(11, FontWeight.w400, p.textTertiary),
                 ),
               ],
+            ),
+            const SizedBox(height: 10),
+            Glass(
+              radius: 20,
+              blur: 20,
+              shadow: false,
+              child: SettingRow(
+                icon: Icons.speed_rounded,
+                title: '注入 Token 上限',
+                subtitle: '0 表示无限制；超出预算的条目会被截断',
+                value: widget.book.maxTokens > 0
+                    ? '${widget.book.maxTokens}'
+                    : '无限制',
+                onTap: _editBudget,
+              ),
             ),
             const SizedBox(height: 12),
             if (entryList.isEmpty)
@@ -461,6 +543,15 @@ class _LorebookPageState extends State<LorebookPage> {
                   ],
                 ),
               ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: GlassPrimaryButton(
+                label: '添加条目',
+                icon: Icons.add_rounded,
+                onTap: _add,
+              ),
+            ),
             const SizedBox(height: 16),
             Text(
               '条目内容会按关键词自动进入上下文；「常驻」条目每次都会注入。',
@@ -623,8 +714,17 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
           label: '内容',
           controller: _content,
           hint: '命中关键词后注入模型的世界设定…',
-          minLines: 10,
-          maxLines: null,
+          height: 220,
+          onFullscreen: () async {
+            final value = await Navigator.of(context).push<String>(
+              CupertinoPageRoute(
+                builder: (_) => _FullscreenLoreEditor(initial: _content.text),
+              ),
+            );
+            if (value != null && mounted) {
+              setState(() => _content.text = value);
+            }
+          },
         ),
         _LoreField(
           label: '次要关键词（可选）',
@@ -689,15 +789,15 @@ class _LoreField extends StatelessWidget {
     required this.label,
     required this.controller,
     required this.hint,
-    this.minLines = 1,
-    this.maxLines = 1,
+    this.height,
+    this.onFullscreen,
   });
 
   final String label;
   final TextEditingController controller;
   final String hint;
-  final int minLines;
-  final int? maxLines;
+  final double? height;
+  final VoidCallback? onFullscreen;
 
   @override
   Widget build(BuildContext context) {
@@ -712,19 +812,35 @@ class _LoreField extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: appText(10.5, FontWeight.w500, p.textTertiary)),
+            Row(
+              children: [
+                Expanded(child: Text(label, style: appText(10.5, FontWeight.w500, p.textTertiary))),
+                if (onFullscreen != null)
+                  GlassPill(
+                    label: '全屏编辑',
+                    icon: Icons.open_in_full_rounded,
+                    height: 26,
+                    onTap: onFullscreen,
+                  ),
+              ],
+            ),
             const SizedBox(height: 4),
-            TextField(
-              controller: controller,
-              minLines: minLines,
-              maxLines: maxLines,
-              style: appText(14, FontWeight.w400, p.textPrimary, height: 1.45),
-              cursorColor: p.amber,
-              decoration: InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                hintText: hint,
-                hintStyle: appText(12.5, FontWeight.w400, p.textTertiary),
+            SizedBox(
+              height: height,
+              child: TextField(
+                controller: controller,
+                minLines: height == null ? 1 : null,
+                maxLines: height == null ? 1 : null,
+                expands: height != null,
+                textAlignVertical: height == null ? null : TextAlignVertical.top,
+                style: appText(14, FontWeight.w400, p.textPrimary, height: 1.45),
+                cursorColor: p.amber,
+                decoration: InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                  hintText: hint,
+                  hintStyle: appText(12.5, FontWeight.w400, p.textTertiary),
+                ),
               ),
             ),
           ],
@@ -845,6 +961,103 @@ class _NewLorebookPageState extends State<_NewLorebookPage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _FullscreenLoreEditor extends StatefulWidget {
+  const _FullscreenLoreEditor({required this.initial});
+  final String initial;
+
+  @override
+  State<_FullscreenLoreEditor> createState() => _FullscreenLoreEditorState();
+}
+
+class _FullscreenLoreEditorState extends State<_FullscreenLoreEditor> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      backgroundColor: p.canvasTop,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [p.canvasTop, p.canvasBottom],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                child: Row(
+                  children: [
+                    GlassCircleButton(
+                      icon: Icons.close_rounded,
+                      size: 40,
+                      iconSize: 17,
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '编辑世界书内容',
+                        style: appText(17, FontWeight.w600, p.textPrimary),
+                      ),
+                    ),
+                    GlassPill(
+                      label: '保存',
+                      icon: Icons.check_rounded,
+                      onTap: () => Navigator.of(context).pop(_controller.text),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                  child: Glass(
+                    radius: 22,
+                    blur: 22,
+                    padding: const EdgeInsets.all(14),
+                    child: TextField(
+                      controller: _controller,
+                      autofocus: true,
+                      expands: true,
+                      maxLines: null,
+                      minLines: null,
+                      textAlignVertical: TextAlignVertical.top,
+                      style: appText(14.5, FontWeight.w400, p.textPrimary, height: 1.55),
+                      cursorColor: p.amber,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: '输入世界书条目内容…',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

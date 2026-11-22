@@ -8,6 +8,7 @@ import '../design/theme.dart';
 import 'about.dart';
 import 'appearance.dart';
 import 'automation.dart';
+import 'context_page.dart';
 import 'data.dart';
 import 'generation.dart';
 import 'interaction.dart';
@@ -225,9 +226,9 @@ class SettingsScreen extends StatelessWidget {
                 SettingRow(
                   icon: Icons.format_align_left_rounded,
                   title: '上下文与格式',
-                  value: '温度 ${api.temperature.toStringAsFixed(2)}',
+                  value: '${settings.maxContext} ctx · 预留 ${settings.tokenPadding}',
                   iconColor: p.rose,
-                  onTap: () => _open(context, const GenerationPage()),
+                  onTap: () => _open(context, const ContextPage()),
                 ),
               ],
             ),

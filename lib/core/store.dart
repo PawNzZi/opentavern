@@ -237,6 +237,12 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteLorebook(String id) async {
+    lorebooks.removeWhere((b) => b.id == id);
+    await saveLorebooks();
+    notifyListeners();
+  }
+
   Future<void> addLorebook(Lorebook book) async {
     final index = lorebooks.indexWhere((b) => b.id == book.id);
     if (index >= 0) {

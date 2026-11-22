@@ -984,65 +984,68 @@ class _CharacterMessageState extends State<_CharacterMessage> {
               child: Row(
                 children: [
                   Glass(
-                    radius: 15,
+                    radius: 13,
                     blur: 18,
                     shadow: false,
                     padding: EdgeInsets.zero,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Pressable(
-                          onTap: () => widget.onSwipe(-1),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
-                            child: Icon(
-                              Icons.chevron_left_rounded,
-                              size: 14,
-                              color: p.textSecondary,
+                    child: SizedBox(
+                      height: 30,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Pressable(
+                            onTap: () => widget.onSwipe(-1),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(7, 0, 3, 0),
+                              child: Icon(
+                                Icons.chevron_left_rounded,
+                                size: 13,
+                                color: p.textSecondary,
+                              ),
                             ),
                           ),
-                        ),
-                        Text(
-                          '${message.swipeIndex + 1} / ${message.swipes.length}',
-                          style: appText(
-                            10,
-                            FontWeight.w600,
-                            p.textSecondary,
-                          ),
-                        ),
-                        Pressable(
-                          onTap: () => widget.onSwipe(1),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 6, 8, 6),
-                            child: Icon(
-                              Icons.chevron_right_rounded,
-                              size: 14,
-                              color: p.textSecondary,
+                          Text(
+                            '${message.swipeIndex + 1} / ${message.swipes.length}',
+                            style: appText(
+                              9.5,
+                              FontWeight.w600,
+                              p.textSecondary,
                             ),
                           ),
-                        ),
-                      ],
+                          Pressable(
+                            onTap: () => widget.onSwipe(1),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(3, 0, 7, 0),
+                              child: Icon(
+                                Icons.chevron_right_rounded,
+                                size: 13,
+                                color: p.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   GlassPill(
                     label: '继续',
                     icon: Icons.play_arrow_rounded,
-                    height: 34,
+                    height: 30,
                     onTap: widget.onContinue,
                   ),
                   const SizedBox(width: 6),
                   GlassPill(
                     label: '重写',
                     icon: Icons.refresh_rounded,
-                    height: 34,
+                    height: 30,
                     onTap: widget.onRegenerate,
                   ),
                   const SizedBox(width: 6),
                   GlassCircleButton(
                     icon: Icons.more_horiz_rounded,
-                    size: 36,
-                    iconSize: 16,
+                    size: 30,
+                    iconSize: 14,
                     blur: 0,
                     onTap: widget.onLongPress,
                   ),

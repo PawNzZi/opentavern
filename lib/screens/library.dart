@@ -130,7 +130,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           const SizedBox(height: 22),
           if (latestSession != null && continueCharacter != null)
             _ContinueCard(
-              character: continueCharacter,
+              character: continueCharacter!,
               session: latestSession,
               onTap: () => openGlassPage(
                 context,

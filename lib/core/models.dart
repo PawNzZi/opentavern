@@ -483,6 +483,7 @@ class Lorebook {
     this.enabled = true,
     this.isGlobal = false,
     this.linked,
+    this.maxTokens = 0,
     int? updatedAt,
   })  : entries = entries ?? [],
         updatedAt = updatedAt ?? DateTime.now().millisecondsSinceEpoch;
@@ -493,6 +494,7 @@ class Lorebook {
   bool enabled;
   bool isGlobal;
   String? linked;
+  int maxTokens;
   int updatedAt;
 
   Map<String, dynamic> toJson() => {
@@ -501,6 +503,7 @@ class Lorebook {
         'enabled': enabled,
         'isGlobal': isGlobal,
         'linked': linked,
+        'maxTokens': maxTokens,
         'updatedAt': updatedAt,
         'entries': entries.map((e) => e.toJson()).toList(),
       };
@@ -512,6 +515,7 @@ class Lorebook {
       enabled: json['enabled'] != false,
       isGlobal: json['isGlobal'] == true,
       linked: json['linked']?.toString(),
+      maxTokens: (json['maxTokens'] as num?)?.toInt() ?? 0,
       updatedAt: (json['updatedAt'] as num?)?.toInt(),
       entries: (json['entries'] as List?)
               ?.whereType<Map>()

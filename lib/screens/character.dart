@@ -1187,14 +1187,13 @@ class _GreetingPickerPage extends StatelessWidget {
           child: Column(
             children: [
               for (var i = 0; i < greetings.length; i++) ...[
-                SettingRow(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  title: greetings[i],
-                  subtitle: '开场白 ${i + 1}',
-                  iconColor: p.amber,
-                  onTap: () => Navigator.of(context).pop(i),
+                _GreetingOption(
+                  index: i,
+                  text: greetings[i],
+                  color: p.amber,
+                  onChoose: () => Navigator.of(context).pop(i),
                 ),
-                if (i != greetings.length - 1) const Hairline(indent: 56),
+                if (i != greetings.length - 1) const Hairline(indent: 18),
               ],
             ],
           ),
@@ -1254,6 +1253,119 @@ class _ExportCardPage extends StatelessWidget {
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _GreetingOption extends StatefulWidget {
+  const _GreetingOption({
+    required this.index,
+    required this.text,
+    required this.color,
+    required this.onChoose,
+  });
+
+  final int index;
+  final String text;
+  final Color color;
+  final VoidCallback onChoose;
+
+  @override
+  State<_GreetingOption> createState() => _GreetingOptionState();
+}
+
+class _GreetingOptionState extends State<_GreetingOption> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final preview = widget.text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Pressable(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: SizedBox(
+            height: 58,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(11),
+                      color: widget.color.withValues(alpha: .16),
+                    ),
+                    child: Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 16,
+                      color: widget.color,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '开场白 ${widget.index + 1}',
+                          style: appText(13, FontWeight.w600, p.textPrimary),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          preview.isEmpty ? '（空）' : preview,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: appText(10.5, FontWeight.w400, p.textTertiary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: p.textTertiary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (_expanded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(58, 0, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      widget.text.isEmpty ? '（空开场白）' : widget.text,
+                      style: appText(12.5, FontWeight.w400, p.textSecondary, height: 1.55),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: GlassPill(
+                    label: '使用这个开场白',
+                    icon: Icons.check_rounded,
+                    height: 30,
+                    onTap: widget.onChoose,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
