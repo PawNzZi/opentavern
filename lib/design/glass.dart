@@ -1,18 +1,18 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui';
 
+import 'package:flutter/cupertino.dart' as cupertino;
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-final ValueNotifier<bool> glassScrolling = ValueNotifier<bool>(false);
-
-/// A frosted, rim-lit pane. The building block of the whole interface.
+/// A flat, quiet surface used across the app.
 ///
-/// The material is deliberately restrained: one blur, one gradient, one
-/// hairline of light. Content stays legible because the fill is tinted, not
-/// transparent.
+/// The old "liquid glass" implementation used a full-screen BackdropFilter for
+/// every card. On low-end phones that is one of the most expensive things a
+/// Flutter UI can do while scrolling. The public API is kept so existing
+/// screens do not need to change; blur/fill/highlight are accepted but the
+/// render path is now a cheap opaque surface with a hairline border.
 class Glass extends StatelessWidget {
   const Glass({
     super.key,
@@ -45,106 +45,58 @@ class Glass extends StatelessWidget {
   final double? width;
   final double? height;
 
-  Color _mix(Color glass, Color base) {
-    if (tint == null) return glass;
-    return Color.alphaBlend(base.withValues(alpha: tintStrength), glass);
-  }
-
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: glassScrolling,
-      builder: (context, scrolling, _) =>
-          _buildPane(context, blur > 0 && !scrolling),
-    );
-  }
-
-  Widget _buildPane(BuildContext context, bool allowBlur) {
     final p = AppPalette.of(context);
     final br = BorderRadius.circular(radius);
-    final base = tint ?? Colors.white;
+    final base = tint ??
+        (p.isDark ? const Color(0xFF171B24) : const Color(0xFFFFFCF8));
+    final top = Color.alphaBlend(
+      p.glassTop.withValues(
+        alpha: tint != null ? .08 : (p.isDark ? .34 : .52),
+      ),
+      base,
+    );
+    final bottom = Color.alphaBlend(
+      p.glassBottom.withValues(
+        alpha: tint != null ? .04 : (p.isDark ? .18 : .32),
+      ),
+      base,
+    );
 
-    Widget pane = DecoratedBox(
+    Widget pane = Container(
+      width: width,
+      height: height,
       decoration: BoxDecoration(
         borderRadius: br,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            _mix(p.glassTop, base).withValues(
-              alpha: (p.glassTop.a * fill).clamp(0.0, 1.0),
-            ),
-            _mix(p.glassBottom, base).withValues(
-              alpha: (p.glassBottom.a * fill).clamp(0.0, 1.0),
-            ),
-          ],
+          colors: [top, bottom],
         ),
-        border: stroke ? Border.all(color: p.glassStroke, width: .8) : null,
-      ),
-      child: Stack(
-        children: [
-          if (padding != null)
-            Padding(padding: padding!, child: child)
-          else
-            child,
-          if (highlight)
-            Positioned(
-              top: 0,
-              left: radius * .6,
-              right: radius * .6,
-              child: IgnorePointer(
-                child: Container(
-                  height: .9,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withValues(alpha: 0),
-                        Colors.white.withValues(
-                          alpha: p.isDark ? .38 : .85,
-                        ),
-                        Colors.white.withValues(alpha: 0),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(1),
-                  ),
+        border: stroke
+            ? Border.all(
+                color: p.glassStroke.withValues(alpha: p.isDark ? .55 : .7),
+                width: .8,
+              )
+            : null,
+        boxShadow: shadow
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: p.isDark ? .18 : .08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-            ),
-        ],
+              ]
+            : null,
+      ),
+      child: ClipRRect(
+        borderRadius: br,
+        child: padding != null
+            ? Padding(padding: padding!, child: child)
+            : child,
       ),
     );
-
-    // Keep the widget tree stable while scrolling. Switching between a
-    // BackdropFilter and a plain ClipRRect recreates the subtree and can make
-    // a focused TextField lose focus when the keyboard opens.
-    pane = ClipRRect(
-      borderRadius: br,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: allowBlur ? blur : 0,
-          sigmaY: allowBlur ? blur : 0,
-        ),
-        child: pane,
-      ),
-    );
-
-    if (shadow) {
-      pane = Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          borderRadius: br,
-          boxShadow: [
-            BoxShadow(
-              color: p.glassShadow.withValues(alpha: p.isDark ? .38 : .10),
-              blurRadius: 28,
-              offset: const Offset(0, 14),
-            ),
-          ],
-        ),
-        child: pane,
-      );
-    }
 
     if (onTap != null) {
       pane = Pressable(onTap: onTap, child: pane);
@@ -171,22 +123,12 @@ class Pressable extends StatefulWidget {
 }
 
 class _PressableState extends State<Pressable> {
-  bool _down = false;
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _down = true),
-      onTapCancel: () => setState(() => _down = false),
-      onTapUp: (_) => setState(() => _down = false),
       onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _down ? widget.scale : 1,
-        duration: const Duration(milliseconds: 130),
-        curve: Curves.easeOutCubic,
-        child: widget.child,
-      ),
+      child: widget.child,
     );
   }
 }
@@ -331,7 +273,7 @@ class GlassPill extends StatelessWidget {
               Icon(
                 icon,
                 size: 14,
-                color: selected ? p.chipActiveText : p.textSecondary,
+                color: selected ? p.onUserBubble : p.textSecondary,
               ),
               const SizedBox(width: 6),
             ],
@@ -340,7 +282,7 @@ class GlassPill extends StatelessWidget {
               style: appText(
                 13.5,
                 FontWeight.w500,
-                selected ? p.chipActiveText : p.textSecondary,
+                selected ? p.onUserBubble : p.textSecondary,
               ),
             ),
           ],
@@ -371,68 +313,98 @@ class GlassTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    // iOS uses the platform-style tab bar; on iOS 26 this is the system
+    // bottom bar instead of a hand-built blur pane.
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return SafeArea(
+        top: false,
+        child: cupertino.CupertinoTabBar(
+          currentIndex: index,
+          onTap: onChanged,
+          height: 58,
+          backgroundColor:
+              p.isDark ? const Color(0xF2151820) : const Color(0xF7FFFCF8),
+          activeColor: p.amber,
+          inactiveColor: p.textTertiary,
+          border: Border(
+            top: BorderSide(
+              color: p.glassStroke.withValues(alpha: .55),
+              width: .5,
+            ),
+          ),
+          items: [
+            for (final tab in tabs)
+              BottomNavigationBarItem(
+                icon: Icon(tab.icon, size: 21),
+                activeIcon: Icon(tab.icon, size: 21),
+                label: tab.label,
+              ),
+          ],
+        ),
+      );
+    }
+
+    // Android/other platforms: flat bar, no blur and no animated pill.
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.fromLTRB(26, 0, 26, 10),
-      child: Glass(
-        radius: 34,
-        blur: 34,
-        shadow: true,
-        tint: tint,
-        tintStrength: tintStrength,
-        fill: fill,
-        padding: const EdgeInsets.all(6),
-        child: SizedBox(
-          height: 58,
-          child: Row(
-            children: List.generate(tabs.length, (i) {
-              final active = i == index;
-              final tab = tabs[i];
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onChanged(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 240),
-                    curve: Curves.easeOutCubic,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      color: active
-                          ? p.amber.withValues(alpha: p.isDark ? .20 : .22)
-                          : Colors.transparent,
-                      border: active
-                          ? Border.all(
-                              color: p.amber.withValues(alpha: .38),
-                              width: .8,
-                            )
-                          : null,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          tab.icon,
-                          size: 21,
-                          color: active ? p.amber : p.textTertiary,
+      minimum: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+      child: Container(
+        height: 62,
+        decoration: BoxDecoration(
+          color: p.isDark ? const Color(0xFF171B24) : const Color(0xFFFFFCF8),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: p.glassStroke.withValues(alpha: .55),
+            width: .8,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: p.isDark ? .22 : .08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: List.generate(tabs.length, (i) {
+            final active = i == index;
+            final tab = tabs[i];
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChanged(i),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    color: active
+                        ? p.amber.withValues(alpha: p.isDark ? .18 : .16)
+                        : Colors.transparent,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        tab.icon,
+                        size: 21,
+                        color: active ? p.amber : p.textTertiary,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        tab.label,
+                        style: appText(
+                          10.5,
+                          active ? FontWeight.w600 : FontWeight.w500,
+                          active ? p.amber : p.textTertiary,
+                          letterSpacing: .2,
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          tab.label,
-                          style: appText(
-                            10.5,
-                            active ? FontWeight.w600 : FontWeight.w500,
-                            active ? p.amber : p.textTertiary,
-                            letterSpacing: .2,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              );
-            }),
-          ),
+              ),
+            );
+          }),
         ),
       ),
     );
@@ -503,36 +475,6 @@ class Portrait extends StatelessWidget {
                     gaplessPlayback: true,
                   ),
                 ),
-              if (avatar == null)
-                Positioned(
-                right: -w * .22,
-                top: -h * .10,
-                child: _Blob(
-                  size: s * .9,
-                  color: Colors.white.withValues(alpha: .38),
-                  blur: 34,
-                ),
-              ),
-              if (avatar == null)
-                Positioned(
-                left: -w * .30,
-                bottom: -h * .12,
-                child: _Blob(
-                  size: s * .85,
-                  color: colors.last.withValues(alpha: .65),
-                  blur: 40,
-                ),
-              ),
-              if (avatar == null)
-                Positioned(
-                left: w * .22,
-                top: h * .30,
-                child: _Blob(
-                  size: s * .36,
-                  color: Colors.white.withValues(alpha: .20),
-                  blur: 26,
-                ),
-              ),
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -577,29 +519,6 @@ class Portrait extends StatelessWidget {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _Blob extends StatelessWidget {
-  const _Blob({required this.size, required this.color, required this.blur});
-
-  final double size;
-  final Color color;
-  final double blur;
-
-  @override
-  Widget build(BuildContext context) {
-    return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color,
-        ),
       ),
     );
   }

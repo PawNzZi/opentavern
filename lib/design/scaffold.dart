@@ -1,20 +1,9 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import 'glass.dart';
 import 'theme.dart';
-
-Timer? _glassScrollTimer;
-
-void _pulseGlassScroll() {
-  glassScrolling.value = true;
-  _glassScrollTimer?.cancel();
-  _glassScrollTimer = Timer(const Duration(milliseconds: 180), () {
-    glassScrolling.value = false;
-  });
-}
 
 class TavernRootScope extends InheritedWidget {
   const TavernRootScope({super.key, required this.enabled, required super.child});
@@ -84,18 +73,12 @@ class TavernScaffold extends StatelessWidget {
       ],
     );
 
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        _pulseGlassScroll();
-        return false;
-      },
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: resizeToAvoidBottomInset,
-        body: isNested
-            ? body
-            : AuroraBackground(intensity: intensity, child: body),
-      ),
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: resizeToAvoidBottomInset,
+      body: isNested
+          ? body
+          : AuroraBackground(intensity: intensity, child: body),
     );
   }
 }

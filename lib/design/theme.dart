@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
@@ -196,8 +195,8 @@ ThemeData buildTavernTheme({required bool dark}) {
   );
 }
 
-/// The ambient backdrop: deep ink + slow colored light. Every glass surface
-/// samples from this, which is what makes the material feel alive.
+/// Flat ambient background: a static warm gradient plus two cheap radial
+/// washes. No BackdropFilter, no animated blur, no film grain.
 class AuroraBackground extends StatelessWidget {
   const AuroraBackground({
     super.key,
@@ -213,12 +212,6 @@ class AuroraBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final size = MediaQuery.sizeOf(context);
-    final t = animate
-        ? (DateTime.now().millisecondsSinceEpoch % 24000) / 24000
-        : 0.0;
-    final drift = math.sin(t * math.pi * 2) * 18;
-
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -231,115 +224,58 @@ class AuroraBackground extends StatelessWidget {
             ),
           ),
         ),
-        _Orb(
-          left: -size.width * .38 + drift,
-          top: -size.height * .12,
-          size: size.width * 1.15,
-          color: p.orbAmber.withValues(alpha: .55 * intensity),
-          blur: 90,
+        Positioned(
+          left: -140,
+          top: -180,
+          width: 460,
+          height: 460,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    p.orbAmber.withValues(alpha: .16 * intensity),
+                    p.orbAmber.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
-        _Orb(
-          left: size.width * .48 - drift,
-          top: size.height * .02,
-          size: size.width * .9,
-          color: p.orbRose.withValues(alpha: .42 * intensity),
-          blur: 100,
+        Positioned(
+          right: -180,
+          bottom: 80,
+          width: 520,
+          height: 520,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    p.orbViolet.withValues(alpha: .11 * intensity),
+                    p.orbViolet.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
-        _Orb(
-          left: -size.width * .3,
-          top: size.height * .52,
-          size: size.width * 1.0,
-          color: p.orbSage.withValues(alpha: .26 * intensity),
-          blur: 110,
-        ),
-        _Orb(
-          left: size.width * .55,
-          top: size.height * .62,
-          size: size.width * .8,
-          color: p.orbViolet.withValues(alpha: .3 * intensity),
-          blur: 110,
-        ),
-        // A quiet vignette keeps the glass edges readable.
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: RadialGradient(
               center: Alignment.center,
-              radius: 1.1,
+              radius: 1.15,
               colors: [
                 Colors.transparent,
-                p.canvasBottom.withValues(alpha: p.isDark ? .55 : .25),
+                p.canvasBottom.withValues(alpha: p.isDark ? .35 : .16),
               ],
             ),
           ),
         ),
-        const Positioned.fill(child: IgnorePointer(child: _Grain())),
         child,
       ],
     );
   }
-}
-
-class _Orb extends StatelessWidget {
-  const _Orb({
-    required this.left,
-    required this.top,
-    required this.size,
-    required this.color,
-    required this.blur,
-  });
-
-  final double left;
-  final double top;
-  final double size;
-  final Color color;
-  final double blur;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: left,
-      top: top,
-      child: ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [color, color.withValues(alpha: 0)],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 1px film grain. Barely visible, but it stops large blurs from banding.
-class _Grain extends StatelessWidget {
-  const _Grain();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(painter: _GrainPainter(), size: Size.infinite);
-  }
-}
-
-class _GrainPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rnd = math.Random(7);
-    final paint = Paint()..color = Colors.white.withValues(alpha: .022);
-    for (var i = 0; i < 520; i++) {
-      canvas.drawCircle(
-        Offset(rnd.nextDouble() * size.width, rnd.nextDouble() * size.height),
-        .6,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
