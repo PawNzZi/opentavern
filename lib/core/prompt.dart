@@ -12,6 +12,8 @@ class BuiltPrompt {
     required this.approxTokens,
     required this.droppedMessages,
     this.sections = const {},
+    this.mainSource = '',
+    this.lore = const PromptLoreStats(),
   });
 
   final List<Map<String, dynamic>> messages;
@@ -23,6 +25,42 @@ class BuiltPrompt {
   /// `jailbreak`（角色卡的 post_history_instructions / PHI）固定排在最后：
   /// 它作为历史消息之后的最后一条 system 消息发送。
   final Map<String, String> sections;
+
+  /// 主提示词的实际来源（预设名或全局设置），供「构建预览」展示。
+  final String mainSource;
+
+  /// 世界书扫描与注入的统计信息。
+  final PromptLoreStats lore;
+}
+
+/// 世界书扫描 / 注入的诊断结果。
+///
+/// 「构建预览」用它解释世界书段落为什么有内容或为什么被跳过，避免用户只能
+/// 面对一个「该段落为空」的结论。
+class PromptLoreStats {
+  const PromptLoreStats({
+    this.scopeBooks = const [],
+    this.scopeEntries = 0,
+    this.matched = const [],
+    this.injected = const [],
+  });
+
+  /// 本次参与扫描的世界书名（角色绑定 / 全局 / 角色卡绑定）。
+  final List<String> scopeBooks;
+
+  /// 扫描范围内启用的条目总数。
+  final int scopeEntries;
+
+  /// 关键词命中、有资格进入 prompt 的条目（预算裁剪前）。
+  final List<LoreEntry> matched;
+
+  /// 最终实际进入 prompt 的条目（预算裁剪后）。
+  final List<LoreEntry> injected;
+
+  int get droppedByBudget => matched.length - injected.length;
+
+  int get atDepthCount =>
+      injected.where((e) => e.position == 'at_depth').length;
 }
 
 int estimateTokens(String text) {
@@ -64,6 +102,33 @@ class PromptBuilder {
           lastMessage: lastAny,
         );
 
+    final preset = AppStore.instance.presetForCharacter(character);
+    // 预设是主提示词的唯一来源：一旦绑定了预设，即使预设的主提示词为空也
+    // 不再回退到全局设置。否则用户在「提示词」里清空主提示词后，仍会收到
+    // 一条在 UI 里看不到的默认提示词（「主提示词明明为空却有内容」）。
+    final main = preset?.mainPrompt ?? settings.mainPrompt;
+    final mainSource = preset == null
+        ? '全局设置（未绑定预设）'
+        : '预设「${preset.name}」';
+    final effectiveAuthorNote =
+        session.authorNoteOverride ? session.authorNote : settings.authorNote;
+    final userLabel = settings.userName.trim().isNotEmpty
+        ? settings.userName.trim()
+        : settings.personaName.trim().isNotEmpty
+            ? settings.personaName.trim()
+            : 'User';
+    final rawSummary = session.summary.trim();
+    final summaryText = rawSummary.isEmpty ? '' : macro(rawSummary).trim();
+    final postHistory = character.postHistoryInstructions.trim().isEmpty
+        ? ''
+        : '\n[越狱 / PHI]\n${macro(character.postHistoryInstructions).trim()}';
+    final rawMaxPrompt =
+        settings.maxContext - settings.api.maxTokens - settings.tokenPadding;
+    final maxPrompt = rawMaxPrompt < 256 ? 256 : rawMaxPrompt;
+
+    // 世界书关键词扫描：除了最近 8 条对话，也扫描角色卡字段、人格、作者笔记
+    // 与摘要。角色卡和世界书通常共享同一批专有名词，只扫描对话会让「新聊天
+    // 里明明有设定却一条都没命中」。
     final recentText = session.messages
         .where((m) => !m.hidden && m.text.trim().isNotEmpty)
         .toList()
@@ -71,17 +136,30 @@ class PromptBuilder {
         .take(8)
         .map((m) => m.text)
         .join('\n');
-    final activatedLore = _activatedLore(character, recentText);
-    final preset = AppStore.instance.presetForCharacter(character);
-    final main = preset?.mainPrompt.trim().isNotEmpty == true
-        ? preset!.mainPrompt
-        : settings.mainPrompt;
-    final postHistory = character.postHistoryInstructions.trim().isEmpty
-        ? ''
-        : '\n[越狱 / PHI]\n${macro(character.postHistoryInstructions).trim()}';
-    final rawMaxPrompt =
-        settings.maxContext - settings.api.maxTokens - settings.tokenPadding;
-    final maxPrompt = rawMaxPrompt < 256 ? 256 : rawMaxPrompt;
+    final loreContext = [
+      character.name,
+      character.description,
+      character.personality,
+      character.scenario,
+      userLabel,
+      settings.personaDescription,
+      effectiveAuthorNote,
+      summaryText,
+      recentText,
+    ].where((part) => part.trim().isNotEmpty).map(macro).join('\n');
+    final loreScan = _scanLore(character, loreContext);
+
+    final presetEntries = preset == null
+        ? const <PromptEntry>[]
+        : (preset.entries.where((e) => e.enabled).toList()
+          ..sort((a, b) => a.order.compareTo(b.order)));
+    // 预设条目只展开一次宏：既用于 Token 估算，也用于真正拼接，避免
+    // {{setvar}} / {{addvar}} 这类有副作用的宏被执行两次。
+    final expandedEntries = <String, String>{
+      for (final entry in presetEntries)
+        entry.id: macro(entry.content).trim(),
+    };
+
     final fixedParts = <String>[
       main,
       character.systemPrompt,
@@ -90,15 +168,11 @@ class PromptBuilder {
       character.scenario,
       character.exampleDialogue,
       settings.personaDescription,
-      settings.summaryPosition == 'in_prompt' ? session.summary : '',
-      session.authorNoteOverride ? session.authorNote : settings.authorNote,
+      settings.summaryPosition == 'in_prompt' ? summaryText : '',
+      effectiveAuthorNote,
       postHistory,
+      ...expandedEntries.values,
     ];
-    if (preset != null) {
-      for (final entry in preset.entries.where((e) => e.enabled)) {
-        fixedParts.add(macro(entry.content));
-      }
-    }
     final fixedTokens =
         estimateTokens(fixedParts.join('\n')) + fixedParts.length * 8;
     final historyReserve =
@@ -108,17 +182,27 @@ class PromptBuilder {
     final loreBudget = settings.loreMaxTokens > 0
         ? settings.loreMaxTokens.clamp(0, availableForLore).toInt()
         : availableForLore;
-    final loreEntries = _applyLoreBudget(activatedLore, loreBudget);
+    // 世界书正文同样要展开宏（{{user}} / {{char}} / 变量……），否则角色卡
+    // 世界书里的占位符会原样发给模型。
+    final expandedLore = <String, String>{
+      for (final entry in loreScan.matched)
+        entry.id: macro(entry.content).trim(),
+    };
+    final loreEntries = _applyLoreBudget(
+      loreScan.matched,
+      expandedLore,
+      loreBudget,
+    );
     final loreAtDepth =
         loreEntries.where((e) => e.position == 'at_depth').toList();
     final loreBefore = loreEntries
         .where((e) => e.position != 'after' && e.position != 'at_depth')
-        .map((e) => e.content.trim())
+        .map((e) => expandedLore[e.id] ?? '')
         .where((e) => e.isNotEmpty)
         .join('\n\n');
     final loreAfter = loreEntries
         .where((e) => e.position == 'after')
-        .map((e) => e.content.trim())
+        .map((e) => expandedLore[e.id] ?? '')
         .where((e) => e.isNotEmpty)
         .join('\n\n');
 
@@ -149,20 +233,16 @@ class PromptBuilder {
     }
     if (settings.personaDescription.trim().isNotEmpty) {
       sections['personaDescription'] =
-          '\n[用户设定]\n名字：${settings.userName}\n'
+          '\n[用户设定]\n名字：$userLabel\n'
           '${macro(settings.personaDescription).trim()}';
     }
     if (character.exampleDialogue.trim().isNotEmpty) {
       sections['dialogueExamples'] =
           '\n[对话示例]\n${macro(character.exampleDialogue).trim()}';
     }
-    final summaryText = session.summary.trim();
     if (summaryText.isNotEmpty && settings.summaryPosition == 'in_prompt') {
       sections['summary'] = '\n[前情提要]\n$summaryText';
     }
-    final effectiveAuthorNote = session.authorNoteOverride
-        ? session.authorNote
-        : settings.authorNote;
     if (effectiveAuthorNote.trim().isNotEmpty) {
       sections['authorsNote'] =
           '\n[作者笔记]\n${macro(effectiveAuthorNote).trim()}';
@@ -184,20 +264,16 @@ class PromptBuilder {
     }
 
     final extra = <Map<String, String>>[];
-    if (preset != null) {
-      final enabled = preset.entries.where((e) => e.enabled).toList()
-        ..sort((a, b) => a.order.compareTo(b.order));
-      for (final entry in enabled) {
-        final content = macro(entry.content).trim();
-        if (content.isEmpty) continue;
-        if (entry.role == 'system') {
-          system.writeln('\n[${entry.name}]\n$content');
-        } else {
-          extra.add({
-            'role': entry.role == 'assistant' ? 'assistant' : 'user',
-            'content': content,
-          });
-        }
+    for (final entry in presetEntries) {
+      final content = expandedEntries[entry.id] ?? '';
+      if (content.isEmpty) continue;
+      if (entry.role == 'system') {
+        system.writeln('\n[${entry.name}]\n$content');
+      } else {
+        extra.add({
+          'role': entry.role == 'assistant' ? 'assistant' : 'user',
+          'content': content,
+        });
       }
     }
 
@@ -216,9 +292,10 @@ class PromptBuilder {
       final m = session.messages[i];
       if (m.hidden || m.isSystem) continue;
       if (m.text.trim().isEmpty && m.attachments.isEmpty) continue;
-      var content = m.isUser
-          ? _formatUserRoleplay(m.text)
-          : m.text;
+      // 历史消息以原始文本存储，发送前才展开宏，这样 {{user}} / {{char}}
+      // 不会原样进入上下文，同时聊天记录仍保留用户输入的原文。
+      var content = macro(m.text);
+      content = m.isUser ? _formatUserRoleplay(content) : content;
       content = applyRegexScripts(
         content,
         AppStore.instance.regexScripts,
@@ -266,11 +343,12 @@ class PromptBuilder {
               : 'system';
       final index =
           (history.length - entry.depth).clamp(0, history.length);
+      final content = expandedLore[entry.id] ?? entry.content.trim();
       history.insert(index, {
         'role': role,
-        'content': entry.content.trim(),
+        'content': content,
       });
-      used += estimateTokens(entry.content) + 4;
+      used += estimateTokens(content) + 4;
     }
     final summaryMessages = <Map<String, dynamic>>[];
     if (summaryText.isNotEmpty && settings.summaryPosition != 'in_prompt') {
@@ -306,6 +384,13 @@ class PromptBuilder {
       ],
       approxTokens: used,
       droppedMessages: dropped,
+      mainSource: mainSource,
+      lore: PromptLoreStats(
+        scopeBooks: loreScan.scopeBooks,
+        scopeEntries: loreScan.scopeEntries,
+        matched: loreScan.matched,
+        injected: loreEntries,
+      ),
       sections: {
         ...usedSections,
         if (postHistory.trim().isNotEmpty) 'jailbreak': postHistory.trim(),
@@ -328,12 +413,38 @@ class PromptBuilder {
     return result;
   }
 
-  static List<LoreEntry> _activatedLore(
+  /// 世界书是否属于本次对话的扫描范围。
+  ///
+  /// 只有「全局」世界书、绑定了当前角色的世界书，或角色卡上标记了该书
+  /// （名称 / id）的世界书才会被扫描。未绑定且非全局的世界书不会生效，
+  /// 「构建预览」会把这种情况单独提示出来。
+  static bool _bookInScope(DemoCharacter character, Lorebook book) {
+    if (book.isGlobal) return true;
+    final linked = (book.linked ?? '').trim();
+    if (linked.isNotEmpty && linked == character.name) return true;
+    final bound = character.lorebook.trim();
+    if (bound.isEmpty || bound == '未绑定') return false;
+    return bound == book.name || bound == book.id;
+  }
+
+  static _LoreScan _scanLore(
     DemoCharacter character,
     String text,
   ) {
     final selected = <LoreEntry>[];
     final selectedIds = <String>{};
+    final scopeBookList = AppStore.instance.lorebooks
+        .where((book) => book.enabled && _bookInScope(character, book))
+        .toList();
+    final scopeBooks = scopeBookList.map((book) => book.name).toList();
+    var scopeEntries = scopeBookList.fold<int>(
+      0,
+      (sum, book) =>
+          sum +
+          book.entries
+              .where((e) => e.enabled && e.content.trim().isNotEmpty)
+              .length,
+    );
 
     bool containsKey(String haystack, LoreEntry entry, String key) {
       final raw = key.trim();
@@ -392,13 +503,7 @@ class PromptBuilder {
     }
 
     void scanBooks(String haystack, {required bool recursionPass}) {
-      for (final book in AppStore.instance.lorebooks) {
-        if (!book.enabled) continue;
-        final boundByCard = character.lorebook.isNotEmpty &&
-            (character.lorebook == book.name || character.lorebook == book.id);
-        if (!book.isGlobal && book.linked != character.name && !boundByCard) {
-          continue;
-        }
+      for (final book in scopeBookList) {
         for (final entry in book.entries) {
           if (!entry.enabled || entry.content.trim().isEmpty) continue;
           if (selectedIds.contains(entry.id)) continue;
@@ -422,6 +527,7 @@ class PromptBuilder {
       if (book is Map) {
         final entries = book['entries'];
         if (entries is List) {
+          var embedded = 0;
           for (final item in entries.whereType<Map>()) {
             if (item['enabled'] == false) continue;
             final keys = item['keys'] is List
@@ -444,6 +550,11 @@ class PromptBuilder {
             );
             selected.add(entry);
             selectedIds.add(entry.id);
+            embedded++;
+          }
+          if (embedded > 0) {
+            scopeBooks.add('角色卡内嵌世界书');
+            scopeEntries += embedded;
           }
         }
       }
@@ -476,11 +587,16 @@ class PromptBuilder {
     }
     result.addAll(grouped.values);
     result.sort((a, b) => b.order.compareTo(a.order));
-    return result;
+    return _LoreScan(
+      matched: result,
+      scopeBooks: scopeBooks,
+      scopeEntries: scopeEntries,
+    );
   }
 
   static List<LoreEntry> _applyLoreBudget(
     List<LoreEntry> entries,
+    Map<String, String> contents,
     int maxTokens,
   ) {
     if (maxTokens <= 0) return const <LoreEntry>[];
@@ -488,12 +604,25 @@ class PromptBuilder {
     final result = <LoreEntry>[];
     var used = 0;
     for (final entry in sorted) {
-      final cost = estimateTokens(entry.content) + 2;
+      final cost =
+          estimateTokens(contents[entry.id] ?? entry.content) + 2;
       if (used + cost > maxTokens) continue;
       result.add(entry);
       used += cost;
     }
     return result;
   }
+}
+
+class _LoreScan {
+  const _LoreScan({
+    required this.matched,
+    required this.scopeBooks,
+    required this.scopeEntries,
+  });
+
+  final List<LoreEntry> matched;
+  final List<String> scopeBooks;
+  final int scopeEntries;
 }
 

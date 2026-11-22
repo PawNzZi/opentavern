@@ -53,13 +53,16 @@ class MacroEngine {
           case 'char':
             return character.name;
           case 'user':
-            return settings.userName.trim().isEmpty
-                ? 'User'
-                : settings.userName;
+            // userName 是唯一可编辑的来源；旧数据可能只有 personaName。
+            final userName = settings.userName.trim().isNotEmpty
+                ? settings.userName.trim()
+                : settings.personaName.trim();
+            return userName.isEmpty ? 'User' : userName;
           case 'persona':
-            return settings.personaName.trim().isEmpty
-                ? 'User'
-                : settings.personaName;
+            final persona = settings.personaName.trim().isNotEmpty
+                ? settings.personaName.trim()
+                : settings.userName.trim();
+            return persona.isEmpty ? 'User' : persona;
           case 'description':
             return character.description;
           case 'personality':
@@ -80,7 +83,7 @@ class MacroEngine {
             final now = DateTime.now();
             return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
           case 'weekday':
-            const days = ['鍛ㄤ竴', '鍛ㄤ簩', '鍛ㄤ笁', '鍛ㄥ洓', '鍛ㄤ簲', '鍛ㄥ叚', '鍛ㄦ棩'];
+            const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
             return days[DateTime.now().weekday - 1];
           case 'newline':
             return '\n';
@@ -113,6 +116,27 @@ class MacroEngine {
       if (text == before) break;
     }
     return text;
+  }
+
+  /// Expands only the identity macros that are safe to resolve while rendering
+  /// stored chat text: `{{char}}`, `{{user}}` and `{{persona}}`.
+  ///
+  /// Chat messages are stored raw. Rendering goes through this helper instead
+  /// of [expand] so that `{{random}}`, `{{roll}}`, `{{time}}` and variables do
+  /// not re-roll (or mutate the session) every time the bubble rebuilds. The
+  /// full engine still expands everything when the prompt is actually built.
+  static String expandIdentity(
+    String input, {
+    required String charName,
+    required String userName,
+  }) {
+    if (!input.contains('{{')) return input;
+    return input.replaceAllMapped(
+      RegExp(r'\{\{\s*(char|user|persona)\s*\}\}', caseSensitive: false),
+      (match) => match.group(1)!.toLowerCase() == 'char'
+          ? charName
+          : userName,
+    );
   }
 }
 

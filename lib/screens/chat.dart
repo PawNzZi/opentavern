@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 
 import '../chat/chat_controller.dart';
 import '../core/docx_text.dart';
+import '../core/macros.dart';
 import '../core/models.dart';
 import '../core/pdf_text.dart';
 import '../core/regex.dart';
@@ -23,8 +24,21 @@ import 'chat_info.dart';
 
 String _renderDisplayText(ChatMessage message, String characterName) {
   if (message.text.isEmpty) return message.text;
-  return applyRegexScripts(
+  // 聊天气泡以原文存储，渲染时才展开身份宏：{{user}} / {{char}} 不会在
+  // 界面上露出占位符，同时也不会像 prompt 那样重掷 {{random}} / {{time}}。
+  final settings = AppStore.instance.settings;
+  final userName = settings.userName.trim().isNotEmpty
+      ? settings.userName.trim()
+      : settings.personaName.trim().isNotEmpty
+          ? settings.personaName.trim()
+          : 'User';
+  final expanded = MacroEngine.expandIdentity(
     message.text,
+    charName: characterName,
+    userName: userName,
+  );
+  return applyRegexScripts(
+    expanded,
     AppStore.instance.regexScripts,
     stage: 'display',
     characterName: characterName,
@@ -291,7 +305,11 @@ class _ChatScreenState extends State<ChatScreen> {
   void _handleMenuAction(String action, ChatMessage message) {
     switch (action) {
       case '复制':
-        Clipboard.setData(ClipboardData(text: message.text));
+        Clipboard.setData(
+          ClipboardData(
+            text: _renderDisplayText(message, widget.character.name),
+          ),
+        );
         _toast('已复制');
       case '编辑':
         _editMessage(message);

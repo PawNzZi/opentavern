@@ -126,7 +126,7 @@ class _PromptManagerPageState extends State<PromptManagerPage> {
               const SizedBox(height: 6),
               Text(
                 _preset.mainPrompt.trim().isEmpty
-                    ? '未设置，将使用设置中的全局主提示词。'
+                    ? '未设置：构建 prompt 时跳过「主提示词 / 规则」段落；填写后才会发送。'
                     : _preset.mainPrompt,
                 maxLines: 5,
                 overflow: TextOverflow.ellipsis,

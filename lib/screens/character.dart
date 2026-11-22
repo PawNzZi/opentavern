@@ -563,9 +563,10 @@ class _CharacterScreenState extends State<CharacterScreen> {
     _CharacterUsage usage,
   ) {
     final p = AppPalette.of(context);
+    final boundName = c.lorebook.trim();
     Lorebook? book;
     for (final b in AppStore.instance.lorebooks) {
-      if (b.name == c.lorebook) book = b;
+      if (b.name == boundName || b.id == boundName) book = b;
     }
     final loreEntries = book?.entries ?? const <LoreEntry>[];
     final activePreset = AppStore.instance.presetForCharacter(c);
@@ -591,7 +592,11 @@ class _CharacterScreenState extends State<CharacterScreen> {
               padding: const EdgeInsets.all(13),
               onTap: () {
                 if (book == null) {
-                  openGlassPage(context, const LoreScreen());
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => CharacterEditorPage(character: c),
+                    ),
+                  );
                   return;
                 }
                 openGlassPage(context, LorebookPage(book: book));
@@ -628,7 +633,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                         const SizedBox(height: 2),
                         Text(
                           book == null
-                              ? '未绑定或已删除'
+                              ? '未绑定或已删除 · 点按绑定'
                               : '${loreEntries.length} 条 · 本地世界书',
                           style: appText(9.5, FontWeight.w400, p.textTertiary),
                         ),
@@ -695,7 +700,7 @@ class _CharacterScreenState extends State<CharacterScreen> {
                 const Hairline(indent: 56),
                 SettingRow(
                   icon: Icons.subject_rounded,
-                  title: '主提示词覆盖',
+                  title: '角色专属提示词',
                   value: c.systemPrompt.trim().isEmpty ? '未设置' : '已设置',
                   iconColor: p.amber,
                   onTap: () => Navigator.of(context).push(

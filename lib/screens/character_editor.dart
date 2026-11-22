@@ -414,7 +414,7 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
         ),
         const SectionLabel('高级'),
         _EditField(
-          label: '主提示词覆盖',
+          label: '角色专属提示词（System Prompt）',
           controller: _system,
           maxLines: 5,
         ),
@@ -425,7 +425,8 @@ class _CharacterEditorPageState extends State<CharacterEditorPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          '角色专属提示词会覆盖全局预设；留空则跟随预设。'
+          '角色专属提示词会作为独立的「角色专属提示词」段落追加，'
+          '不会替换预设的主提示词；留空则不追加。'
           '绑定预设后，温度与 maxTokens 优先使用绑定预设的值。',
           style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.45),
         ),

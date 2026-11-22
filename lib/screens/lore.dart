@@ -15,6 +15,17 @@ import '../design/settings_kit.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
 
+/// 世界书在 Prompt 构建中的生效状态，用于列表 / 详情页提示。
+///
+/// 非全局且未绑定角色的世界书不会被任何对话扫描，这是最容易误以为
+/// 「世界书已经导入却没有拼接」的原因。
+String _bookStatusLabel(Lorebook book) {
+  if (book.isGlobal) return '全局';
+  final linked = (book.linked ?? '').trim();
+  if (linked.isNotEmpty) return '绑定：$linked';
+  return '未绑定 · 不生效';
+}
+
 class LoreScreen extends StatefulWidget {
   const LoreScreen({super.key, this.standalone = true});
   final bool standalone;
@@ -260,8 +271,10 @@ class _LoreScreenState extends State<LoreScreen> {
                   const SizedBox(width: 9),
                   Expanded(
                     child: Text(
-                      '对话时，世界书会扫描最近的消息，命中关键词的条目会自动进入提示词。'
-                      '你也可以把条目设为「常驻」，让它始终在场。',
+                      '对话时，世界书会扫描最近的消息、角色卡、人格与作者笔记，'
+                      '命中关键词的条目会自动进入提示词。'
+                      '只有「全局」世界书或绑定了当前角色的世界书会参与构建；'
+                      '把条目设为「常驻」可以让它始终在场。',
                       style: appText(11.5, FontWeight.w400, p.textSecondary, height: 1.5),
                     ),
                   ),
@@ -365,7 +378,7 @@ class _LorebookPageState extends State<LorebookPage> {
         children: [
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, ''),
-            child: const Text('不绑定（全局世界书对所有角色生效）'),
+            child: const Text('不绑定（未绑定且非全局的世界书不会生效）'),
           ),
           for (final name in names)
             SimpleDialogOption(
@@ -499,14 +512,14 @@ class _LorebookPageState extends State<LorebookPage> {
             PageHeader(
               eyebrow: 'LOREBOOK',
               title: book.name,
-              subtitle:
-                  '${book.entries.length} 条 · ${book.linked ?? (book.isGlobal ? "全局" : "未绑定")}',
+              subtitle: '${book.entries.length} 条 · ${_bookStatusLabel(book)}',
             ),
             const SizedBox(height: 14),
             SettingsGroup(
               title: '世界书设置',
               footnote: '关闭「启用」后，整本书不会参与关键词匹配；'
-                  '「全局」世界书对所有角色生效，非全局时只对绑定的角色或角色卡上绑定的世界书生效。'
+                  '「全局」世界书对所有角色生效；非全局世界书只对绑定的角色生效，'
+                  '既未绑定角色、也没开启「全局」的世界书不会进入任何 Prompt。'
                   '这里的修改会立即保存。',
               children: [
                 SwitchLine(
@@ -528,7 +541,7 @@ class _LorebookPageState extends State<LorebookPage> {
                       ? '全局世界书无需绑定；这里仅记录关联角色'
                       : '仅该角色的对话会额外扫描本书',
                   value: (book.linked ?? '').trim().isEmpty
-                      ? '未绑定'
+                      ? (book.isGlobal ? '未绑定' : '未绑定 · 不生效')
                       : book.linked,
                   onTap: _pickLinkedCharacter,
                 ),
@@ -1193,8 +1206,15 @@ class _LoreCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${book.entries.length} 条 · ${book.linked ?? (book.isGlobal ? "全局" : "未绑定")}',
-                  style: appText(11, FontWeight.w400, p.textTertiary),
+                  '${book.entries.length} 条 · ${_bookStatusLabel(book)}',
+                  style: appText(
+                    11,
+                    FontWeight.w400,
+                    book.isGlobal ||
+                            (book.linked ?? '').trim().isNotEmpty
+                        ? p.textTertiary
+                        : p.rose,
+                  ),
                 ),
               ],
             ),
