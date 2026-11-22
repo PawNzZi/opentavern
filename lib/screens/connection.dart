@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../core/llm.dart';
 import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/settings_kit.dart';
@@ -30,6 +33,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
   late final TextEditingController _key;
   late final TextEditingController _model;
   late String _provider;
+  Timer? _fetchDebounce;
+  List<String> _models = const [];
+  bool _loadingModels = false;
+  String? _modelError;
 
   @override
   void initState() {
@@ -39,14 +46,29 @@ class _ConnectionPageState extends State<ConnectionPage> {
     _key = TextEditingController(text: api.apiKey);
     _model = TextEditingController(text: api.model);
     _provider = _labelFor(api.provider);
+    _base.addListener(_onEndpointChanged);
+    _key.addListener(_onEndpointChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fetchModels();
+    });
   }
 
   @override
   void dispose() {
+    _fetchDebounce?.cancel();
+    _base.removeListener(_onEndpointChanged);
+    _key.removeListener(_onEndpointChanged);
     _base.dispose();
     _key.dispose();
     _model.dispose();
     super.dispose();
+  }
+
+  void _onEndpointChanged() {
+    _fetchDebounce?.cancel();
+    _fetchDebounce = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) _fetchModels();
+    });
   }
 
   String _labelFor(String provider) {
@@ -83,6 +105,54 @@ class _ConnectionPageState extends State<ConnectionPage> {
     }
   }
 
+  bool get _needsKey => _providerKey(_provider) != 'ollama';
+
+  Future<void> _fetchModels() async {
+    if (_loadingModels) return;
+    if (_needsKey && _key.text.trim().isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _models = const [];
+        _modelError = '填写密钥后自动获取可用模型';
+      });
+      return;
+    }
+    final api = AppStore.instance.settings.api.copyWith(
+      provider: _providerKey(_provider),
+      baseUrl: _base.text.trim(),
+      apiKey: _key.text.trim(),
+      model: _model.text.trim(),
+    );
+    setState(() {
+      _loadingModels = true;
+      _modelError = null;
+    });
+    try {
+      final models = await LLMClient().fetchModels(api);
+      if (!mounted) return;
+      final unique = models.toSet().toList()..sort();
+      String? autoSelected;
+      if (unique.isNotEmpty &&
+          (_model.text.trim().isEmpty || !unique.contains(_model.text.trim()))) {
+        final preferred = _presets[_provider]?.$2;
+        autoSelected = unique.contains(preferred) ? preferred : unique.first;
+      }
+      setState(() {
+        _models = unique;
+        _loadingModels = false;
+        _modelError = unique.isEmpty ? '服务商没有返回可用模型' : null;
+        if (autoSelected != null) _model.text = autoSelected;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingModels = false;
+        _models = const [];
+        _modelError = error is LLMException ? error.message : '$error';
+      });
+    }
+  }
+
   void _selectProvider(String label) {
     setState(() {
       _provider = label;
@@ -91,10 +161,20 @@ class _ConnectionPageState extends State<ConnectionPage> {
         _base.text = preset.$1;
         _model.text = preset.$2;
       }
+      _models = const [];
+      _modelError = null;
+    });
+    _fetchDebounce?.cancel();
+    _fetchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) _fetchModels();
     });
   }
 
   Future<void> _save() async {
+    if (_model.text.trim().isEmpty) {
+      showTavernToast(context, '请先选择模型');
+      return;
+    }
     final settings = AppStore.instance.settings;
     AppStore.instance.settings = settings.copyWith(
       api: settings.api.copyWith(
@@ -130,6 +210,8 @@ class _ConnectionPageState extends State<ConnectionPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
               child: Wrap(
+                alignment: WrapAlignment.start,
+                crossAxisAlignment: WrapCrossAlignment.start,
                 spacing: 8,
                 runSpacing: 8,
                 children: [
@@ -162,11 +244,15 @@ class _ConnectionPageState extends State<ConnectionPage> {
               obscure: true,
             ),
             const Hairline(indent: 56),
-            _ConnectionField(
-              label: '模型名',
-              controller: _model,
-              hint: 'gpt-4o-mini',
-              icon: Icons.auto_awesome_rounded,
+            _ModelPicker(
+              models: _models,
+              value: _model.text,
+              loading: _loadingModels,
+              error: _modelError,
+              onSelect: (value) {
+                setState(() => _model.text = value);
+              },
+              onRefresh: _fetchModels,
             ),
           ],
         ),
@@ -177,7 +263,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Text(
                 '支持 OpenAI 兼容、Claude、Gemini、DeepSeek 与本地 Ollama。'
-                '修改后点击底部「保存连接」生效。',
+                '填写密钥后会自动获取模型列表；修改后点击底部「保存连接」生效。',
                 style: appText(
                   11.5,
                   FontWeight.w400,
@@ -189,6 +275,119 @@ class _ConnectionPageState extends State<ConnectionPage> {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _ModelPicker extends StatelessWidget {
+  const _ModelPicker({
+    required this.models,
+    required this.value,
+    required this.loading,
+    required this.error,
+    required this.onSelect,
+    required this.onRefresh,
+  });
+
+  final List<String> models;
+  final String value;
+  final bool loading;
+  final String? error;
+  final ValueChanged<String> onSelect;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final options = {
+      if (value.isNotEmpty && !models.contains(value)) value,
+      ...models,
+    }.toList();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.auto_awesome_rounded, size: 17, color: p.textTertiary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '模型',
+                  style: appText(11, FontWeight.w400, p.textTertiary),
+                ),
+                const SizedBox(height: 2),
+                DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: options.contains(value) ? value : null,
+                    hint: Text(
+                      loading ? '正在获取可用模型…' : '填写密钥后选择模型',
+                      style: appText(12.5, FontWeight.w400, p.textTertiary),
+                    ),
+                    isExpanded: true,
+                    isDense: true,
+                    dropdownColor: p.isDark
+                        ? const Color(0xFF171B24)
+                        : const Color(0xFFFFFCF8),
+                    borderRadius: BorderRadius.circular(14),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                    style: appText(13.5, FontWeight.w500, p.textPrimary),
+                    items: [
+                      for (final model in options)
+                        DropdownMenuItem<String>(
+                          value: model,
+                          child: Text(
+                            model,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: appText(13, FontWeight.w500, p.textPrimary),
+                          ),
+                        ),
+                    ],
+                    onChanged: options.isEmpty
+                        ? null
+                        : (selected) {
+                            if (selected != null) onSelect(selected);
+                          },
+                  ),
+                ),
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      error!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: appText(10.5, FontWeight.w400, p.textTertiary),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (loading)
+            const Padding(
+              padding: EdgeInsets.only(top: 18),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 1.8),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: IconButton(
+                tooltip: '刷新模型列表',
+                iconSize: 18,
+                onPressed: onRefresh,
+                icon: Icon(Icons.refresh_rounded, color: p.textSecondary),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

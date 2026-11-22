@@ -48,6 +48,136 @@ class LLMClient {
     }
   }
 
+  /// Fetches the model ids exposed by the current provider.
+  ///
+  /// This is used by the connection screen so the model field can be a picker
+  /// instead of a free-form input. Providers that do not expose a list endpoint
+  /// throw a readable [LLMException].
+  Future<List<String>> fetchModels(APISettings api) async {
+    if (api.baseUrl.trim().isEmpty) {
+      throw LLMException('请先填写 API 地址');
+    }
+    final client = http.Client();
+    try {
+      switch (api.provider) {
+        case 'anthropic':
+          if (api.apiKey.trim().isEmpty) {
+            throw LLMException('Claude 需要先填写 API Key');
+          }
+          var root = _trim(api.baseUrl);
+          if (root.endsWith('/v1/messages')) root = root.substring(0, root.length - 12);
+          final uri = Uri.parse(
+            root.endsWith('/v1') ? '$root/models' : '$root/v1/models',
+          );
+          final response = await client.get(
+            uri,
+            headers: {
+              'x-api-key': api.apiKey.trim(),
+              'anthropic-version': '2023-06-01',
+            },
+          ).timeout(const Duration(seconds: 20));
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            throw LLMException(
+              _errorText(response.body, response.statusCode),
+              statusCode: response.statusCode,
+            );
+          }
+          final decoded = _tryJson(response.body);
+          final data = decoded?['data'];
+          return [
+            if (data is List)
+              for (final item in data.whereType<Map>())
+                if ((item['id'] ?? '').toString().trim().isNotEmpty)
+                  item['id'].toString(),
+          ];
+        case 'gemini':
+          if (api.apiKey.trim().isEmpty) {
+            throw LLMException('Gemini 需要先填写 API Key');
+          }
+          var root = _trim(api.baseUrl);
+          if (root.endsWith('/models')) root = root.substring(0, root.length - 7);
+          final uri = Uri.parse(
+            '$root/models?key=${Uri.encodeQueryComponent(api.apiKey.trim())}',
+          );
+          final response = await client
+              .get(uri)
+              .timeout(const Duration(seconds: 20));
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            throw LLMException(
+              _errorText(response.body, response.statusCode),
+              statusCode: response.statusCode,
+            );
+          }
+          final decoded = _tryJson(response.body);
+          final models = decoded?['models'];
+          return [
+            if (models is List)
+              for (final item in models.whereType<Map>())
+                if ((item['name'] ?? '').toString().trim().isNotEmpty)
+                  item['name'].toString().replaceFirst('models/', ''),
+          ];
+        case 'ollama':
+          final root = _trim(api.baseUrl);
+          final uri = Uri.parse(
+            root.endsWith('/api/tags') ? root : '$root/api/tags',
+          );
+          final response = await client
+              .get(uri)
+              .timeout(const Duration(seconds: 20));
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            throw LLMException(
+              _errorText(response.body, response.statusCode),
+              statusCode: response.statusCode,
+            );
+          }
+          final decoded = _tryJson(response.body);
+          final models = decoded?['models'];
+          return [
+            if (models is List)
+              for (final item in models.whereType<Map>())
+                if ((item['name'] ?? '').toString().trim().isNotEmpty)
+                  item['name'].toString(),
+          ];
+        default:
+          if (api.apiKey.trim().isEmpty) {
+            throw LLMException('请先填写 API Key');
+          }
+          var root = _trim(api.baseUrl);
+          if (root.endsWith('/chat/completions')) {
+            root = root.substring(0, root.length - 17);
+          }
+          final uri = Uri.parse(
+            root.endsWith('/models') ? root : '$root/models',
+          );
+          final response = await client.get(
+            uri,
+            headers: {
+              'Authorization': 'Bearer ${api.apiKey.trim()}',
+              'Content-Type': 'application/json',
+            },
+          ).timeout(const Duration(seconds: 20));
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            throw LLMException(
+              _errorText(response.body, response.statusCode),
+              statusCode: response.statusCode,
+            );
+          }
+          final decoded = _tryJson(response.body);
+          final data = decoded?['data'];
+          return [
+            if (data is List)
+              for (final item in data.whereType<Map>())
+                if ((item['id'] ?? '').toString().trim().isNotEmpty)
+                  item['id'].toString(),
+          ];
+      }
+    } on TimeoutException {
+      throw LLMException('获取模型列表超时，请检查网络或 API 地址');
+    } finally {
+      client.close();
+    }
+  }
+
   Stream<String> _openAI(
     APISettings api,
     List<Map<String, dynamic>> messages,

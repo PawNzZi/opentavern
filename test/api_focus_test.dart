@@ -6,13 +6,16 @@ void main() {
   testWidgets('API key field keeps focus', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: ConnectionPage()));
     await tester.pumpAndSettle();
-    final fields = find.byType(TextField);
-    expect(fields, findsNWidgets(3));
-    await tester.tap(fields.at(1));
+    final keyField = find.byWidgetPredicate(
+      (widget) => widget is TextField && widget.obscureText,
+    );
+    expect(keyField, findsOneWidget);
+    await tester.tap(keyField);
     await tester.pump();
-    await tester.enterText(fields.at(1), 'sk-test');
-    await tester.pump();
-    final field = tester.widget<TextField>(fields.at(1));
+    await tester.enterText(keyField, 'sk-test');
+    await tester.pump(const Duration(milliseconds: 50));
+    final field = tester.widget<TextField>(keyField);
     expect(field.controller?.text, 'sk-test');
+    expect(field.focusNode?.hasFocus ?? true, isTrue);
   });
 }
