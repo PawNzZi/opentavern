@@ -21,6 +21,7 @@ class ContextPage extends StatefulWidget {
 class _ContextPageState extends State<ContextPage> {
   late double _maxContext;
   late double _tokenPadding;
+  late double _loreMaxTokens;
 
   @override
   void initState() {
@@ -28,6 +29,7 @@ class _ContextPageState extends State<ContextPage> {
     final settings = AppStore.instance.settings;
     _maxContext = settings.maxContext.toDouble();
     _tokenPadding = settings.tokenPadding.toDouble();
+    _loreMaxTokens = settings.loreMaxTokens.toDouble();
   }
 
   Future<void> _save() async {
@@ -35,6 +37,7 @@ class _ContextPageState extends State<ContextPage> {
     AppStore.instance.settings = settings.copyWith(
       maxContext: _maxContext.round(),
       tokenPadding: _tokenPadding.round(),
+      loreMaxTokens: _loreMaxTokens.round(),
     );
     await AppStore.instance.saveSettings();
     if (!mounted) return;
@@ -96,6 +99,31 @@ class _ContextPageState extends State<ContextPage> {
               child: Text(
                 '给模型回复预留的 Token。该值会从上下文中扣除，'
                 '避免上下文把回复空间挤占掉。',
+                style: appText(11, FontWeight.w400, p.textTertiary, height: 1.55),
+              ),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: '世界书注入',
+          children: [
+            SliderLine(
+              title: '世界书 Token 上限',
+              value: _loreMaxTokens,
+              min: 0,
+              max: 8192,
+              divisions: 64,
+              display: _loreMaxTokens <= 0
+                  ? '无限制'
+                  : '${_loreMaxTokens.round()} tokens',
+              onChanged: (v) => setState(() => _loreMaxTokens = v),
+            ),
+            const Hairline(indent: 14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              child: Text(
+                '这是全局设置，对所有世界书生效。0 表示无限制；'
+                '设置上限后只截断世界书部分，不会改变聊天历史预算。',
                 style: appText(11, FontWeight.w400, p.textTertiary, height: 1.55),
               ),
             ),

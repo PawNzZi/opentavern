@@ -310,6 +310,7 @@ class AppSettings {
     this.authorNote = '',
     this.maxContext = 8192,
     this.tokenPadding = 64,
+    this.loreMaxTokens = 0,
     this.memoryEnabled = true,
     this.summaryInterval = 20,
     this.summaryPrompt =
@@ -325,6 +326,7 @@ class AppSettings {
   final String authorNote;
   final int maxContext;
   final int tokenPadding;
+  final int loreMaxTokens;
   final bool memoryEnabled;
   final int summaryInterval;
   final String summaryPrompt;
@@ -339,6 +341,7 @@ class AppSettings {
     String? authorNote,
     int? maxContext,
     int? tokenPadding,
+    int? loreMaxTokens,
     bool? memoryEnabled,
     int? summaryInterval,
     String? summaryPrompt,
@@ -353,6 +356,7 @@ class AppSettings {
       authorNote: authorNote ?? this.authorNote,
       maxContext: maxContext ?? this.maxContext,
       tokenPadding: tokenPadding ?? this.tokenPadding,
+      loreMaxTokens: loreMaxTokens ?? this.loreMaxTokens,
       memoryEnabled: memoryEnabled ?? this.memoryEnabled,
       summaryInterval: summaryInterval ?? this.summaryInterval,
       summaryPrompt: summaryPrompt ?? this.summaryPrompt,
@@ -369,6 +373,7 @@ class AppSettings {
         'authorNote': authorNote,
         'maxContext': maxContext,
         'tokenPadding': tokenPadding,
+        'loreMaxTokens': loreMaxTokens,
         'memoryEnabled': memoryEnabled,
         'summaryInterval': summaryInterval,
         'summaryPrompt': summaryPrompt,
@@ -395,6 +400,7 @@ class AppSettings {
       authorNote: (json['authorNote'] ?? '').toString(),
       maxContext: (json['maxContext'] as num?)?.toInt() ?? 8192,
       tokenPadding: (json['tokenPadding'] as num?)?.toInt() ?? 64,
+      loreMaxTokens: (json['loreMaxTokens'] as num?)?.toInt() ?? 0,
       memoryEnabled: json['memoryEnabled'] != false,
       summaryInterval: (json['summaryInterval'] as num?)?.toInt() ?? 20,
       summaryPrompt: (json['summaryPrompt'] ??
@@ -483,7 +489,6 @@ class Lorebook {
     this.enabled = true,
     this.isGlobal = false,
     this.linked,
-    this.maxTokens = 0,
     int? updatedAt,
   })  : entries = entries ?? [],
         updatedAt = updatedAt ?? DateTime.now().millisecondsSinceEpoch;
@@ -494,7 +499,6 @@ class Lorebook {
   bool enabled;
   bool isGlobal;
   String? linked;
-  int maxTokens;
   int updatedAt;
 
   Map<String, dynamic> toJson() => {
@@ -503,7 +507,6 @@ class Lorebook {
         'enabled': enabled,
         'isGlobal': isGlobal,
         'linked': linked,
-        'maxTokens': maxTokens,
         'updatedAt': updatedAt,
         'entries': entries.map((e) => e.toJson()).toList(),
       };
@@ -515,7 +518,6 @@ class Lorebook {
       enabled: json['enabled'] != false,
       isGlobal: json['isGlobal'] == true,
       linked: json['linked']?.toString(),
-      maxTokens: (json['maxTokens'] as num?)?.toInt() ?? 0,
       updatedAt: (json['updatedAt'] as num?)?.toInt(),
       entries: (json['entries'] as List?)
               ?.whereType<Map>()

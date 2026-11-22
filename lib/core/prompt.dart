@@ -69,7 +69,11 @@ class PromptBuilder {
         .take(8)
         .map((m) => m.text)
         .join('\n');
-    final loreEntries = _activatedLore(character, recentText);
+    final loreEntries = _activatedLore(
+      character,
+      recentText,
+      settings.loreMaxTokens,
+    );
     final loreBefore = loreEntries
         .where((e) => e.position != 'after')
         .map((e) => e.content.trim())
@@ -244,6 +248,7 @@ class PromptBuilder {
   static List<LoreEntry> _activatedLore(
     DemoCharacter character,
     String text,
+    int maxTokens,
   ) {
     final lower = text.toLowerCase();
     final selected = <LoreEntry>[];
@@ -269,9 +274,7 @@ class PromptBuilder {
     for (final book in AppStore.instance.lorebooks) {
       if (!book.enabled) continue;
       if (!book.isGlobal && book.linked != character.name) continue;
-      final candidates = <LoreEntry>[];
-      scanEntries(book.entries, candidates);
-      selected.addAll(_applyBookBudget(candidates, book.maxTokens));
+      scanEntries(book.entries, selected);
     }
 
     // Fallback for cards that have not been imported into the lorebook store.
@@ -311,7 +314,7 @@ class PromptBuilder {
     }
 
     selected.sort((a, b) => b.order.compareTo(a.order));
-    return selected;
+    return _applyBookBudget(selected, maxTokens);
   }
 
   static List<LoreEntry> _applyBookBudget(

@@ -276,49 +276,6 @@ class _LorebookPageState extends State<LorebookPage> {
     if (context.mounted) Navigator.of(context).pop();
   }
 
-  Future<void> _editBudget() async {
-    final controller = TextEditingController(
-      text: widget.book.maxTokens > 0 ? '${widget.book.maxTokens}' : '',
-    );
-    final result = await showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('注入 Token 上限'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('留空或点「无限制」表示不裁剪；填写数字后按 Token 截断。'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: const InputDecoration(
-                hintText: '例如 1200',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, -1), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, 0), child: const Text('无限制')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, int.tryParse(controller.text.trim()) ?? -1),
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (result == null || result < 0) return;
-    widget.book.maxTokens = result;
-    await AppStore.instance.saveLorebooks();
-    if (mounted) setState(() {});
-  }
-
   Future<void> _moveEntry(LoreEntry entry, int delta) async {
     final index = widget.book.entries.indexOf(entry);
     final target = index + delta;
@@ -458,21 +415,6 @@ class _LorebookPageState extends State<LorebookPage> {
                   style: appText(11, FontWeight.w400, p.textTertiary),
                 ),
               ],
-            ),
-            const SizedBox(height: 10),
-            Glass(
-              radius: 20,
-              blur: 20,
-              shadow: false,
-              child: SettingRow(
-                icon: Icons.speed_rounded,
-                title: '注入 Token 上限',
-                subtitle: '0 表示无限制；超出预算的条目会被截断',
-                value: widget.book.maxTokens > 0
-                    ? '${widget.book.maxTokens}'
-                    : '无限制',
-                onTap: _editBudget,
-              ),
             ),
             const SizedBox(height: 12),
             if (entryList.isEmpty)
