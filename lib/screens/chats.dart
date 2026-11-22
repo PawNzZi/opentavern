@@ -219,7 +219,7 @@ class _ChatGroup extends StatelessWidget {
       children: [
         for (var i = 0; i < chats.length; i++) ...[
           _SwipeChatRow(
-            key: ValueKey(chats[i].character.name),
+            key: ValueKey(chats[i].sessionId ?? chats[i].character.name),
             chat: chats[i],
             onTap: () => onOpenChat(chats[i]),
             onPin: () => onPin(chats[i]),

@@ -42,6 +42,7 @@ Future<void> _copyCharacter(
     name: _uniqueCopyName(character.name),
     chats: 0,
     unread: 0,
+    createdAt: DateTime.now().millisecondsSinceEpoch,
   );
   await AppStore.instance.addCharacter(copy);
   if (!context.mounted) return;

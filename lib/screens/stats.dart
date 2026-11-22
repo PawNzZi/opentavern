@@ -27,7 +27,7 @@ class _StatsPageState extends State<StatsPage> {
         ? 0
         : now.subtract(Duration(days: _days!)).millisecondsSinceEpoch;
     final allSessions = store.sessions
-        .where((s) => s.updatedAt >= cutoff)
+        .where((s) => widget.sessionId != null || s.updatedAt >= cutoff)
         .where((s) => widget.sessionId == null || s.id == widget.sessionId)
         .toList();
     final sessions = _selected == null

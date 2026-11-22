@@ -77,8 +77,9 @@ class PromptBuilder {
     final postHistory = character.postHistoryInstructions.trim().isEmpty
         ? ''
         : '\n[越狱 / PHI]\n${macro(character.postHistoryInstructions).trim()}';
-    final maxPrompt =
+    final rawMaxPrompt =
         settings.maxContext - settings.api.maxTokens - settings.tokenPadding;
+    final maxPrompt = rawMaxPrompt < 256 ? 256 : rawMaxPrompt;
     final fixedParts = <String>[
       main,
       character.systemPrompt,
@@ -293,7 +294,11 @@ class PromptBuilder {
 
     for (final book in AppStore.instance.lorebooks) {
       if (!book.enabled) continue;
-      if (!book.isGlobal && book.linked != character.name) continue;
+      final boundByCard = character.lorebook.isNotEmpty &&
+          (character.lorebook == book.name || character.lorebook == book.id);
+      if (!book.isGlobal && book.linked != character.name && !boundByCard) {
+        continue;
+      }
       scanEntries(book.entries, selected);
     }
 

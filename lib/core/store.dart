@@ -403,6 +403,7 @@ class AppStore extends ChangeNotifier {
       'activeQuickSetId': activeQuickSetId,
       'presets': presets.map((p) => p.toJson()).toList(),
       'activePresetId': activePresetId,
+      'regexes': regexScripts.map((r) => r.toJson()).toList(),
     });
   }
 
@@ -518,7 +519,13 @@ class AppStore extends ChangeNotifier {
           session.characterName = character.name;
         }
       }
+      for (final book in lorebooks) {
+        if (book.linked == previousName) {
+          book.linked = character.name;
+        }
+      }
       await saveSessions();
+      await saveLorebooks();
     }
     await saveCharacters();
     notifyListeners();

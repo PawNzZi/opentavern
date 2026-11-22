@@ -364,6 +364,40 @@ class ChatController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _sub?.cancel();
+    _sub = null;
+    // Keep the partial reply when the user leaves mid-generation.
+    final message = streamingMessage;
+    if (message != null) {
+      final text = message.text.trim();
+      if (text.isEmpty) {
+        if (_regenerating && message.swipes.isNotEmpty) {
+          message.text = message.currentSwipe;
+        } else if (!_regenerating && !_continuing) {
+          messages.remove(message);
+        }
+      } else {
+        message.text = text;
+        message.time = _time();
+        if (_regenerating) {
+          if (!message.swipes.contains(text)) message.swipes.insert(0, text);
+          message.swipeIndex = message.swipes.indexOf(text);
+        } else if (_continuing) {
+          if (message.swipes.isEmpty) {
+            message.swipes = [text];
+          } else {
+            final index = message.swipeIndex.clamp(0, message.swipes.length - 1);
+            message.swipes[index] = text;
+          }
+        } else if (message.swipes.isEmpty ||
+            message.swipes.every((s) => s.isEmpty)) {
+          message.swipes = [text];
+          message.swipeIndex = 0;
+        }
+        _session.updatedAt = DateTime.now().millisecondsSinceEpoch;
+        AppStore.instance.saveSessions();
+      }
+    }
+    streamingMessage = null;
     super.dispose();
   }
 }

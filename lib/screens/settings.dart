@@ -16,6 +16,7 @@ import 'media.dart';
 import 'memory.dart';
 import 'presets.dart';
 import 'prompts.dart';
+import 'sheets.dart';
 import 'stats.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -301,7 +302,7 @@ class SettingsScreen extends StatelessWidget {
                   title: '导入角色',
                   value: 'PNG · JSON',
                   iconColor: p.amber,
-                  onTap: () => _open(context, const DataPage()),
+                  onTap: () => _open(context, const ImportSheetScreen()),
                 ),
                 const Hairline(indent: 56),
                 SettingRow(

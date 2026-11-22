@@ -82,6 +82,7 @@ class DemoCharacter {
     String? postHistoryInstructions,
     List<String>? alternateGreetings,
     String? avatarBase64,
+    int? createdAt,
   }) {
     return DemoCharacter(
       name: name ?? this.name,
@@ -107,8 +108,8 @@ class DemoCharacter {
       postHistoryInstructions: postHistoryInstructions ?? this.postHistoryInstructions,
       alternateGreetings: alternateGreetings ?? this.alternateGreetings,
       avatarBase64: avatarBase64 ?? this.avatarBase64,
+      createdAt: createdAt ?? this.createdAt,
       rawJson: rawJson,
-      createdAt: createdAt,
     );
   }
 
