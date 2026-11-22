@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import '../core/llm.dart';
 import '../core/models.dart';
 import '../core/prompt.dart';
-import '../core/regex.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 
@@ -170,18 +169,14 @@ class ChatController extends ChangeNotifier {
     final message = streamingMessage;
     if (message != null) {
       final text = message.text.trim();
-      final cleaned = applyRegexScripts(
-        text.isEmpty ? '……' : text,
-        AppStore.instance.regexScripts,
-        stage: 'display',
-        characterName: character.name,
-      );
-      message.text = cleaned;
+      // Store the raw model output. Display-only regex is applied when the
+      // message is rendered, never written back into chat history.
+      message.text = text.isEmpty ? '……' : text;
       message.time = _time();
       message.model = _activeSettings.api.model;
       message.apiProvider = _activeSettings.api.provider;
       message.promptTokens = _promptTokens;
-      message.completionTokens = estimateTokens(cleaned);
+      message.completionTokens = estimateTokens(message.text);
       message.durationMs = _generationStartedAt == null
           ? null
           : DateTime.now()

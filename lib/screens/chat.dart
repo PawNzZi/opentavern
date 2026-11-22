@@ -12,6 +12,7 @@ import '../chat/chat_controller.dart';
 import '../core/docx_text.dart';
 import '../core/models.dart';
 import '../core/pdf_text.dart';
+import '../core/regex.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
@@ -19,6 +20,16 @@ import '../design/scaffold.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
 import 'chat_info.dart';
+
+String _renderDisplayText(ChatMessage message, String characterName) {
+  if (message.text.isEmpty) return message.text;
+  return applyRegexScripts(
+    message.text,
+    AppStore.instance.regexScripts,
+    stage: 'display',
+    characterName: characterName,
+  );
+}
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
@@ -465,6 +476,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: message.isUser
                   ? _UserMessage(
                       message: message,
+                      characterName: c.name,
                       onLongPress: () => _showMessageMenu(message),
                     )
                   : _CharacterMessage(
@@ -833,6 +845,9 @@ class _CharacterMessage extends StatefulWidget {
 class _CharacterMessageState extends State<_CharacterMessage> {
   double _drag = 0;
 
+  String get _displayText =>
+      _renderDisplayText(widget.message, widget.character.name);
+
   bool get _canSwipe =>
       widget.isLast && !widget.streaming && widget.message.hasSwipes;
 
@@ -997,7 +1012,7 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                                     child: KeyedSubtree(
                                       key: ValueKey(message.swipeIndex),
                                       child: _RichMessage(
-                                        text: message.text,
+                                        text: _displayText,
                                         color: p.textPrimary,
                                         italicColor: p.textSecondary,
                                       ),
@@ -1133,9 +1148,14 @@ class _CharacterMessageState extends State<_CharacterMessage> {
 }
 
 class _UserMessage extends StatelessWidget {
-  const _UserMessage({required this.message, this.onLongPress});
+  const _UserMessage({
+    required this.message,
+    required this.characterName,
+    this.onLongPress,
+  });
 
   final ChatMessage message;
+  final String characterName;
   final VoidCallback? onLongPress;
 
   @override
@@ -1174,7 +1194,7 @@ class _UserMessage extends StatelessWidget {
               ],
             ),
             child: Text(
-              message.text,
+              _renderDisplayText(message, characterName),
               style: appText(
                 15,
                 FontWeight.w500,
@@ -1393,7 +1413,7 @@ class _Composer extends StatelessWidget {
                     isDense: true,
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
-                    hintText: '对 ${character.name} 说点什么…',
+                    hintText: '对 ${character.name} 说点什么…  “发言”（环境）',
                     hintStyle: appText(
                       14.5,
                       FontWeight.w400,

@@ -216,8 +216,11 @@ class PromptBuilder {
       final m = session.messages[i];
       if (m.hidden || m.isSystem) continue;
       if (m.text.trim().isEmpty && m.attachments.isEmpty) continue;
-      var content = applyRegexScripts(
-        m.text,
+      var content = m.isUser
+          ? _formatUserRoleplay(m.text)
+          : m.text;
+      content = applyRegexScripts(
+        content,
         AppStore.instance.regexScripts,
         stage: 'prompt',
         characterName: character.name,
@@ -308,6 +311,21 @@ class PromptBuilder {
         if (postHistory.trim().isNotEmpty) 'jailbreak': postHistory.trim(),
       },
     );
+  }
+
+  /// Converts roleplay shorthand in user messages:
+  /// “...” becomes explicit user speech and （...） an environment/action note.
+  static String _formatUserRoleplay(String text) {
+    var result = text;
+    result = result.replaceAllMapped(
+      RegExp(r'“([^”]*)”'),
+      (match) => '[用户发言] ${match.group(1)!.trim()}',
+    );
+    result = result.replaceAllMapped(
+      RegExp(r'（([^）]*)）'),
+      (match) => '[用户环境/动作] ${match.group(1)!.trim()}',
+    );
+    return result;
   }
 
   static List<LoreEntry> _activatedLore(
@@ -471,7 +489,7 @@ class PromptBuilder {
     var used = 0;
     for (final entry in sorted) {
       final cost = estimateTokens(entry.content) + 2;
-      if (result.isNotEmpty && used + cost > maxTokens) continue;
+      if (used + cost > maxTokens) continue;
       result.add(entry);
       used += cost;
     }

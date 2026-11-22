@@ -390,7 +390,15 @@ class AppStore extends ChangeNotifier {
         'is_system': m.isSystem,
         'send_date': DateTime.fromMillisecondsSinceEpoch(m.createdAt).toIso8601String(),
         'mes': m.text,
-        'extra': {'bookmarked': m.bookmarked, 'hidden': m.hidden},
+        'extra': {
+          'bookmarked': m.bookmarked,
+          'hidden': m.hidden,
+          'model': m.model,
+          'apiProvider': m.apiProvider,
+          'promptTokens': m.promptTokens,
+          'completionTokens': m.completionTokens,
+          'durationMs': m.durationMs,
+        },
         'swipes': m.swipes,
         'swipe_id': m.swipeIndex,
       }));
@@ -404,6 +412,8 @@ class AppStore extends ChangeNotifier {
     bool jsonl = true,
   }) async {
     final messages = <ChatMessage>[];
+    String summary = '';
+    Map<String, String> variables = {};
     if (jsonl) {
       for (final line in raw.split('\n')) {
         final trimmed = line.trim();
@@ -412,6 +422,15 @@ class AppStore extends ChangeNotifier {
           final decoded = jsonDecode(trimmed);
           if (decoded is! Map) continue;
           final map = Map<String, dynamic>.from(decoded);
+          if (map['chat_metadata'] is Map) {
+            final metadata = Map<String, dynamic>.from(map['chat_metadata'] as Map);
+            summary = (metadata['summary'] ?? '').toString();
+            if (metadata['variables'] is Map) {
+              variables = (metadata['variables'] as Map).map(
+                (k, v) => MapEntry(k.toString(), v.toString()),
+              );
+            }
+          }
           if (map.containsKey('mes')) {
             messages.add(ChatMessage(
               id: 'import-${messages.length}-${DateTime.now().microsecondsSinceEpoch}',
@@ -422,6 +441,25 @@ class AppStore extends ChangeNotifier {
               swipeIndex: (map['swipe_id'] as num?)?.toInt() ?? 0,
               bookmarked: (map['extra'] is Map && map['extra']['bookmarked'] == true),
               hidden: (map['extra'] is Map && map['extra']['hidden'] == true),
+              createdAt: DateTime.tryParse(
+                    (map['send_date'] ?? map['createdAt'] ?? '').toString(),
+                  )?.millisecondsSinceEpoch ??
+                  DateTime.now().millisecondsSinceEpoch,
+              model: map['extra'] is Map
+                  ? map['extra']['model']?.toString()
+                  : null,
+              apiProvider: map['extra'] is Map
+                  ? map['extra']['apiProvider']?.toString()
+                  : null,
+              promptTokens: map['extra'] is Map
+                  ? (map['extra']['promptTokens'] as num?)?.toInt()
+                  : null,
+              completionTokens: map['extra'] is Map
+                  ? (map['extra']['completionTokens'] as num?)?.toInt()
+                  : null,
+              durationMs: map['extra'] is Map
+                  ? (map['extra']['durationMs'] as num?)?.toInt()
+                  : null,
             ));
           }
         } catch (_) {}
@@ -457,6 +495,9 @@ class AppStore extends ChangeNotifier {
       characterName: characterName,
       title: '$characterName · 导入',
       messages: messages,
+      summary: summary,
+      summaryUpTo: messages.length,
+      variables: variables,
     );
     sessions.add(session);
     await saveSessions();
