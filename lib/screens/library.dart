@@ -18,7 +18,7 @@ class LibraryScreen extends StatefulWidget {
 
   final ValueChanged<DemoCharacter> onOpenCharacter;
   final ValueChanged<DemoCharacter> onOpenChat;
-  final VoidCallback onImport;
+  final Future<void> Function() onImport;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -80,7 +80,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
             trailing: GlassCircleButton(
               icon: Icons.add_rounded,
               size: 46,
-              onTap: widget.onImport,
+              onTap: () async {
+                await widget.onImport();
+                if (mounted) setState(() => _tag = '全部');
+              },
             ),
           ),
           const SizedBox(height: 20),

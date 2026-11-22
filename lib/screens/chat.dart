@@ -150,7 +150,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _toast('目前支持 TXT / MD / JSON / CSV / DOCX / PDF');
       return;
     }
-    var content = text!;
+    var content = text;
     if (content.length > 20000) content = content.substring(0, 20000);
     if (!mounted) return;
     setState(() {
@@ -437,7 +437,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Text(
-                  '今天 · 11 月 18 日',
+                  '今天 · ${DateTime.now().month} 月 ${DateTime.now().day} 日',
                   style: appText(
                     10,
                     FontWeight.w500,

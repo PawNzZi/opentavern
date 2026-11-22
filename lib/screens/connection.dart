@@ -116,6 +116,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
       eyebrow: 'CONNECTION',
       title: 'API 连接',
       subtitle: '密钥只保存在本机，不会上传。',
+      resizeToAvoidBottomInset: true,
       footer: GlassPrimaryButton(
         label: '保存连接',
         icon: Icons.check_rounded,

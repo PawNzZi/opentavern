@@ -34,6 +34,15 @@ import 'screens/stats.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppStore.instance.init();
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarContrastEnforced: false,
+    ),
+  );
   runApp(const TavernApp());
 }
 
@@ -291,8 +300,8 @@ class RootShell extends StatefulWidget {
 class _RootShellState extends State<RootShell> {
   late int _index = widget.initialTab;
 
-  void _push(Widget screen) {
-    Navigator.of(context).push(
+  Future<void> _push(Widget screen) async {
+    await Navigator.of(context).push(
       CupertinoPageRoute(builder: (_) => screen),
     );
   }

@@ -419,6 +419,7 @@ class _LorebookPageState extends State<LorebookPage> {
                         title: _entryTitle(entryList[i]),
                         subtitle: _entrySubtitle(entryList[i]),
                         value: _entryStatus(entryList[i]),
+                        chevron: false,
                         iconColor: entryList[i].enabled
                             ? p.amber
                             : p.textTertiary,
@@ -450,14 +451,7 @@ class _LorebookPageState extends State<LorebookPage> {
                               blur: 0,
                               onTap: () => _moveEntry(entryList[i], 1),
                             ),
-                            const SizedBox(width: 2),
-                            GlassCircleButton(
-                              icon: Icons.delete_outline_rounded,
-                              size: 28,
-                              iconSize: 14,
-                              blur: 0,
-                              onTap: () => _deleteEntry(entryList[i]),
-                            ),
+
                           ],
                         ),
                       ),
@@ -570,6 +564,26 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
     Navigator.of(context).maybePop();
   }
 
+  Future<void> _deleteEntry() async {
+    final entry = widget.entry;
+    if (entry == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除条目'),
+        content: Text('确定删除「${entry.name.isEmpty ? entry.keys.join(' · ') : entry.name}」？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    widget.book.entries.removeWhere((e) => e.id == entry.id);
+    await AppStore.instance.saveLorebooks();
+    if (context.mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
@@ -583,6 +597,15 @@ class _LoreEntryEditorPageState extends State<LoreEntryEditorPage> {
       eyebrow: isNew ? 'NEW LORE ENTRY' : 'LORE ENTRY',
       title: isNew ? '新建条目' : '编辑条目',
       subtitle: '${widget.book.name} · $status',
+      trailing: isNew
+          ? null
+          : GlassCircleButton(
+              icon: Icons.delete_outline_rounded,
+              size: 38,
+              iconSize: 17,
+              blur: 0,
+              onTap: _deleteEntry,
+            ),
       footer: GlassPrimaryButton(
         label: '保存条目',
         icon: Icons.check_rounded,

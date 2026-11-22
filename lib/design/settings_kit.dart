@@ -17,6 +17,7 @@ class DetailPage extends StatelessWidget {
     this.trailing,
     this.footer,
     this.padding = const EdgeInsets.fromLTRB(20, 6, 20, 40),
+    this.resizeToAvoidBottomInset = false,
   });
 
   final String eyebrow;
@@ -26,12 +27,14 @@ class DetailPage extends StatelessWidget {
   final Widget? trailing;
   final Widget? footer;
   final EdgeInsets padding;
+  final bool resizeToAvoidBottomInset;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     return TavernScaffold(
       intensity: 1.02,
+      resizeToAvoidBottomInset: resizeToAvoidBottomInset,
       child: SafeArea(
         bottom: false,
         child: Column(

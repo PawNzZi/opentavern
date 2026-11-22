@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tavern_app/chat/chat_controller.dart';
 import 'package:tavern_app/core/models.dart';
-import 'package:tavern_app/core/store.dart';
 import 'package:tavern_app/data/demo.dart';
 
 void main() {

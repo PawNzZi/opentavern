@@ -229,7 +229,11 @@ class APISettings {
   final int maxTokens;
   final bool streaming;
 
-  bool get configured => baseUrl.trim().isNotEmpty && model.trim().isNotEmpty;
+  bool get configured {
+    if (baseUrl.trim().isEmpty || model.trim().isEmpty) return false;
+    if (provider == 'ollama' || provider == 'custom') return true;
+    return apiKey.trim().isNotEmpty;
+  }
 
   APISettings copyWith({
     String? provider,
