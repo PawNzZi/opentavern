@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../core/llm.dart';
 import '../core/models.dart';
@@ -208,7 +209,13 @@ class ChatController extends ChangeNotifier {
     _regenerating = false;
     _continuing = false;
     _sub = null;
+    final receivedMessage = message != null &&
+        message.text.trim().isNotEmpty &&
+        !message.text.trim().startsWith('⚠️');
     if (_disposed) return;
+    if (receivedMessage) {
+      SystemSound.play(SystemSoundType.alert).ignore();
+    }
     _session.updatedAt = DateTime.now().millisecondsSinceEpoch;
     notifyListeners();
     _save();

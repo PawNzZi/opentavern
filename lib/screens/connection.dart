@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/llm.dart';
 import '../core/store.dart';
 import '../design/glass.dart';
+import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
@@ -209,7 +210,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-              child: Wrap(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
                 alignment: WrapAlignment.start,
                 crossAxisAlignment: WrapCrossAlignment.start,
                 spacing: 8,
@@ -222,6 +225,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                       onTap: () => _selectProvider(label),
                     ),
                 ],
+              ),
               ),
             ),
           ],
@@ -296,98 +300,178 @@ class _ModelPicker extends StatelessWidget {
   final ValueChanged<String> onSelect;
   final Future<void> Function() onRefresh;
 
+  Future<void> _open(BuildContext context) async {
+    final selected = await showTavernSheet<String>(
+      context,
+      title: '选择模型',
+      subtitle: models.isEmpty
+          ? (error ?? '没有可用模型')
+          : '${models.length} 个可用模型',
+      heightFactor: .62,
+      child: _ModelSheet(
+        models: models,
+        current: value,
+        error: error,
+      ),
+    );
+    if (selected != null) onSelect(selected);
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final options = {
-      if (value.isNotEmpty && !models.contains(value)) value,
-      ...models,
-    }.toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.auto_awesome_rounded, size: 17, color: p.textTertiary),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '模型',
-                  style: appText(11, FontWeight.w400, p.textTertiary),
-                ),
-                const SizedBox(height: 2),
-                DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: options.contains(value) ? value : null,
-                    hint: Text(
-                      loading ? '正在获取可用模型…' : '填写密钥后选择模型',
-                      style: appText(12.5, FontWeight.w400, p.textTertiary),
-                    ),
-                    isExpanded: true,
-                    isDense: true,
-                    dropdownColor: p.isDark
-                        ? const Color(0xFF171B24)
-                        : const Color(0xFFFFFCF8),
-                    borderRadius: BorderRadius.circular(14),
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-                    style: appText(13.5, FontWeight.w500, p.textPrimary),
-                    items: [
-                      for (final model in options)
-                        DropdownMenuItem<String>(
-                          value: model,
-                          child: Text(
-                            model,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: appText(13, FontWeight.w500, p.textPrimary),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _open(context),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '模型',
+                    style: appText(11, FontWeight.w400, p.textTertiary),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          value.trim().isEmpty ? '选择模型' : value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: appText(
+                            13.5,
+                            FontWeight.w500,
+                            value.trim().isEmpty
+                                ? p.textTertiary
+                                : p.textPrimary,
                           ),
                         ),
+                      ),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 19,
+                        color: p.textSecondary,
+                      ),
                     ],
-                    onChanged: options.isEmpty
-                        ? null
-                        : (selected) {
-                            if (selected != null) onSelect(selected);
-                          },
                   ),
-                ),
-                if (error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      error!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: appText(10.5, FontWeight.w400, p.textTertiary),
+                  if (loading)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '正在获取可用模型…',
+                        style: appText(10.5, FontWeight.w400, p.textTertiary),
+                      ),
+                    )
+                  else if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        error!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: appText(10.5, FontWeight.w400, p.textTertiary),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           if (loading)
-            const Padding(
-              padding: EdgeInsets.only(top: 18),
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 1.8),
-              ),
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 1.8),
             )
           else
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: IconButton(
-                tooltip: '刷新模型列表',
-                iconSize: 18,
-                onPressed: onRefresh,
-                icon: Icon(Icons.refresh_rounded, color: p.textSecondary),
-              ),
+            IconButton(
+              tooltip: '刷新模型列表',
+              iconSize: 18,
+              onPressed: onRefresh,
+              icon: Icon(Icons.refresh_rounded, color: p.textSecondary),
             ),
         ],
       ),
+    );
+  }
+}
+
+class _ModelSheet extends StatelessWidget {
+  const _ModelSheet({
+    required this.models,
+    required this.current,
+    required this.error,
+  });
+
+  final List<String> models;
+  final String current;
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    if (models.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(6, 16, 6, 20),
+        child: Column(
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 24, color: p.textTertiary),
+            const SizedBox(height: 8),
+            Text(
+              error ?? '没有获取到可用模型',
+              textAlign: TextAlign.center,
+              style: appText(12.5, FontWeight.w400, p.textSecondary),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '关闭后点右侧刷新按钮重试',
+              style: appText(10.5, FontWeight.w400, p.textTertiary),
+            ),
+          ],
+        ),
+      );
+    }
+    return Column(
+      children: [
+        for (final model in models)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Navigator.of(context).pop(model),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: p.divider, width: .6),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      model,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: appText(
+                        13.5,
+                        model == current ? FontWeight.w600 : FontWeight.w400,
+                        model == current ? p.amber : p.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (model == current)
+                    Icon(Icons.check_rounded, size: 18, color: p.amber),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
