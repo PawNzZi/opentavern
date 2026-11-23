@@ -227,37 +227,20 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _openAttachments() {
-    showTavernSheet<void>(
-      context,
-      title: '添加内容',
-      subtitle: '图片会压缩到 1024px；文本 / PDF / DOCX 作为上下文。',
-      heightFactor: .5,
-      child: Builder(
-        builder: (sheetContext) {
-          final p = AppPalette.of(sheetContext);
-          return Row(
-            children: [
-              _AttachAction(
-                icon: Icons.photo_outlined,
-                label: '图片',
-                color: p.amber,
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  _pickImage(context);
-                },
-              ),
-              const SizedBox(width: 10),
-              _AttachAction(
-                icon: Icons.attach_file_rounded,
-                label: '文件',
-                color: p.sage,
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  _pickFile(context);
-                },
-              ),
-            ],
-          );
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '关闭添加内容',
+      barrierColor: Colors.black.withValues(alpha: .46),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (dialogContext, _, _) => _AttachmentMenu(
+        onImage: () {
+          Navigator.of(dialogContext).pop();
+          _pickImage(context);
+        },
+        onFile: () {
+          Navigator.of(dialogContext).pop();
+          _pickFile(context);
         },
       ),
     );
@@ -652,8 +635,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                 label: reply.label,
                                 height: 32,
                                 onTap: () {
+                                  if (_chat.isGenerating) return;
+                                  FocusScope.of(context).unfocus();
                                   _input.text = reply.message;
                                   setState(() => _hasText = true);
+                                  _send();
                                 },
                               );
                             },
@@ -780,7 +766,11 @@ class _ChatTopBar extends StatelessWidget {
                       width: 5,
                       height: 5,
                       decoration: BoxDecoration(
-                        color: p.amber,
+                        color: generating
+                            ? p.amber
+                            : (AppStore.instance.settings.api.configured
+                                ? p.sage
+                                : p.danger),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -789,8 +779,8 @@ class _ChatTopBar extends StatelessWidget {
                       generating
                           ? '正在生成…'
                           : (AppStore.instance.settings.api.configured
-                              ? '已配置'
-                              : '未配置'),
+                              ? '在线'
+                              : '离线'),
                       style: appText(10, FontWeight.w500, p.amber),
                     ),
                   ],
@@ -1495,6 +1485,109 @@ class _Composer extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AttachmentMenu extends StatelessWidget {
+  const _AttachmentMenu({required this.onImage, required this.onFile});
+
+  final VoidCallback onImage;
+  final VoidCallback onFile;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Glass(
+            radius: 26,
+            blur: 34,
+            fill: 1.25,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: p.amber.withValues(alpha: .16),
+                      ),
+                      child: Icon(
+                        Icons.attach_file_rounded,
+                        size: 15,
+                        color: p.amber,
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    Text(
+                      '添加内容',
+                      style: appText(12, FontWeight.w500, p.textSecondary),
+                    ),
+                    const Spacer(),
+                    GlassCircleButton(
+                      icon: Icons.close_rounded,
+                      size: 28,
+                      iconSize: 13,
+                      blur: 0,
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                GridView.count(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  childAspectRatio: 2.2,
+                  children: [
+                    Pressable(
+                      onTap: onImage,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.photo_outlined, size: 19, color: p.amber),
+                          const SizedBox(height: 5),
+                          Text(
+                            '图片',
+                            style: appText(10.5, FontWeight.w500, p.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Pressable(
+                      onTap: onFile,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.attach_file_rounded,
+                            size: 19,
+                            color: p.sage,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            '文件',
+                            style: appText(10.5, FontWeight.w500, p.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

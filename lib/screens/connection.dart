@@ -323,8 +323,16 @@ class _ModelPicker extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.auto_awesome_rounded, size: 17, color: p.textTertiary),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              size: 17,
+              color: p.textTertiary,
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: GestureDetector(
@@ -385,17 +393,25 @@ class _ModelPicker extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           if (loading)
-            const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 1.8),
+            const Padding(
+              padding: EdgeInsets.only(top: 23),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 1.8),
+              ),
             )
           else
-            IconButton(
-              tooltip: '刷新模型列表',
-              iconSize: 18,
-              onPressed: onRefresh,
-              icon: Icon(Icons.refresh_rounded, color: p.textSecondary),
+            Padding(
+              padding: const EdgeInsets.only(top: 11),
+              child: IconButton(
+                tooltip: '刷新模型列表',
+                iconSize: 18,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: EdgeInsets.zero,
+                onPressed: onRefresh,
+                icon: Icon(Icons.refresh_rounded, color: p.textSecondary),
+              ),
             ),
         ],
       ),

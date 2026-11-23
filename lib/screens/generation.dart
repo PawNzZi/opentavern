@@ -108,15 +108,17 @@ class _GenerationPageState extends State<GenerationPage> {
         ),
         SettingsGroup(
           title: '上下文',
-          footnote: '上下文 = 模型总窗口减去回复长度和预留 token；聊天历史从最新往旧填充。',
+          footnote: '最大上下文只决定能携带多少历史和设定，不会截断回复；回复显示不完整时请调大「最大回复长度」。131072 显示为「不限制」，实际仍取决于模型窗口。',
           children: [
             SliderLine(
               title: '最大上下文',
               value: _maxContext,
               min: 2048,
-              max: 32768,
-              divisions: 30,
-              display: '${_maxContext.round()} tokens',
+              max: 131072,
+              divisions: 63,
+              display: _maxContext >= 131072
+                  ? '不限制'
+                  : '${_maxContext.round()} tokens',
               onChanged: (v) => setState(() => _maxContext = v),
             ),
             SliderLine(
@@ -146,8 +148,8 @@ class _GenerationPageState extends State<GenerationPage> {
               title: '最大回复长度',
               value: _maxTokens,
               min: 128,
-              max: 4096,
-              divisions: 31,
+              max: 8192,
+              divisions: 63,
               display: '${_maxTokens.round()} tokens',
               onChanged: (v) => setState(() => _maxTokens = v),
             ),

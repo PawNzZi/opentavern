@@ -354,8 +354,8 @@ class ChatInfoSheet extends StatelessWidget {
       for (final s in store.sessions)
         if (s.parentId == session.id) s,
     ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    final hasBranchLink = session.parentId != null ||
-        mainLinkId != null ||
+    final hasBranchLink = parentSession != null ||
+        mainSession != null ||
         childBranches.isNotEmpty;
 
     final summaryIndex = _indexOf(_summaryPositionKeys, settings.summaryPosition);
@@ -375,12 +375,6 @@ class ChatInfoSheet extends StatelessWidget {
               onTap: () => _branch(context),
             ),
             ActionSpec(
-              icon: Icons.bookmark_add_outlined,
-              label: '检查点',
-              color: p.sage,
-              onTap: () => _branch(context, checkpoint: true),
-            ),
-            ActionSpec(
               icon: Icons.file_open_outlined,
               label: '导入聊天',
               color: p.violet,
@@ -397,9 +391,9 @@ class ChatInfoSheet extends StatelessWidget {
         if (hasBranchLink)
           SettingsGroup(
             title: '分支关系',
-            footnote: '分支与检查点复制创建时的消息；父聊天、主线与子分支都可以直接打开。',
+            footnote: '分支复制创建时的消息；父聊天、主线与子分支都可以直接打开。',
             children: [
-              if (session.parentId != null) ...[
+              if (parentSession != null) ...[
                 SettingRow(
                   icon: Icons.call_split_rounded,
                   title: '父聊天',
@@ -415,7 +409,7 @@ class ChatInfoSheet extends StatelessWidget {
                       ? null
                       : () => _openSession(context, parentSession),
                 ),
-                if (mainLinkId != null) const Hairline(indent: 56),
+                if (mainSession != null) const Hairline(indent: 56),
               ],
               if (mainLinkId != null)
                 SettingRow(
@@ -433,7 +427,7 @@ class ChatInfoSheet extends StatelessWidget {
                       ? null
                       : () => _openSession(context, mainSession),
                 ),
-              if (mainLinkId != null && childBranches.isNotEmpty)
+              if (mainSession != null && childBranches.isNotEmpty)
                 const Hairline(indent: 56),
               for (var i = 0; i < childBranches.length; i++) ...[
                 SettingRow(
