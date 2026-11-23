@@ -751,7 +751,7 @@ class PromptPreset {
     this.mainPrompt = '',
     List<PromptEntry>? entries,
     this.temperature = .85,
-    this.maxTokens = 512,
+    this.maxTokens = 0,
   }) : entries = entries ?? [];
 
   final String id;
@@ -776,7 +776,7 @@ class PromptPreset {
       name: (json['name'] ?? '默认预设').toString(),
       mainPrompt: (json['mainPrompt'] ?? '').toString(),
       temperature: (json['temperature'] as num?)?.toDouble() ?? .85,
-      maxTokens: (json['maxTokens'] as num?)?.toInt() ?? 512,
+      maxTokens: (json['maxTokens'] as num?)?.toInt() ?? 0,
       entries: (json['entries'] as List?)
               ?.whereType<Map>()
               .map((e) => PromptEntry.fromJson(Map<String, dynamic>.from(e)))

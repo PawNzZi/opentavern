@@ -151,6 +151,17 @@ class AppStore extends ChangeNotifier {
           PromptPreset.fromJson(Map<String, dynamic>.from(item)),
         );
       }
+      // 迁移：旧版默认预设把 maxTokens 写死成 512，会悄悄覆盖全局「最大回复
+      // 长度」，导致长回复（例如世界书要求结尾的心理描写）被截断。512 正是旧
+      // 默认值，将其改为 0（跟随全局生成参数），用户仍可在预设里单独设值。
+      var migrated = false;
+      for (final preset in presets) {
+        if (preset.maxTokens == 512) {
+          preset.maxTokens = 0;
+          migrated = true;
+        }
+      }
+      if (migrated) await savePresets();
     }
     final cfg = await _readJson('settings.json');
     if (cfg is Map) {

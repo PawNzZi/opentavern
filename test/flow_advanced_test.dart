@@ -166,4 +166,44 @@ void main() {
     expect(session!.messages.length, 2);
     store.sessions.clear();
   });
+
+  test('preset defaults to follow-global maxTokens (0)', () {
+    final preset = PromptPreset(id: 'p', name: '默认预设');
+    expect(preset.maxTokens, 0);
+    final parsed = PromptPreset.fromJson({'id': 'p', 'name': 'x'});
+    expect(parsed.maxTokens, 0);
+    // 0 表示跟随全局；ChatController 只在 >0 时用预设值覆盖全局回复长度。
+    const globalMax = 8192;
+    final effective = preset.maxTokens > 0 ? preset.maxTokens : globalMax;
+    expect(effective, globalMax);
+  });
+
+  test('constant worldbook requirement reaches the system prompt', () {
+    final character = _character();
+    final store = AppStore.instance;
+    store.lorebooks
+      ..clear()
+      ..add(Lorebook(
+        id: 'req-book',
+        name: '要求书',
+        linked: character.name,
+        entries: [
+          LoreEntry(
+            id: 'req',
+            constant: true,
+            content: '每次回复的最后必须加入角色的心理描写。',
+          ),
+        ],
+      ));
+    final built = PromptBuilder.build(
+      character: character,
+      session: _session('req-session', character.name),
+      settings: const AppSettings(),
+    );
+    expect(
+      built.messages.first['content'],
+      contains('每次回复的最后必须加入角色的心理描写'),
+    );
+    store.lorebooks.clear();
+  });
 }

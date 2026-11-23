@@ -10,6 +10,10 @@ import '../design/theme.dart';
 import 'chat.dart';
 import 'search.dart';
 
+/// Home dashboard: a "continue" card plus a small, curated preview of two
+/// characters. The full waterfall library (with 全部 / 最近 / 收藏 and tag
+/// filters) lives on its own page so filtering never conflicts with the
+/// two-card preview.
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({
     super.key,
@@ -27,16 +31,6 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  String _tag = '全部';
-
-  List<String> get _tags {
-    final tags = <String>{'全部', '最近', '收藏'};
-    for (final character in AppStore.instance.characters) {
-      tags.addAll(character.tags.where((t) => t.trim().isNotEmpty));
-    }
-    return tags.toList();
-  }
-
   @override
   void initState() {
     super.initState();
@@ -53,33 +47,52 @@ class _LibraryScreenState extends State<LibraryScreen> {
     super.dispose();
   }
 
-  List<DemoCharacter> get _filtered {
-    switch (_tag) {
-      case '全部':
-      case '最近':
-        return AppStore.instance.characters;
-      case '收藏':
-        return AppStore.instance.characters.where((c) => c.favorite).toList();
-      default:
-        return AppStore.instance.characters.where((c) => c.tags.contains(_tag)).toList();
+  /// Two most relevant characters: recent chat activity first, then favorites.
+  List<DemoCharacter> _featured() {
+    final store = AppStore.instance;
+    final lastActive = <String, int>{};
+    for (final s in store.sessions) {
+      final t = lastActive[s.characterName] ?? 0;
+      if (s.updatedAt > t) lastActive[s.characterName] = s.updatedAt;
     }
+    final sorted = [...store.characters];
+    sorted.sort((a, b) {
+      final ta = lastActive[a.name] ?? 0;
+      final tb = lastActive[b.name] ?? 0;
+      if (ta != tb) return tb.compareTo(ta);
+      if (a.favorite != b.favorite) return a.favorite ? -1 : 1;
+      return a.name.compareTo(b.name);
+    });
+    return sorted.take(2).toList();
+  }
+
+  void _openLibrary() {
+    openGlassPage(
+      context,
+      CharacterLibraryPage(
+        onOpenCharacter: widget.onOpenCharacter,
+        onOpenChat: widget.onOpenChat,
+        onImport: widget.onImport,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final characters = _filtered;
+    final store = AppStore.instance;
+    final total = store.characters.length;
+    final featured = _featured();
     ChatSession? latestSession;
-    for (final session in AppStore.instance.sessions) {
-      if (latestSession == null ||
-          session.updatedAt > latestSession.updatedAt) {
+    for (final session in store.sessions) {
+      if (latestSession == null || session.updatedAt > latestSession.updatedAt) {
         latestSession = session;
       }
     }
     DemoCharacter? continueCharacter;
     if (latestSession != null) {
-      for (final c in AppStore.instance.characters) {
-        if (c.name == latestSession!.characterName) {
+      for (final c in store.characters) {
+        if (c.name == latestSession.characterName) {
           continueCharacter = c;
           break;
         }
@@ -100,7 +113,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               size: 46,
               onTap: () async {
                 await widget.onImport();
-                if (mounted) setState(() => _tag = '全部');
+                if (mounted) setState(() {});
               },
             ),
           ),
@@ -109,28 +122,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
             hint: '搜索角色或标签',
             onTap: () => openGlassPage(context, const SearchPage()),
           ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 38,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: _tags.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                final tag = _tags[i];
-                return GlassPill(
-                  label: tag,
-                  selected: _tag == tag,
-                  onTap: () => setState(() => _tag = tag),
-                );
-              },
-            ),
-          ),
           const SizedBox(height: 22),
-          if (latestSession != null && continueCharacter != null)
+          if (latestSession != null && continueCharacter != null) ...[
             _ContinueCard(
-              character: continueCharacter!,
+              character: continueCharacter,
               session: latestSession,
               onTap: () => openGlassPage(
                 context,
@@ -140,21 +135,32 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 22),
+          ],
           SectionLabel(
             '角色',
-            trailing: Text(
-              '${characters.length} 位 · 管理',
-              style: appText(12.5, FontWeight.w500, p.textTertiary),
+            trailing: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _openLibrary,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '查看全部 $total 位',
+                    style: appText(12.5, FontWeight.w500, p.amber),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.chevron_right_rounded, size: 16, color: p.amber),
+                ],
+              ),
             ),
           ),
-          if (characters.isEmpty)
+          if (featured.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 30),
               child: Center(
                 child: Text(
-                  AppStore.instance.characters.isEmpty
-                      ? '还没有角色，点右上角导入角色卡'
-                      : '没有“$_tag”标签的角色',
+                  '还没有角色，点右上角导入角色卡',
                   style: appText(13, FontWeight.w400, p.textTertiary),
                 ),
               ),
@@ -163,7 +169,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: characters.length,
+              itemCount: featured.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 14,
@@ -171,7 +177,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 childAspectRatio: .72,
               ),
               itemBuilder: (context, i) {
-                final c = characters[i];
+                final c = featured[i];
                 return _CharacterTile(
                   character: c,
                   onTap: () => c.alternateGreetings.isNotEmpty
@@ -181,7 +187,214 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 );
               },
             ),
+          if (total > 2) ...[
+            const SizedBox(height: 16),
+            Glass(
+              radius: 20,
+              blur: 20,
+              shadow: false,
+              onTap: _openLibrary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.grid_view_rounded, size: 17, color: p.amber),
+                  const SizedBox(width: 8),
+                  Text(
+                    '查看全部角色 · 筛选与收藏',
+                    style: appText(13, FontWeight.w500, p.textPrimary),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// Full character library: waterfall grid plus 全部 / 最近 / 收藏 and tag
+/// filters and search. This is where browsing many cards happens, keeping the
+/// home dashboard light.
+class CharacterLibraryPage extends StatefulWidget {
+  const CharacterLibraryPage({
+    super.key,
+    required this.onOpenCharacter,
+    required this.onOpenChat,
+    required this.onImport,
+  });
+
+  final ValueChanged<DemoCharacter> onOpenCharacter;
+  final ValueChanged<DemoCharacter> onOpenChat;
+  final Future<void> Function() onImport;
+
+  @override
+  State<CharacterLibraryPage> createState() => _CharacterLibraryPageState();
+}
+
+class _CharacterLibraryPageState extends State<CharacterLibraryPage> {
+  String _tag = '全部';
+  final _query = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    AppStore.instance.addListener(_sync);
+  }
+
+  void _sync() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppStore.instance.removeListener(_sync);
+    _query.dispose();
+    super.dispose();
+  }
+
+  List<String> get _tags {
+    final tags = <String>{'全部', '最近', '收藏'};
+    for (final character in AppStore.instance.characters) {
+      tags.addAll(character.tags.where((t) => t.trim().isNotEmpty));
+    }
+    return tags.toList();
+  }
+
+  List<DemoCharacter> get _filtered {
+    final store = AppStore.instance;
+    final q = _query.text.trim().toLowerCase();
+    List<DemoCharacter> base;
+    switch (_tag) {
+      case '收藏':
+        base = store.characters.where((c) => c.favorite).toList();
+        break;
+      case '最近':
+        final lastActive = <String, int>{};
+        for (final s in store.sessions) {
+          final t = lastActive[s.characterName] ?? 0;
+          if (s.updatedAt > t) lastActive[s.characterName] = s.updatedAt;
+        }
+        base = [...store.characters];
+        base.sort((a, b) {
+          final ta = lastActive[a.name] ?? 0;
+          final tb = lastActive[b.name] ?? 0;
+          return tb.compareTo(ta);
+        });
+        break;
+      case '全部':
+        base = [...store.characters];
+        break;
+      default:
+        base = store.characters.where((c) => c.tags.contains(_tag)).toList();
+    }
+    if (q.isEmpty) return base;
+    return base.where((c) {
+      return c.name.toLowerCase().contains(q) ||
+          c.tagline.toLowerCase().contains(q) ||
+          c.tags.any((t) => t.toLowerCase().contains(q));
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final characters = _filtered;
+    return TavernScaffold(
+      intensity: 1.05,
+      child: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 40),
+          physics: const BouncingScrollPhysics(),
+          children: [
+            Row(
+              children: [
+                GlassCircleButton(
+                  icon: Icons.arrow_back_ios_new_rounded,
+                  size: 40,
+                  iconSize: 15,
+                  onTap: () => Navigator.maybePop(context),
+                ),
+                const Spacer(),
+                GlassCircleButton(
+                  icon: Icons.add_rounded,
+                  size: 40,
+                  onTap: () async {
+                    await widget.onImport();
+                    if (mounted) setState(() {});
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            PageHeader(
+              eyebrow: 'LIBRARY',
+              title: '角色库',
+              subtitle: '${AppStore.instance.characters.length} 位角色 · 筛选、收藏与管理。',
+            ),
+            const SizedBox(height: 18),
+            SearchField(
+              hint: '搜索角色或标签',
+              controller: _query,
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 38,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: _tags.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, i) {
+                  final tag = _tags[i];
+                  return GlassPill(
+                    label: tag,
+                    selected: _tag == tag,
+                    onTap: () => setState(() => _tag = tag),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (characters.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Center(
+                  child: Text(
+                    AppStore.instance.characters.isEmpty
+                        ? '还没有角色，点右上角导入角色卡'
+                        : '没有匹配的角色',
+                    style: appText(13, FontWeight.w400, p.textTertiary),
+                  ),
+                ),
+              )
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: characters.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 14,
+                  crossAxisSpacing: 14,
+                  childAspectRatio: .72,
+                ),
+                itemBuilder: (context, i) {
+                  final c = characters[i];
+                  return _CharacterTile(
+                    character: c,
+                    onTap: () => c.alternateGreetings.isNotEmpty
+                        ? widget.onOpenCharacter(c)
+                        : widget.onOpenChat(c),
+                    onOpenDetails: () => widget.onOpenCharacter(c),
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -83,7 +83,11 @@ class ChatController extends ChangeNotifier {
         : baseSettings.copyWith(
             api: baseSettings.api.copyWith(
               temperature: preset.temperature,
-              maxTokens: preset.maxTokens,
+              // 预设 maxTokens<=0 表示「跟随全局生成参数」，避免默认预设
+              // 悄悄把回复长度压回 512 导致长回复（含结尾心理描写）被截断。
+              maxTokens: preset.maxTokens > 0
+                  ? preset.maxTokens
+                  : baseSettings.api.maxTokens,
             ),
           );
 
@@ -122,7 +126,7 @@ class ChatController extends ChangeNotifier {
         settings: _activeSettings,
         messages: prompt.messages,
       );
-      _sub = stream.timeout(const Duration(seconds: 60), onTimeout: (sink) {
+      _sub = stream.timeout(const Duration(seconds: 180), onTimeout: (sink) {
         sink.addError(TimeoutException('请求超时，请检查网络或 API 地址'));
         sink.close();
       }).listen(

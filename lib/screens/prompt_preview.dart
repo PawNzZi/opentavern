@@ -1,4 +1,8 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/models.dart';
 import '../core/prompt.dart';
@@ -8,6 +12,7 @@ import '../design/glass.dart';
 import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
+import '../design/toast.dart';
 
 /// 「构建预览」页：展示系统段落的顺序（可上下调整并写回
 /// `settings.promptOrder`），并给出每段实际发送的文本与统计信息。
@@ -168,6 +173,187 @@ class _PromptPreviewPageState extends State<PromptPreviewPage> {
             style: appText(12.5, FontWeight.w400, p.textSecondary, height: 1.6),
           ),
         ),
+      ),
+    );
+  }
+
+  /// 把一条消息的 content 截断到前 50 个字符（多模态数组逐段处理）。
+  dynamic _truncateContent(dynamic content, bool full) {
+    String clip(String text) {
+      if (full || text.length <= 50) return text;
+      return '${text.substring(0, 50)}…（共 ${text.length} 字）';
+    }
+
+    if (content is String) return clip(content);
+    if (content is List) {
+      return [
+        for (final part in content)
+          if (part is Map)
+            {
+              'type': part['type'],
+              if (part['type'] == 'text') 'text': clip('${part['text']}'),
+              if (part['type'] == 'image')
+                'image': '<base64 图片，${('${part['base64']}').length} 字符>',
+            }
+          else
+            part,
+      ];
+    }
+    return content;
+  }
+
+  /// 真实发送的 messages 数组（JSON）。full=false 时每条 content 只取前 50 字。
+  String _messagesJson(BuiltPrompt built, bool full) {
+    final list = [
+      for (final m in built.messages)
+        {
+          'role': m['role'],
+          'content': _truncateContent(m['content'], full),
+        },
+    ];
+    return const JsonEncoder.withIndent('  ').convert(list);
+  }
+
+  Map<String, dynamic> _requestParams(AppSettings settings) {
+    final api = settings.api;
+    return {
+      'model': api.model,
+      'provider': api.provider,
+      'temperature': api.temperature,
+      'max_tokens（最大回复长度）': api.maxTokens,
+      'stream': api.streaming,
+      'max_context（最大上下文）': settings.maxContext,
+      'token_padding（回复预留）': settings.tokenPadding,
+      'lore_max_tokens（世界书上限）': settings.loreMaxTokens,
+    };
+  }
+
+  /// 打开「真实 messages 数组」面板：请求参数 + 可切换截断/全文的 JSON。
+  void _showMessagesJson(
+    BuiltPrompt built,
+    AppSettings settings,
+    DemoCharacter character,
+  ) {
+    final p = AppPalette.of(context);
+    var full = false;
+    showTavernSheet<void>(
+      context,
+      title: '真实 messages 数组',
+      subtitle: '${character.name} · ${built.messages.length} 条 · 约 '
+          '${built.approxTokens} tokens',
+      heightFactor: .9,
+      child: StatefulBuilder(
+        builder: (context, setState) {
+          final json = _messagesJson(built, full);
+          final params = const JsonEncoder.withIndent('  ')
+              .convert(_requestParams(settings));
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '请求参数（决定回复是否被截断）',
+                      style: appText(12, FontWeight.w600, p.textPrimary),
+                    ),
+                  ),
+                  GlassPill(
+                    label: full ? '截断 50 字' : '显示全文',
+                    icon: full
+                        ? Icons.compress_rounded
+                        : Icons.expand_rounded,
+                    height: 30,
+                    onTap: () => setState(() => full = !full),
+                  ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Glass(
+                    radius: 16,
+                    blur: 16,
+                    shadow: false,
+                    padding: const EdgeInsets.all(12),
+                    child: SelectionArea(
+                      child: Text(
+                        params,
+                        style: appText(11.5, FontWeight.w400, p.textSecondary,
+                            height: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'messages 数组${full ? '（全文）' : '（content 仅前 50 字）'}',
+                    style: appText(12, FontWeight.w600, p.textPrimary),
+                  ),
+                  const SizedBox(height: 8),
+                  Glass(
+                    radius: 16,
+                    blur: 16,
+                    shadow: false,
+                    padding: const EdgeInsets.all(12),
+                    child: SelectionArea(
+                      child: Text(
+                        json,
+                        style: appText(11, FontWeight.w400, p.textSecondary,
+                            height: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GlassPill(
+                          label: '复制 JSON',
+                          icon: Icons.copy_rounded,
+                          height: 36,
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: json));
+                            showTavernToast(context, '已复制 messages JSON');
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: GlassPill(
+                          label: '导出文件',
+                          icon: Icons.ios_share_rounded,
+                          height: 36,
+                          onTap: () async {
+                            final payload = const JsonEncoder.withIndent('  ')
+                                .convert({
+                              'request': _requestParams(settings),
+                              'messages': [
+                                for (final m in built.messages)
+                                  {
+                                    'role': m['role'],
+                                    'content': m['content'],
+                                  },
+                              ],
+                            });
+                            final uri =
+                                await FilePickerPlatform.instance.saveFile(
+                              fileName: 'messages-${character.name}.json',
+                              bytes: Uint8List.fromList(utf8.encode(payload)),
+                              mimeType: 'application/json',
+                              dialogTitle: '导出 messages 数组',
+                            );
+                            if (context.mounted) {
+                              showTavernToast(
+                                context,
+                                uri == null ? '已取消导出' : '已导出完整 JSON',
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+        },
       ),
     );
   }
@@ -422,6 +608,37 @@ class _PromptPreviewPageState extends State<PromptPreviewPage> {
                   label: '世界书注入',
                 ),
               ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Glass(
+          radius: 20,
+          blur: 20,
+          shadow: false,
+          onTap: () => _showMessagesJson(built, settings, character),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+          child: Row(
+            children: [
+              Icon(Icons.data_object_rounded, size: 18, color: p.amber),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '查看真实 messages 数组',
+                      style: appText(13.5, FontWeight.w600, p.textPrimary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '实际发送给模型的 JSON · 可截断 50 字 / 全文 · 复制 / 导出',
+                      style: appText(10.5, FontWeight.w400, p.textTertiary),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 18, color: p.textTertiary),
             ],
           ),
         ),

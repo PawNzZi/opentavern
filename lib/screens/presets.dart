@@ -195,7 +195,7 @@ class _PresetsPageState extends State<PresetsPage> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        '温度 ${active.temperature.toStringAsFixed(2)} · 最大 ${active.maxTokens} tokens · ${active.entries.length} 条附加提示词',
+                        '温度 ${active.temperature.toStringAsFixed(2)} · 最大 ${active.maxTokens > 0 ? '${active.maxTokens} tok' : '跟随全局'} · ${active.entries.length} 条附加提示词',
                         style: appText(10.5, FontWeight.w400, p.textTertiary),
                       ),
                     ],
@@ -237,7 +237,7 @@ class _PresetsPageState extends State<PresetsPage> {
                 icon: Icons.layers_outlined,
                 title: presets[i].name,
                 subtitle:
-                    '温度 ${presets[i].temperature.toStringAsFixed(2)} · 最大 ${presets[i].maxTokens} tokens · ${presets[i].entries.length} 条附加提示词',
+                    '温度 ${presets[i].temperature.toStringAsFixed(2)} · 最大 ${presets[i].maxTokens > 0 ? '${presets[i].maxTokens} tok' : '跟随全局'} · ${presets[i].entries.length} 条附加提示词',
                 value: presets[i].id == AppStore.instance.activePresetId
                     ? '当前'
                     : null,
@@ -339,8 +339,8 @@ class _PresetEditPageState extends State<_PresetEditPage> {
   Future<void> _save() async {
     final name = _name.text.trim().isEmpty ? _preset.name : _name.text.trim();
     final tokens = int.tryParse(_tokens.text.trim());
-    if (tokens == null || tokens <= 0) {
-      showTavernToast(context, '最大 Tokens 需要是正整数');
+    if (tokens == null || tokens < 0) {
+      showTavernToast(context, '最大 Tokens 填 0（跟随全局）或正整数');
       return;
     }
     final duplicate = AppStore.instance.presets.any(
@@ -354,7 +354,7 @@ class _PresetEditPageState extends State<_PresetEditPage> {
     _preset
       ..name = name
       ..temperature = _temperature
-      ..maxTokens = tokens.clamp(1, 131072);
+      ..maxTokens = tokens.clamp(0, 131072);
     await AppStore.instance.savePresets();
     if (oldName != name && oldName.trim().isNotEmpty) {
       await renamePresetBindings(oldName, name);
@@ -420,12 +420,12 @@ class _PresetEditPageState extends State<_PresetEditPage> {
                   Row(
                     children: [
                       Text(
-                        '最大 Tokens',
+                        '最大回复 Tokens',
                         style: appText(13.5, FontWeight.w500, p.textPrimary),
                       ),
                       const Spacer(),
                       Text(
-                        'maxTokens',
+                        '0 = 跟随全局',
                         style: appText(10.5, FontWeight.w400, p.textTertiary),
                       ),
                     ],
@@ -441,7 +441,7 @@ class _PresetEditPageState extends State<_PresetEditPage> {
                     decoration: InputDecoration(
                       isDense: true,
                       border: InputBorder.none,
-                      hintText: '512',
+                      hintText: '0 = 跟随全局生成参数',
                       hintStyle: appText(13, FontWeight.w400, p.textTertiary),
                     ),
                   ),
@@ -450,9 +450,9 @@ class _PresetEditPageState extends State<_PresetEditPage> {
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      for (final value in const [256, 512, 1024, 2048])
+                      for (final value in const [0, 1024, 2048, 4096, 8192])
                         GlassPill(
-                          label: '$value',
+                          label: value == 0 ? '跟随全局' : '$value',
                           height: 26,
                           selected: _tokens.text.trim() == '$value',
                           onTap: () =>
