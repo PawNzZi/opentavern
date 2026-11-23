@@ -149,6 +149,15 @@ class _PromptManagerPageState extends State<PromptManagerPage> {
           ),
         ),
         const SizedBox(height: 14),
+        if (entries.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 2, 6, 6),
+            child: Text(
+              '还没有附加提示词，点右上角 + 添加。',
+              style: appText(11.5, FontWeight.w400, p.textTertiary),
+            ),
+          )
+        else
         SettingsGroup(
           title: '附加提示词',
           children: [

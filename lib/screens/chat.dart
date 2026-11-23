@@ -552,12 +552,16 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                     Expanded(
-                      child: ListView(
-                        reverse: true,
-                        controller: _scroll,
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                        physics: const BouncingScrollPhysics(),
-                        children: items,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: () => FocusScope.of(context).unfocus(),
+                        child: ListView(
+                          reverse: true,
+                          controller: _scroll,
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                          physics: const BouncingScrollPhysics(),
+                          children: items,
+                        ),
                       ),
                     ),
                     if (_pending.isNotEmpty)
@@ -795,7 +799,7 @@ class _ChatTopBar extends StatelessWidget {
             ),
           ),
           Glass(
-            radius: 13,
+            radius: 12,
             blur: 16,
             shadow: false,
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
@@ -884,7 +888,7 @@ class _CharacterMessageState extends State<_CharacterMessage> {
             children: [
               SizedBox(
                 width: 30,
-                height: 30,
+                height: 26,
                 child: Portrait(
                   initial: widget.character.initial,
                   colors: widget.character.colors,
@@ -908,7 +912,7 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                       Pressable(
                         onTap: widget.onReasoning,
                         child: Glass(
-                          radius: 13,
+                          radius: 12,
                           blur: 18,
                           shadow: false,
                           padding: const EdgeInsets.symmetric(
@@ -1049,7 +1053,7 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                         Text(
                           message.time ?? '',
                           style: appText(
-                            9.5,
+                            8.5,
                             FontWeight.w400,
                             p.textTertiary,
                           ),
@@ -1095,17 +1099,17 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                     shadow: false,
                     padding: EdgeInsets.zero,
                     child: SizedBox(
-                      height: 30,
+                      height: 26,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Pressable(
                             onTap: () => widget.onSwipe(-1),
                             child: Padding(
-                              padding: const EdgeInsets.fromLTRB(7, 0, 3, 0),
+                              padding: const EdgeInsets.fromLTRB(5, 0, 2, 0),
                               child: Icon(
                                 Icons.chevron_left_rounded,
-                                size: 13,
+                                size: 12,
                                 color: p.textSecondary,
                               ),
                             ),
@@ -1113,7 +1117,7 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                           Text(
                             '${message.swipeIndex + 1} / ${message.swipes.length}',
                             style: appText(
-                              9.5,
+                              8.5,
                               FontWeight.w600,
                               p.textSecondary,
                             ),
@@ -1121,10 +1125,10 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                           Pressable(
                             onTap: () => widget.onSwipe(1),
                             child: Padding(
-                              padding: const EdgeInsets.fromLTRB(3, 0, 7, 0),
+                              padding: const EdgeInsets.fromLTRB(2, 0, 5, 0),
                               child: Icon(
                                 Icons.chevron_right_rounded,
-                                size: 13,
+                                size: 12,
                                 color: p.textSecondary,
                               ),
                             ),
@@ -1137,21 +1141,21 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                   GlassPill(
                     label: '继续',
                     icon: Icons.play_arrow_rounded,
-                    height: 30,
+                    height: 26,
                     onTap: widget.onContinue,
                   ),
                   const SizedBox(width: 6),
                   GlassPill(
                     label: '重写',
                     icon: Icons.refresh_rounded,
-                    height: 30,
+                    height: 26,
                     onTap: widget.onRegenerate,
                   ),
                   const SizedBox(width: 6),
                   GlassCircleButton(
                     icon: Icons.more_horiz_rounded,
-                    size: 30,
-                    iconSize: 14,
+                    size: 26,
+                    iconSize: 12,
                     blur: 0,
                     onTap: widget.onLongPress,
                   ),
