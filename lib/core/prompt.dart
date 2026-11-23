@@ -160,39 +160,22 @@ class PromptBuilder {
         entry.id: macro(entry.content).trim(),
     };
 
-    final fixedParts = <String>[
-      main,
-      character.systemPrompt,
-      character.description,
-      character.personality,
-      character.scenario,
-      character.exampleDialogue,
-      settings.personaDescription,
-      settings.summaryPosition == 'in_prompt' ? summaryText : '',
-      effectiveAuthorNote,
-      postHistory,
-      ...expandedEntries.values,
-    ];
-    final fixedTokens =
-        estimateTokens(fixedParts.join('\n')) + fixedParts.length * 8;
-    final historyReserve =
-        (maxPrompt * .25).round().clamp(512, 4096).toInt();
-    final availableForLore =
-        (maxPrompt - fixedTokens - historyReserve).clamp(0, maxPrompt).toInt();
-    final loreBudget = settings.loreMaxTokens > 0
-        ? settings.loreMaxTokens.clamp(0, availableForLore).toInt()
-        : availableForLore;
     // 世界书正文同样要展开宏（{{user}} / {{char}} / 变量……），否则角色卡
     // 世界书里的占位符会原样发给模型。
     final expandedLore = <String, String>{
       for (final entry in loreScan.matched)
         entry.id: macro(entry.content).trim(),
     };
-    final loreEntries = _applyLoreBudget(
-      loreScan.matched,
-      expandedLore,
-      loreBudget,
-    );
+    // 世界书预算：loreMaxTokens=0 = 「无限制」，所有命中条目全部注入，不做
+    // 任何裁剪（与酒馆 world_info_budget_cap=0=不限 一致）；>0 按该绝对上限
+    // 裁剪。无限制时若世界书很大，需要把「最大上下文」调大，否则历史会被挤掉。
+    final loreEntries = settings.loreMaxTokens > 0
+        ? _applyLoreBudget(
+            loreScan.matched,
+            expandedLore,
+            settings.loreMaxTokens,
+          )
+        : loreScan.matched;
     final loreAtDepth =
         loreEntries.where((e) => e.position == 'at_depth').toList();
     final loreBefore = loreEntries

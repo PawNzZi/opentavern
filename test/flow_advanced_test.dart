@@ -206,4 +206,38 @@ void main() {
     );
     store.lorebooks.clear();
   });
+
+  test('loreMaxTokens=0 injects ALL matched entries without budget trimming', () {
+    final character = _character();
+    final store = AppStore.instance;
+    // 三条常驻条目，总量远超一个小上下文窗口；无限制模式下应全部注入。
+    store.lorebooks
+      ..clear()
+      ..add(Lorebook(
+        id: 'unlimited-book',
+        name: '无限制书',
+        linked: character.name,
+        entries: [
+          for (var i = 0; i < 3; i++)
+            LoreEntry(
+              id: 'u$i',
+              constant: true,
+              order: 100 - i,
+              content: '条目$i ' + '设定内容' * 400,
+            ),
+        ],
+      ));
+    final built = PromptBuilder.build(
+      character: character,
+      session: _session('unlimited-session', character.name),
+      settings: const AppSettings(maxContext: 2048, loreMaxTokens: 0),
+    );
+    final system = built.messages.first['content'] as String;
+    expect(system, contains('条目0'));
+    expect(system, contains('条目1'));
+    expect(system, contains('条目2'));
+    expect(built.lore.injected.length, 3);
+    expect(built.lore.droppedByBudget, 0);
+    store.lorebooks.clear();
+  });
 }

@@ -135,7 +135,8 @@ class _LoreScreenState extends State<LoreScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('全局生效。0 或「无限制」表示不单独限制世界书；总数仍受上下文窗口约束。'),
+            const Text('全局生效。0 或「无限制」= 所有命中条目全部注入，不做任何裁剪；'
+                '填数字则按该 Token 上限裁剪。无限制时请把「最大上下文」调大，否则历史可能被挤掉。'),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
@@ -232,7 +233,7 @@ class _LoreScreenState extends State<LoreScreen> {
               child: SettingRow(
                 icon: Icons.speed_rounded,
                 title: '世界书 Token 上限',
-                subtitle: '全局设置；0 表示不单独限制，仍受总上下文约束',
+                subtitle: '全局设置；0 = 无限制，全部命中条目注入；填数字按上限裁剪',
                 value: AppStore.instance.settings.loreMaxTokens > 0
                     ? '${AppStore.instance.settings.loreMaxTokens}'
                     : '无限制',
