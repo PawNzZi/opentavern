@@ -72,6 +72,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   late final ChatController _chat;
   final _input = TextEditingController();
+  final _inputFocus = FocusNode();
   final _scroll = ScrollController();
   bool _hasText = false;
   final _pending = <ChatAttachment>[];
@@ -120,8 +121,26 @@ class _ChatScreenState extends State<ChatScreen> {
     AppStore.instance.removeListener(_onStoreChanged);
     _chat.dispose();
     _input.dispose();
+    _inputFocus.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// 在光标处插入成对符号（如 “” / （）），并把光标放到两者中间，方便直接输入。
+  void _insertPair(String open, String close) {
+    final text = _input.text;
+    final sel = _input.selection;
+    final start = sel.isValid ? sel.start : text.length;
+    final end = sel.isValid ? sel.end : text.length;
+    final newText = text.replaceRange(start, end, '$open$close');
+    final caret = start + open.length;
+    _input.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: caret),
+      composing: TextRange.empty,
+    );
+    setState(() => _hasText = newText.trim().isNotEmpty);
+    _inputFocus.requestFocus();
   }
 
   void _send() {
@@ -646,9 +665,30 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                       ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                      child: Row(
+                        children: [
+                          GlassPill(
+                            label: '“” 发言',
+                            icon: Icons.format_quote_rounded,
+                            height: 30,
+                            onTap: () => _insertPair('“', '”'),
+                          ),
+                          const SizedBox(width: 7),
+                          GlassPill(
+                            label: '（） 环境',
+                            icon: Icons.theater_comedy_outlined,
+                            height: 30,
+                            onTap: () => _insertPair('（', '）'),
+                          ),
+                        ],
+                      ),
+                    ),
                     _Composer(
                       character: c,
                       controller: _input,
+                      focusNode: _inputFocus,
                       hasText: _hasText,
                       generating: _chat.isGenerating,
                       onChanged: (value) {
@@ -1027,6 +1067,7 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                                         text: _displayText,
                                         color: p.textPrimary,
                                         italicColor: p.textSecondary,
+                                        dialogueColor: p.amber,
                                       ),
                                     ),
                                   ),
@@ -1205,14 +1246,11 @@ class _UserMessage extends StatelessWidget {
                 ),
               ],
             ),
-            child: Text(
-              _renderDisplayText(message, characterName),
-              style: appText(
-                15,
-                FontWeight.w500,
-                p.onUserBubble,
-                height: 1.45,
-              ),
+            child: _RichMessage(
+              text: _renderDisplayText(message, characterName),
+              color: p.onUserBubble,
+              italicColor: p.onUserBubble.withValues(alpha: .72),
+              dialogueColor: const Color(0xFF1E3A8A),
             ),
           ),
         ),
@@ -1241,39 +1279,69 @@ class _RichMessage extends StatelessWidget {
     required this.text,
     required this.color,
     required this.italicColor,
+    this.dialogueColor,
   });
 
   final String text;
   final Color color;
   final Color italicColor;
 
+  /// 对话高亮色：被 “”「」『』"" 包裹的「说的话」用这个颜色显示。
+  final Color? dialogueColor;
+
+  static final _dialogue = RegExp(
+    '\u201c[^\u201d]*\u201d|\u300c[^\u300d]*\u300d|\u300e[^\u300f]*\u300f|"[^"]*"',
+  );
+
+  List<TextSpan> _italicSpans(String src, TextStyle italic) {
+    final spans = <TextSpan>[];
+    var cursor = 0;
+    while (cursor < src.length) {
+      final open = src.indexOf('*', cursor);
+      if (open == -1) {
+        spans.add(TextSpan(text: src.substring(cursor)));
+        break;
+      }
+      if (open > cursor) {
+        spans.add(TextSpan(text: src.substring(cursor, open)));
+      }
+      final close = src.indexOf('*', open + 1);
+      if (close == -1) {
+        spans.add(TextSpan(text: src.substring(open)));
+        break;
+      }
+      spans.add(
+        TextSpan(text: src.substring(open + 1, close), style: italic),
+      );
+      cursor = close + 1;
+    }
+    return spans;
+  }
+
   @override
   Widget build(BuildContext context) {
     final base = appText(15, FontWeight.w400, color, height: 1.5);
     final italic = base.copyWith(color: italicColor);
+    final dc = dialogueColor;
     final spans = <TextSpan>[];
-    var cursor = 0;
-    while (cursor < text.length) {
-      final open = text.indexOf('*', cursor);
-      if (open == -1) {
-        spans.add(TextSpan(text: text.substring(cursor)));
-        break;
-      }
-      if (open > cursor) {
-        spans.add(TextSpan(text: text.substring(cursor, open)));
-      }
-      final close = text.indexOf('*', open + 1);
-      if (close == -1) {
-        spans.add(TextSpan(text: text.substring(open)));
-        break;
-      }
-      spans.add(
-        TextSpan(
-          text: text.substring(open + 1, close),
-          style: italic,
-        ),
+    if (dc == null) {
+      spans.addAll(_italicSpans(text, italic));
+    } else {
+      final dialogueStyle = base.copyWith(
+        color: dc,
+        fontWeight: FontWeight.w600,
       );
-      cursor = close + 1;
+      var cursor = 0;
+      for (final m in _dialogue.allMatches(text)) {
+        if (m.start > cursor) {
+          spans.addAll(_italicSpans(text.substring(cursor, m.start), italic));
+        }
+        spans.add(TextSpan(text: m.group(0), style: dialogueStyle));
+        cursor = m.end;
+      }
+      if (cursor < text.length) {
+        spans.addAll(_italicSpans(text.substring(cursor), italic));
+      }
     }
     return Text.rich(
       TextSpan(style: base, children: spans),
@@ -1372,6 +1440,7 @@ class _Composer extends StatelessWidget {
     required this.onStop,
     required this.onAttach,
     required this.onVoice,
+    this.focusNode,
   });
 
   final DemoCharacter character;
@@ -1383,6 +1452,7 @@ class _Composer extends StatelessWidget {
   final VoidCallback onStop;
   final VoidCallback onAttach;
   final VoidCallback onVoice;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -1414,6 +1484,7 @@ class _Composer extends StatelessWidget {
                 ),
                 child: TextField(
                   controller: controller,
+                  focusNode: focusNode,
                   maxLines: 4,
                   minLines: 1,
                   onChanged: onChanged,

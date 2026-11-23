@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/models.dart';
 import '../core/store.dart';
@@ -8,6 +9,7 @@ import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/routes.dart';
 import '../design/theme.dart';
+import '../design/toast.dart';
 import 'editors.dart';
 
 class AutomationPage extends StatefulWidget {
@@ -89,6 +91,14 @@ class _AutomationPageState extends State<AutomationPage> {
           hint: '搜索宏，例如 random、getvar',
           controller: _query,
           onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 12),
+        const HintCard(
+          text: '点按宏或右侧 + 可复制语法。另外两个「输入 shorthand」不在宏列表里：'
+              '用 “” 包裹发言、（） 包裹环境/动作，发送时自动转成 [用户发言] / [用户环境/动作]；'
+              '聊天输入框上方有 “”发言 / （）环境 快捷按钮，点击即在光标处插入并把光标置于中间。',
+          icon: Icons.format_quote_rounded,
+          color: Color(0xFFF0B36A),
         ),
         SettingsGroup(
           title: '宏浏览器',
@@ -198,39 +208,55 @@ class _MacroRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 9, 12, 9),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '{{${item.name}${item.args.isEmpty ? '' : '::${item.args}'}}}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 11.5,
-                    color: p.amber,
-                    height: 1.3,
+    final syntax =
+        '{{${item.name}${item.args.isEmpty ? '' : '::${item.args}'}}}';
+    void copy() {
+      Clipboard.setData(ClipboardData(text: syntax));
+      showTavernToast(context, '已复制 $syntax');
+    }
+
+    return Pressable(
+      onTap: copy,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 9, 12, 9),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    syntax,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11.5,
+                      color: p.amber,
+                      height: 1.3,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  item.description,
-                  style: appText(9.5, FontWeight.w400, p.textTertiary),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    item.description,
+                    style: appText(9.5, FontWeight.w400, p.textTertiary),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Icon(
-            Icons.add_circle_outline_rounded,
-            size: 18,
-            color: p.textTertiary,
-          ),
-        ],
+            Pressable(
+              onTap: copy,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.add_circle_outline_rounded,
+                  size: 18,
+                  color: p.amber,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
