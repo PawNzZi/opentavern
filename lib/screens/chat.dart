@@ -1594,48 +1594,6 @@ class _AttachmentMenu extends StatelessWidget {
   }
 }
 
-class _AttachAction extends StatelessWidget {
-  const _AttachAction({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return Expanded(
-      child: Pressable(
-        onTap: onTap,
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
-                color: color.withValues(alpha: .16),
-              ),
-              child: Icon(icon, size: 21, color: color),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: appText(10.5, FontWeight.w500, p.textSecondary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _MessageMenu extends StatelessWidget {
   const _MessageMenu({
     required this.name,

@@ -397,35 +397,21 @@ class ChatInfoSheet extends StatelessWidget {
                 SettingRow(
                   icon: Icons.call_split_rounded,
                   title: '父聊天',
-                  subtitle: parentSession == null
-                      ? '原聊天已删除'
-                      : parentSession.title,
-                  value: parentSession == null
-                      ? '已删除'
-                      : '${parentSession.messages.length} 条消息',
+                  subtitle: parentSession.title,
+                  value: '${parentSession.messages.length} 条消息',
                   iconColor: p.amber,
-                  chevron: parentSession != null,
-                  onTap: parentSession == null
-                      ? null
-                      : () => _openSession(context, parentSession),
+                  onTap: () => _openSession(context, parentSession),
                 ),
                 if (mainSession != null) const Hairline(indent: 56),
               ],
-              if (mainLinkId != null)
+              if (mainSession != null)
                 SettingRow(
                   icon: Icons.account_tree_outlined,
                   title: '主线聊天',
-                  subtitle: mainSession == null
-                      ? '原聊天已删除'
-                      : mainSession.title,
-                  value: mainSession == null
-                      ? '已删除'
-                      : '${mainSession.messages.length} 条消息',
+                  subtitle: mainSession.title,
+                  value: '${mainSession.messages.length} 条消息',
                   iconColor: p.violet,
-                  chevron: mainSession != null,
-                  onTap: mainSession == null
-                      ? null
-                      : () => _openSession(context, mainSession),
+                  onTap: () => _openSession(context, mainSession),
                 ),
               if (mainSession != null && childBranches.isNotEmpty)
                 const Hairline(indent: 56),
