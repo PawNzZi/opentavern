@@ -14,6 +14,7 @@ import '../core/macros.dart';
 import '../core/models.dart';
 import '../core/pdf_text.dart';
 import '../core/regex.dart';
+import '../core/statusbar.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
@@ -21,6 +22,7 @@ import '../design/scaffold.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
 import 'chat_info.dart';
+import 'status_bar.dart';
 
 String _renderDisplayText(ChatMessage message, String characterName) {
   if (message.text.isEmpty) return message.text;
@@ -32,8 +34,10 @@ String _renderDisplayText(ChatMessage message, String characterName) {
       : settings.personaName.trim().isNotEmpty
           ? settings.personaName.trim()
           : 'User';
+  // 状态栏单独渲染：正文里若带 <UpdateVariable> 状态块，显示时剥离，只留内容。
+  final cleaned = StatusBar.strip(message.text);
   final expanded = MacroEngine.expandIdentity(
-    message.text,
+    cleaned,
     charName: characterName,
     userName: userName,
   );
@@ -76,6 +80,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scroll = ScrollController();
   bool _hasText = false;
   final _pending = <ChatAttachment>[];
+  late final Map<String, num> _statusRanges;
 
   @override
   void initState() {
@@ -91,6 +96,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _chat = ChatController(character: widget.character, session: session);
     _chat.addListener(_onChatChanged);
     AppStore.instance.addListener(_onStoreChanged);
+    final rules = StatusBar.findRulesContent(widget.character);
+    _statusRanges = rules == null ? const {} : StatusBar.parseRanges(rules);
     if (widget.autoDemo) {
       Timer(const Duration(milliseconds: 900), () {
         if (!mounted) return;
@@ -553,6 +560,14 @@ class _ChatScreenState extends State<ChatScreen> {
                         onMore: _openInfo,
                       ),
                     ),
+                    if (_chat.session.statData.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                        child: StatusBarPanel(
+                          data: _chat.session.statData,
+                          ranges: _statusRanges,
+                        ),
+                      ),
                     Expanded(
                       child: GestureDetector(
                         behavior: HitTestBehavior.translucent,

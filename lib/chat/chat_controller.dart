@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../core/llm.dart';
 import '../core/models.dart';
 import '../core/prompt.dart';
+import '../core/statusbar.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 
@@ -15,6 +16,7 @@ export '../core/models.dart' show ChatMessage;
 class ChatController extends ChangeNotifier {
   ChatController({required this.character, ChatSession? session}) {
     _session = session ?? AppStore.instance.sessionFor(character);
+    _initStatusBar();
     if (_session.messages.isEmpty && character.greeting.trim().isNotEmpty) {
       _session.messages.add(
         ChatMessage(
@@ -47,6 +49,26 @@ class ChatController extends ChangeNotifier {
   String _time() {
     final now = DateTime.now();
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// 若角色世界书带 [InitVar] 初始值条目、且会话还没有变量树，则解析为状态栏初值。
+  void _initStatusBar() {
+    if (_session.statData.isNotEmpty) return;
+    final init = StatusBar.findInitContent(character);
+    if (init == null || init.trim().isEmpty) return;
+    final parsed = StatusBar.parseInit(init);
+    if (parsed.isNotEmpty) {
+      _session.statData = parsed;
+      _save();
+    }
+  }
+
+  /// 应用回复末尾 <UpdateVariable> 里的 JSONPatch 到会话变量树（状态栏数据源）。
+  void _applyStatusUpdate(String text) {
+    if (!StatusBar.hasUpdate(text)) return;
+    final ops = StatusBar.extractOps(text);
+    if (ops.isEmpty) return;
+    _session.statData = StatusBar.applyOps(_session.statData, ops);
   }
 
   void send(String text, {List<ChatAttachment> attachments = const []}) {
@@ -177,6 +199,8 @@ class ChatController extends ChangeNotifier {
       // Store the raw model output. Display-only regex is applied when the
       // message is rendered, never written back into chat history.
       message.text = text.isEmpty ? '……' : text;
+      // 状态栏变量更新只在收到回复时应用一次；正文里的状态块在显示/发送时剥离。
+      _applyStatusUpdate(message.text);
       message.time = _time();
       message.model = _activeSettings.api.model;
       message.apiProvider = _activeSettings.api.provider;

@@ -182,8 +182,10 @@ class ChatSession {
     this.authorNoteOverride = false,
     this.parentId,
     this.mainChatId,
+    Map<String, dynamic>? statData,
   })  : messages = messages ?? [],
         variables = variables ?? {},
+        statData = statData ?? {},
         updatedAt = updatedAt ?? DateTime.now().millisecondsSinceEpoch;
 
   final String id;
@@ -193,6 +195,9 @@ class ChatSession {
   bool pinned;
   int updatedAt;
   final Map<String, String> variables;
+
+  /// 世界书状态栏的嵌套变量树（MVU stat_data），随回复中的 JSONPatch 更新。
+  Map<String, dynamic> statData;
   String summary;
   int summaryUpTo;
   String authorNote;
@@ -221,6 +226,7 @@ class ChatSession {
         'pinned': pinned,
         'updatedAt': updatedAt,
         'variables': variables,
+        'statData': statData,
         'summary': summary,
         'summaryUpTo': summaryUpTo,
         'authorNote': authorNote,
@@ -239,6 +245,10 @@ class ChatSession {
       updatedAt: (json['updatedAt'] as num?)?.toInt(),
       variables: (json['variables'] as Map?)?.map(
             (k, v) => MapEntry(k.toString(), v.toString()),
+          ) ??
+          {},
+      statData: (json['statData'] as Map?)?.map(
+            (k, v) => MapEntry(k.toString(), v),
           ) ??
           {},
       summary: (json['summary'] ?? '').toString(),

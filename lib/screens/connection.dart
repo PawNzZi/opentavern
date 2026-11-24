@@ -183,6 +183,28 @@ class _ConnectionPageState extends State<ConnectionPage> {
     }
   }
 
+  /// 点击模型下拉箭头：先手动获取一次模型列表，再打开选择面板。
+  Future<void> _openModelPicker() async {
+    await _fetchModels();
+    if (!mounted) return;
+    final selected = await showTavernSheet<String>(
+      context,
+      title: '选择模型',
+      subtitle: _models.isEmpty
+          ? (_modelError ?? '没有可用模型')
+          : '${_models.length} 个可用模型',
+      heightFactor: .62,
+      child: _ModelSheet(
+        models: _models,
+        current: _model.text,
+        error: _modelError,
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() => _model.text = selected);
+    }
+  }
+
   void _selectProvider(String label) {
     if (label == _provider) return;
     // 先保存当前服务商的输入，再载入目标服务商自己的档案 —— 密钥绝不串用。
@@ -293,10 +315,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
               value: _model.text,
               loading: _loadingModels,
               error: _modelError,
-              onSelect: (value) {
-                setState(() => _model.text = value);
-              },
-              onRefresh: _fetchModels,
+              onTap: _openModelPicker,
             ),
           ],
         ),
@@ -308,7 +327,8 @@ class _ConnectionPageState extends State<ConnectionPage> {
               child: Text(
                 '支持 OpenAI 兼容、Claude、Gemini、DeepSeek、OpenRouter 与随想中转。'
                 '每个服务商的地址、密钥与模型独立保存，切换服务商不会串用密钥。'
-                '填写密钥后会自动获取模型列表；修改后点击底部「保存连接」生效。',
+                '填完密钥会自动获取一次模型列表，也可点击模型的下拉箭头手动获取；'
+                '修改后点击底部「保存连接」生效。',
                 style: appText(
                   11.5,
                   FontWeight.w400,
@@ -330,33 +350,14 @@ class _ModelPicker extends StatelessWidget {
     required this.value,
     required this.loading,
     required this.error,
-    required this.onSelect,
-    required this.onRefresh,
+    required this.onTap,
   });
 
   final List<String> models;
   final String value;
   final bool loading;
   final String? error;
-  final ValueChanged<String> onSelect;
-  final Future<void> Function() onRefresh;
-
-  Future<void> _open(BuildContext context) async {
-    final selected = await showTavernSheet<String>(
-      context,
-      title: '选择模型',
-      subtitle: models.isEmpty
-          ? (error ?? '没有可用模型')
-          : '${models.length} 个可用模型',
-      heightFactor: .62,
-      child: _ModelSheet(
-        models: models,
-        current: value,
-        error: error,
-      ),
-    );
-    if (selected != null) onSelect(selected);
-  }
+  final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -378,7 +379,8 @@ class _ModelPicker extends StatelessWidget {
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => _open(context),
+              // 点击下拉箭头（整行）：手动获取一次模型并打开选择面板。
+              onTap: () => onTap(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -403,11 +405,22 @@ class _ModelPicker extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 19,
-                        color: p.textSecondary,
-                      ),
+                      // 加载指示与下拉箭头在同一水平线上，取代原来错位的刷新按钮。
+                      if (loading)
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.6,
+                            color: p.textSecondary,
+                          ),
+                        )
+                      else
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 19,
+                          color: p.textSecondary,
+                        ),
                     ],
                   ),
                   if (loading)
@@ -432,28 +445,6 @@ class _ModelPicker extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 6),
-          if (loading)
-            const Padding(
-              padding: EdgeInsets.only(top: 23),
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 1.8),
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(top: 11),
-              child: IconButton(
-                tooltip: '刷新模型列表',
-                iconSize: 18,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                padding: EdgeInsets.zero,
-                onPressed: onRefresh,
-                icon: Icon(Icons.refresh_rounded, color: p.textSecondary),
-              ),
-            ),
         ],
       ),
     );

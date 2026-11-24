@@ -2,6 +2,7 @@ import 'dart:math';
 
 import '../data/demo.dart';
 import 'regex.dart';
+import 'statusbar.dart';
 import 'store.dart';
 import 'macros.dart';
 import 'models.dart';
@@ -93,14 +94,22 @@ class PromptBuilder {
       }
       if (lastAny.isNotEmpty && lastUser.isNotEmpty) break;
     }
-    String macro(String input) => MacroEngine.expand(
-          input,
-          character: character,
-          settings: settings,
-          variables: session.variables,
-          userInput: lastUser,
-          lastMessage: lastAny,
-        );
+    String macro(String input) {
+      // 状态栏变量树通过 {{format_message_variable::stat_data}} 注入，
+      // 让模型在更新变量前能读到当前值。
+      final withStat = input.replaceAllMapped(
+        RegExp(r'\{\{\s*format_message_variable::stat_data\s*\}\}'),
+        (_) => StatusBar.format(session.statData),
+      );
+      return MacroEngine.expand(
+        withStat,
+        character: character,
+        settings: settings,
+        variables: session.variables,
+        userInput: lastUser,
+        lastMessage: lastAny,
+      );
+    }
 
     final preset = AppStore.instance.presetForCharacter(character);
     // 预设是主提示词的唯一来源：一旦绑定了预设，即使预设的主提示词为空也
@@ -277,7 +286,8 @@ class PromptBuilder {
       if (m.text.trim().isEmpty && m.attachments.isEmpty) continue;
       // 历史消息以原始文本存储，发送前才展开宏，这样 {{user}} / {{char}}
       // 不会原样进入上下文，同时聊天记录仍保留用户输入的原文。
-      var content = macro(m.text);
+      // 状态块（<UpdateVariable>）单独渲染，发送时剥离以节省上下文。
+      var content = macro(StatusBar.strip(m.text));
       content = m.isUser ? _formatUserRoleplay(content) : content;
       content = applyRegexScripts(
         content,
