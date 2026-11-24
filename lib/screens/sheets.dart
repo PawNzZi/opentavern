@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 
 import 'package:flutter/material.dart';
 
+import '../core/models.dart';
 import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -22,6 +23,7 @@ class _ConnectSheetScreenState extends State<ConnectSheetScreen> {
   late final TextEditingController _key;
   late final TextEditingController _model;
   late String _provider;
+  late Map<String, ProviderProfile> _profiles;
 
   static const _presets = <String, (String, String)>{
     'Claude': ('https://api.anthropic.com', 'claude-sonnet-4-5'),
@@ -31,7 +33,8 @@ class _ConnectSheetScreenState extends State<ConnectSheetScreen> {
       'gemini-2.5-flash'
     ),
     'DeepSeek': ('https://api.deepseek.com/v1', 'deepseek-chat'),
-    'Ollama': ('http://127.0.0.1:11434', 'llama3.2'),
+    'OpenRouter': ('https://openrouter.ai/api/v1', 'openrouter/auto'),
+    '随想': ('https://www.sui-xiang.net', ''),
     '自定义': ('', ''),
   };
 
@@ -39,10 +42,22 @@ class _ConnectSheetScreenState extends State<ConnectSheetScreen> {
   void initState() {
     super.initState();
     final api = AppStore.instance.settings.api;
-    _base = TextEditingController(text: api.baseUrl);
-    _key = TextEditingController(text: api.apiKey);
-    _model = TextEditingController(text: api.model);
+    _profiles = Map<String, ProviderProfile>.from(api.profiles);
     _provider = _labelFor(api.provider);
+    final profile = _profiles[_providerKey(_provider)];
+    _base = TextEditingController(
+      text: profile != null && profile.baseUrl.isNotEmpty
+          ? profile.baseUrl
+          : api.baseUrl,
+    );
+    _key = TextEditingController(
+      text: profile != null ? profile.apiKey : api.apiKey,
+    );
+    _model = TextEditingController(
+      text: profile != null && profile.model.isNotEmpty
+          ? profile.model
+          : api.model,
+    );
   }
 
   @override
@@ -59,10 +74,12 @@ class _ConnectSheetScreenState extends State<ConnectSheetScreen> {
         return 'Claude';
       case 'gemini':
         return 'Gemini';
-      case 'ollama':
-        return 'Ollama';
       case 'deepseek':
         return 'DeepSeek';
+      case 'openrouter':
+        return 'OpenRouter';
+      case 'suixiang':
+        return '随想';
       case 'openai':
         return 'OpenAI';
       default:
@@ -76,10 +93,12 @@ class _ConnectSheetScreenState extends State<ConnectSheetScreen> {
         return 'anthropic';
       case 'Gemini':
         return 'gemini';
-      case 'Ollama':
-        return 'ollama';
       case 'DeepSeek':
         return 'deepseek';
+      case 'OpenRouter':
+        return 'openrouter';
+      case '随想':
+        return 'suixiang';
       case 'OpenAI':
         return 'openai';
       default:
@@ -87,23 +106,41 @@ class _ConnectSheetScreenState extends State<ConnectSheetScreen> {
     }
   }
 
+  void _stashCurrent() {
+    _profiles[_providerKey(_provider)] = ProviderProfile(
+      baseUrl: _base.text.trim(),
+      apiKey: _key.text.trim(),
+      model: _model.text.trim(),
+    );
+  }
+
   void _selectProvider(String label) {
+    if (label == _provider) return;
+    _stashCurrent();
+    final incoming = _profiles[_providerKey(label)];
+    final preset = _presets[label];
     setState(() {
       _provider = label;
-      final preset = _presets[label];
-      if (preset != null && preset.$1.isNotEmpty) {
-        _base.text = preset.$1;
-        _model.text = preset.$2;
+      if (incoming != null && !incoming.isEmpty) {
+        _base.text = incoming.baseUrl;
+        _key.text = incoming.apiKey;
+        _model.text = incoming.model;
+      } else {
+        _base.text = preset?.$1 ?? '';
+        _model.text = preset?.$2 ?? '';
+        _key.text = '';
       }
     });
   }
 
   Future<void> _save() async {
+    _stashCurrent();
     final api = AppStore.instance.settings.api.copyWith(
       provider: _providerKey(_provider),
       baseUrl: _base.text.trim(),
       apiKey: _key.text.trim(),
       model: _model.text.trim(),
+      profiles: Map<String, ProviderProfile>.from(_profiles),
     );
     AppStore.instance.settings =
         AppStore.instance.settings.copyWith(api: api);
@@ -118,7 +155,7 @@ class _ConnectSheetScreenState extends State<ConnectSheetScreen> {
     final p = AppPalette.of(context);
     return SheetStage(
       title: '模型连接',
-      subtitle: '支持 OpenAI 兼容、Claude、Gemini 与本地 Ollama',
+      subtitle: '支持 OpenAI 兼容、Claude、Gemini、OpenRouter 与随想',
       heightFactor: .92,
       footer: GlassPrimaryButton(
         label: '保存连接',

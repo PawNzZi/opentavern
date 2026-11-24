@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/llm.dart';
+import '../core/models.dart';
 import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -26,7 +27,8 @@ class _ConnectionPageState extends State<ConnectionPage> {
       'gemini-2.5-flash',
     ),
     'DeepSeek': ('https://api.deepseek.com/v1', 'deepseek-chat'),
-    'Ollama': ('http://127.0.0.1:11434', 'llama3.2'),
+    'OpenRouter': ('https://openrouter.ai/api/v1', 'openrouter/auto'),
+    '随想': ('https://www.sui-xiang.net', ''),
     '自定义': ('', ''),
   };
 
@@ -34,6 +36,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
   late final TextEditingController _key;
   late final TextEditingController _model;
   late String _provider;
+  late Map<String, ProviderProfile> _profiles;
   Timer? _fetchDebounce;
   List<String> _models = const [];
   bool _loadingModels = false;
@@ -43,10 +46,23 @@ class _ConnectionPageState extends State<ConnectionPage> {
   void initState() {
     super.initState();
     final api = AppStore.instance.settings.api;
-    _base = TextEditingController(text: api.baseUrl);
-    _key = TextEditingController(text: api.apiKey);
-    _model = TextEditingController(text: api.model);
+    _profiles = Map<String, ProviderProfile>.from(api.profiles);
     _provider = _labelFor(api.provider);
+    // 当前服务商优先用自己的独立档案；没有档案时回退到活动配置。
+    final profile = _profiles[_providerKey(_provider)];
+    _base = TextEditingController(
+      text: profile != null && profile.baseUrl.isNotEmpty
+          ? profile.baseUrl
+          : api.baseUrl,
+    );
+    _key = TextEditingController(
+      text: profile != null ? profile.apiKey : api.apiKey,
+    );
+    _model = TextEditingController(
+      text: profile != null && profile.model.isNotEmpty
+          ? profile.model
+          : api.model,
+    );
     _base.addListener(_onEndpointChanged);
     _key.addListener(_onEndpointChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -78,10 +94,12 @@ class _ConnectionPageState extends State<ConnectionPage> {
         return 'Claude';
       case 'gemini':
         return 'Gemini';
-      case 'ollama':
-        return 'Ollama';
       case 'deepseek':
         return 'DeepSeek';
+      case 'openrouter':
+        return 'OpenRouter';
+      case 'suixiang':
+        return '随想';
       case 'openai':
         return 'OpenAI';
       default:
@@ -95,10 +113,12 @@ class _ConnectionPageState extends State<ConnectionPage> {
         return 'anthropic';
       case 'Gemini':
         return 'gemini';
-      case 'Ollama':
-        return 'ollama';
       case 'DeepSeek':
         return 'deepseek';
+      case 'OpenRouter':
+        return 'openrouter';
+      case '随想':
+        return 'suixiang';
       case 'OpenAI':
         return 'openai';
       default:
@@ -106,7 +126,16 @@ class _ConnectionPageState extends State<ConnectionPage> {
     }
   }
 
-  bool get _needsKey => _providerKey(_provider) != 'ollama';
+  bool get _needsKey => _providerKey(_provider) != 'custom';
+
+  /// 把当前输入框的内容存回当前服务商的独立档案（切换 / 保存前调用）。
+  void _stashCurrent() {
+    _profiles[_providerKey(_provider)] = ProviderProfile(
+      baseUrl: _base.text.trim(),
+      apiKey: _key.text.trim(),
+      model: _model.text.trim(),
+    );
+  }
 
   Future<void> _fetchModels() async {
     if (_loadingModels) return;
@@ -155,12 +184,21 @@ class _ConnectionPageState extends State<ConnectionPage> {
   }
 
   void _selectProvider(String label) {
+    if (label == _provider) return;
+    // 先保存当前服务商的输入，再载入目标服务商自己的档案 —— 密钥绝不串用。
+    _stashCurrent();
+    final incoming = _profiles[_providerKey(label)];
+    final preset = _presets[label];
     setState(() {
       _provider = label;
-      final preset = _presets[label];
-      if (preset != null && preset.$1.isNotEmpty) {
-        _base.text = preset.$1;
-        _model.text = preset.$2;
+      if (incoming != null && !incoming.isEmpty) {
+        _base.text = incoming.baseUrl;
+        _key.text = incoming.apiKey;
+        _model.text = incoming.model;
+      } else {
+        _base.text = preset?.$1 ?? '';
+        _model.text = preset?.$2 ?? '';
+        _key.text = '';
       }
       _models = const [];
       _modelError = null;
@@ -176,6 +214,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
       showTavernToast(context, '请先选择模型');
       return;
     }
+    _stashCurrent();
     final settings = AppStore.instance.settings;
     AppStore.instance.settings = settings.copyWith(
       api: settings.api.copyWith(
@@ -183,6 +222,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
         baseUrl: _base.text.trim(),
         apiKey: _key.text.trim(),
         model: _model.text.trim(),
+        profiles: Map<String, ProviderProfile>.from(_profiles),
       ),
     );
     await AppStore.instance.saveSettings();
@@ -266,7 +306,8 @@ class _ConnectionPageState extends State<ConnectionPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Text(
-                '支持 OpenAI 兼容、Claude、Gemini、DeepSeek 与本地 Ollama。'
+                '支持 OpenAI 兼容、Claude、Gemini、DeepSeek、OpenRouter 与随想中转。'
+                '每个服务商的地址、密钥与模型独立保存，切换服务商不会串用密钥。'
                 '填写密钥后会自动获取模型列表；修改后点击底部「保存连接」生效。',
                 style: appText(
                   11.5,

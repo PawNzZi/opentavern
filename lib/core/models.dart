@@ -256,6 +256,45 @@ class ChatSession {
   }
 }
 
+/// 单个服务商的独立连接档案：地址 / 密钥 / 模型各自保存，切换服务商时
+/// 互不串用（尤其是密钥）。
+class ProviderProfile {
+  const ProviderProfile({
+    this.baseUrl = '',
+    this.apiKey = '',
+    this.model = '',
+  });
+
+  final String baseUrl;
+  final String apiKey;
+  final String model;
+
+  bool get isEmpty =>
+      baseUrl.trim().isEmpty && apiKey.trim().isEmpty && model.trim().isEmpty;
+
+  ProviderProfile copyWith({String? baseUrl, String? apiKey, String? model}) {
+    return ProviderProfile(
+      baseUrl: baseUrl ?? this.baseUrl,
+      apiKey: apiKey ?? this.apiKey,
+      model: model ?? this.model,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'baseUrl': baseUrl,
+        'apiKey': apiKey,
+        'model': model,
+      };
+
+  factory ProviderProfile.fromJson(Map<String, dynamic> json) {
+    return ProviderProfile(
+      baseUrl: (json['baseUrl'] ?? '').toString(),
+      apiKey: (json['apiKey'] ?? '').toString(),
+      model: (json['model'] ?? '').toString(),
+    );
+  }
+}
+
 class APISettings {
   const APISettings({
     this.provider = 'openai',
@@ -265,6 +304,7 @@ class APISettings {
     this.temperature = .85,
     this.maxTokens = 512,
     this.streaming = true,
+    this.profiles = const {},
   });
 
   final String provider;
@@ -275,9 +315,12 @@ class APISettings {
   final int maxTokens;
   final bool streaming;
 
+  /// 每个服务商独立的连接档案（provider id → 地址/密钥/模型）。
+  final Map<String, ProviderProfile> profiles;
+
   bool get configured {
     if (baseUrl.trim().isEmpty || model.trim().isEmpty) return false;
-    if (provider == 'ollama' || provider == 'custom') return true;
+    if (provider == 'custom') return true;
     return apiKey.trim().isNotEmpty;
   }
 
@@ -289,6 +332,7 @@ class APISettings {
     double? temperature,
     int? maxTokens,
     bool? streaming,
+    Map<String, ProviderProfile>? profiles,
   }) {
     return APISettings(
       provider: provider ?? this.provider,
@@ -298,6 +342,7 @@ class APISettings {
       temperature: temperature ?? this.temperature,
       maxTokens: maxTokens ?? this.maxTokens,
       streaming: streaming ?? this.streaming,
+      profiles: profiles ?? this.profiles,
     );
   }
 
@@ -309,17 +354,42 @@ class APISettings {
         'temperature': temperature,
         'maxTokens': maxTokens,
         'streaming': streaming,
+        'profiles': profiles.map((k, v) => MapEntry(k, v.toJson())),
       };
 
   factory APISettings.fromJson(Map<String, dynamic> json) {
+    final provider = (json['provider'] ?? 'openai').toString();
+    final baseUrl = (json['baseUrl'] ?? 'https://api.openai.com/v1').toString();
+    final apiKey = (json['apiKey'] ?? '').toString();
+    final model = (json['model'] ?? 'gpt-4o-mini').toString();
+    var profiles = <String, ProviderProfile>{};
+    final rawProfiles = json['profiles'];
+    if (rawProfiles is Map) {
+      rawProfiles.forEach((k, v) {
+        if (v is Map) {
+          profiles[k.toString()] =
+              ProviderProfile.fromJson(Map<String, dynamic>.from(v));
+        }
+      });
+    }
+    // 旧版本只有单一 apiKey：把它迁移成当前服务商的独立档案，避免升级后丢密钥。
+    if (!profiles.containsKey(provider) &&
+        (apiKey.trim().isNotEmpty || baseUrl.trim().isNotEmpty)) {
+      profiles[provider] = ProviderProfile(
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+        model: model,
+      );
+    }
     return APISettings(
-      provider: (json['provider'] ?? 'openai').toString(),
-      baseUrl: (json['baseUrl'] ?? 'https://api.openai.com/v1').toString(),
-      apiKey: (json['apiKey'] ?? '').toString(),
-      model: (json['model'] ?? 'gpt-4o-mini').toString(),
+      provider: provider,
+      baseUrl: baseUrl,
+      apiKey: apiKey,
+      model: model,
       temperature: (json['temperature'] as num?)?.toDouble() ?? .85,
       maxTokens: (json['maxTokens'] as num?)?.toInt() ?? 512,
       streaming: json['streaming'] != false,
+      profiles: profiles,
     );
   }
 }

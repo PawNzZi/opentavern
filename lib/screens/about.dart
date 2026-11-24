@@ -62,7 +62,7 @@ class AboutPage extends StatelessWidget {
             const SettingRow(
               icon: Icons.bolt_rounded,
               title: 'API',
-              value: 'OpenAI 兼容 / Claude / Gemini / Ollama',
+              value: 'OpenAI 兼容 / Claude / Gemini 等',
               iconColor: Color(0xFFA9A0E8),
             ),
           ],

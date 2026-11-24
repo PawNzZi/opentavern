@@ -32,9 +32,8 @@ class LLMClient {
         source = _anthropic(api, messages);
       case 'gemini':
         source = _gemini(api, messages);
-      case 'ollama':
-        source = _ollama(api, messages);
       default:
+        // openai / deepseek / openrouter / suixiang / custom 都走 OpenAI 兼容协议。
         source = _openAI(api, messages);
     }
     if (api.streaming) {
@@ -117,27 +116,7 @@ class LLMClient {
                   item['name'].toString().replaceFirst('models/', ''),
           ];
         case 'ollama':
-          final root = _trim(api.baseUrl);
-          final uri = Uri.parse(
-            root.endsWith('/api/tags') ? root : '$root/api/tags',
-          );
-          final response = await client
-              .get(uri)
-              .timeout(const Duration(seconds: 20));
-          if (response.statusCode < 200 || response.statusCode >= 300) {
-            throw LLMException(
-              _errorText(response.body, response.statusCode),
-              statusCode: response.statusCode,
-            );
-          }
-          final decoded = _tryJson(response.body);
-          final models = decoded?['models'];
-          return [
-            if (models is List)
-              for (final item in models.whereType<Map>())
-                if ((item['name'] ?? '').toString().trim().isNotEmpty)
-                  item['name'].toString(),
-          ];
+          throw LLMException('Ollama 已移除，请改用其他服务商');
         default:
           if (api.apiKey.trim().isEmpty) {
             throw LLMException('请先填写 API Key');
@@ -371,52 +350,6 @@ class LLMClient {
     }
   }
 
-  Stream<String> _ollama(
-    APISettings api,
-    List<Map<String, dynamic>> messages,
-  ) async* {
-    final client = http.Client();
-    try {
-      final base = _trim(api.baseUrl);
-      final uri = Uri.parse(
-        base.endsWith('/api/chat') ? base : '$base/api/chat',
-      );
-      final request = http.Request('POST', uri)
-        ..headers['Content-Type'] = 'application/json'
-        ..body = jsonEncode({
-          'model': api.model,
-          'messages': [
-            for (final message in messages) _ollamaMessage(message),
-          ],
-          'stream': true,
-          'options': {
-            'temperature': api.temperature,
-            'num_predict': api.maxTokens,
-          },
-        });
-      final response = await client.send(request);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        final body = await response.stream.bytesToString();
-        throw LLMException(
-          _errorText(body, response.statusCode),
-          statusCode: response.statusCode,
-        );
-      }
-      await for (final line in response.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())) {
-        if (line.trim().isEmpty) continue;
-        final decoded = _tryJson(line.trim());
-        if (decoded == null) continue;
-        final message = decoded['message'];
-        final content = message is Map ? message['content'] : null;
-        if (content is String && content.isNotEmpty) yield content;
-      }
-    } finally {
-      client.close();
-    }
-  }
-
   dynamic _openAIContent(dynamic content) {
     if (content is String) return content;
     if (content is List) {
@@ -474,32 +407,6 @@ class LLMClient {
       ];
     }
     return [{'text': content?.toString() ?? ''}];
-  }
-
-  Map<String, dynamic> _ollamaMessage(Map<String, dynamic> message) {
-    final content = message['content'];
-    if (content is String) {
-      return {'role': message['role'], 'content': content};
-    }
-    if (content is List) {
-      final text = content
-          .whereType<Map>()
-          .where((p) => p['type'] != 'image')
-          .map((p) => p['text']?.toString() ?? '')
-          .join('\n');
-      final images = content
-          .whereType<Map>()
-          .where((p) => p['type'] == 'image')
-          .map((p) => p['base64'])
-          .whereType<String>()
-          .toList();
-      return {
-        'role': message['role'],
-        'content': text,
-        if (images.isNotEmpty) 'images': images,
-      };
-    }
-    return {'role': message['role'], 'content': ''};
   }
 
   String _trim(String value) {
