@@ -129,9 +129,65 @@ class AppPalette extends ThemeExtension<AppPalette> {
       Theme.of(context).extension<AppPalette>() ?? dark;
 
   @override
-  AppPalette copyWith({bool? isDark}) => isDark == null
-      ? this
-      : (isDark ? AppPalette.dark : AppPalette.light);
+  AppPalette copyWith({
+    bool? isDark,
+    Color? canvasTop,
+    Color? canvasBottom,
+    Color? textPrimary,
+    Color? textSecondary,
+    Color? textTertiary,
+    Color? amber,
+    Color? amberSoft,
+    Color? rose,
+    Color? sage,
+    Color? violet,
+    Color? danger,
+    Color? glassTop,
+    Color? glassBottom,
+    Color? glassStroke,
+    Color? glassShadow,
+    Color? chipActiveFill,
+    Color? chipActiveStroke,
+    Color? chipActiveText,
+    Color? userBubbleStart,
+    Color? userBubbleEnd,
+    Color? onUserBubble,
+    Color? divider,
+    Color? orbAmber,
+    Color? orbRose,
+    Color? orbSage,
+    Color? orbViolet,
+  }) {
+    return AppPalette(
+      isDark: isDark ?? this.isDark,
+      canvasTop: canvasTop ?? this.canvasTop,
+      canvasBottom: canvasBottom ?? this.canvasBottom,
+      textPrimary: textPrimary ?? this.textPrimary,
+      textSecondary: textSecondary ?? this.textSecondary,
+      textTertiary: textTertiary ?? this.textTertiary,
+      amber: amber ?? this.amber,
+      amberSoft: amberSoft ?? this.amberSoft,
+      rose: rose ?? this.rose,
+      sage: sage ?? this.sage,
+      violet: violet ?? this.violet,
+      danger: danger ?? this.danger,
+      glassTop: glassTop ?? this.glassTop,
+      glassBottom: glassBottom ?? this.glassBottom,
+      glassStroke: glassStroke ?? this.glassStroke,
+      glassShadow: glassShadow ?? this.glassShadow,
+      chipActiveFill: chipActiveFill ?? this.chipActiveFill,
+      chipActiveStroke: chipActiveStroke ?? this.chipActiveStroke,
+      chipActiveText: chipActiveText ?? this.chipActiveText,
+      userBubbleStart: userBubbleStart ?? this.userBubbleStart,
+      userBubbleEnd: userBubbleEnd ?? this.userBubbleEnd,
+      onUserBubble: onUserBubble ?? this.onUserBubble,
+      divider: divider ?? this.divider,
+      orbAmber: orbAmber ?? this.orbAmber,
+      orbRose: orbRose ?? this.orbRose,
+      orbSage: orbSage ?? this.orbSage,
+      orbViolet: orbViolet ?? this.orbViolet,
+    );
+  }
 
   @override
   AppPalette lerp(ThemeExtension<AppPalette>? other, double t) {
@@ -170,8 +226,51 @@ TextStyle appText(
   );
 }
 
-ThemeData buildTavernTheme({required bool dark}) {
-  final p = dark ? AppPalette.dark : AppPalette.light;
+/// Recolors the primary accent family (the `amber` slots, chips, sliders,
+/// orbs and the user bubble) to one of the four accent options. `amber` is
+/// the default and returns the base palette unchanged, so the stock look is
+/// preserved exactly. The user bubble always stays a light pastel of the
+/// accent so the dark `onUserBubble` text keeps its contrast in both themes.
+AppPalette applyAccent(AppPalette base, String accent) {
+  final Color main;
+  final Color bubbleStart;
+  final Color bubbleEnd;
+  switch (accent) {
+    case 'rose':
+      main = base.isDark ? const Color(0xFFEE9AA8) : const Color(0xFFC46172);
+      bubbleStart = const Color(0xFFF2AEB9);
+      bubbleEnd = const Color(0xFFE5929F);
+      break;
+    case 'sage':
+      main = base.isDark ? const Color(0xFF8FD0BE) : const Color(0xFF3F8677);
+      bubbleStart = const Color(0xFFA5DCCB);
+      bubbleEnd = const Color(0xFF86C8B4);
+      break;
+    case 'violet':
+      main = base.isDark ? const Color(0xFFA9A0E8) : const Color(0xFF6D61B8);
+      bubbleStart = const Color(0xFFBDB5F0);
+      bubbleEnd = const Color(0xFFA89FE6);
+      break;
+    default:
+      return base;
+  }
+  final chipText = base.isDark
+      ? Color.lerp(main, Colors.white, .55)!
+      : Color.lerp(main, Colors.black, .45)!;
+  return base.copyWith(
+    amber: main,
+    amberSoft: main.withValues(alpha: .2),
+    chipActiveFill: main.withValues(alpha: .2),
+    chipActiveStroke: main.withValues(alpha: .5),
+    chipActiveText: chipText,
+    userBubbleStart: bubbleStart,
+    userBubbleEnd: bubbleEnd,
+    orbAmber: main,
+  );
+}
+
+ThemeData buildTavernTheme({required bool dark, String accent = 'amber'}) {
+  final p = applyAccent(dark ? AppPalette.dark : AppPalette.light, accent);
   final base = ThemeData(
     useMaterial3: true,
     brightness: dark ? Brightness.dark : Brightness.light,

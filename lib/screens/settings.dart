@@ -9,6 +9,7 @@ import 'about.dart';
 import 'appearance.dart';
 import 'automation.dart';
 import 'data.dart';
+import 'editors.dart';
 import 'generation.dart';
 import 'interaction.dart';
 import 'lore.dart';
@@ -41,6 +42,17 @@ class SettingsScreen extends StatelessWidget {
   Widget _content(BuildContext context) {
     final p = AppPalette.of(context);
     final settings = AppStore.instance.settings;
+    final themeLabel = switch (settings.themeMode) {
+      'light' => '浅色',
+      'system' => '跟随系统',
+      _ => '深色',
+    };
+    final accentLabel = switch (settings.accent) {
+      'rose' => '玫瑰',
+      'sage' => '青瓷',
+      'violet' => '紫罗兰',
+      _ => '琥珀',
+    };
     final personaName = settings.personaName.trim();
     final personaDesc = settings.personaDescription.trim();
     final quickSets = AppStore.instance.quickReplySets.length;
@@ -73,7 +85,7 @@ class SettingsScreen extends StatelessWidget {
             radius: 26,
             blur: 26,
             padding: const EdgeInsets.all(13),
-            onTap: () => _open(context, const InteractionPage()),
+            onTap: () => _open(context, const PersonaEditorSheet()),
             child: Row(
               children: [
                 SizedBox(
@@ -144,7 +156,7 @@ class SettingsScreen extends StatelessWidget {
                   size: 34,
                   iconSize: 15,
                   blur: 0,
-                  onTap: () => _open(context, const InteractionPage()),
+                  onTap: () => _open(context, const PersonaEditorSheet()),
                 ),
               ],
             ),
@@ -222,7 +234,6 @@ class SettingsScreen extends StatelessWidget {
                   iconColor: p.violet,
                   onTap: () => _open(context, const MemoryPage()),
                 ),
-                const Hairline(indent: 56),
               ],
             ),
           ),
@@ -284,8 +295,9 @@ class SettingsScreen extends StatelessWidget {
             child: SettingRow(
               icon: Icons.palette_outlined,
               title: '外观与显示',
-              subtitle: '主题 · 液态玻璃 · 字号与气泡',
-              value: '默认外观',
+              subtitle: '主题 · 强调色 · 聊天显示',
+              value:
+                  '$themeLabel · $accentLabel · 字号 ${settings.chatFontSize.toStringAsFixed(0)}',
               iconColor: p.amber,
               onTap: () => _open(context, const AppearancePage()),
             ),

@@ -366,6 +366,11 @@ class AppSettings {
     this.summaryPrompt =
         '请用简洁的中文总结以下角色对话的剧情、人物关系、当前场景与未解决的线索。只输出摘要，不要续写对话。',
     this.promptOrder = kDefaultPromptOrder,
+    this.themeMode = 'dark',
+    this.accent = 'amber',
+    this.chatFontSize = 15,
+    this.showAvatar = true,
+    this.showTimestamp = true,
   });
 
   final APISettings api;
@@ -386,6 +391,14 @@ class AppSettings {
   final String summaryPrompt;
   final List<String> promptOrder;
 
+  /// 外观与显示：主题（dark / light / system）、强调色（amber / rose / sage /
+  /// violet）、聊天字号、是否显示角色头像与消息时间。
+  final String themeMode;
+  final String accent;
+  final double chatFontSize;
+  final bool showAvatar;
+  final bool showTimestamp;
+
   AppSettings copyWith({
     APISettings? api,
     String? userName,
@@ -404,6 +417,11 @@ class AppSettings {
     int? summaryInterval,
     String? summaryPrompt,
     List<String>? promptOrder,
+    String? themeMode,
+    String? accent,
+    double? chatFontSize,
+    bool? showAvatar,
+    bool? showTimestamp,
   }) {
     return AppSettings(
       api: api ?? this.api,
@@ -423,6 +441,11 @@ class AppSettings {
       summaryInterval: summaryInterval ?? this.summaryInterval,
       summaryPrompt: summaryPrompt ?? this.summaryPrompt,
       promptOrder: promptOrder ?? List.of(this.promptOrder),
+      themeMode: themeMode ?? this.themeMode,
+      accent: accent ?? this.accent,
+      chatFontSize: chatFontSize ?? this.chatFontSize,
+      showAvatar: showAvatar ?? this.showAvatar,
+      showTimestamp: showTimestamp ?? this.showTimestamp,
     );
   }
 
@@ -444,6 +467,11 @@ class AppSettings {
         'summaryInterval': summaryInterval,
         'summaryPrompt': summaryPrompt,
         'promptOrder': promptOrder,
+        'themeMode': themeMode,
+        'accent': accent,
+        'chatFontSize': chatFontSize,
+        'showAvatar': showAvatar,
+        'showTimestamp': showTimestamp,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -479,8 +507,20 @@ class AppSettings {
       promptOrder: storedOrder.contains('charDescription')
           ? storedOrder
           : kDefaultPromptOrder,
+      themeMode: _normTheme((json['themeMode'] ?? 'dark').toString()),
+      accent: _normAccent((json['accent'] ?? 'amber').toString()),
+      chatFontSize:
+          ((json['chatFontSize'] as num?)?.toDouble() ?? 15).clamp(12, 20),
+      showAvatar: json['showAvatar'] != false,
+      showTimestamp: json['showTimestamp'] != false,
     );
   }
+
+  static String _normTheme(String v) =>
+      (v == 'light' || v == 'system') ? v : 'dark';
+
+  static String _normAccent(String v) =>
+      (v == 'rose' || v == 'sage' || v == 'violet') ? v : 'amber';
 
   String toJsonString() => jsonEncode(toJson());
 }

@@ -54,14 +54,36 @@ class TavernApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final params = Uri.base.queryParameters;
     final screen = params['screen'] ?? 'home';
-    final light = params['theme'] == 'light';
 
-    return MaterialApp(
+    return ListenableBuilder(
+      listenable: AppStore.instance,
+      builder: (context, _) {
+        final settings = AppStore.instance.settings;
+        // 外观设置驱动主题；Web 预览仍可用 ?theme= 覆盖。
+        ThemeMode mode;
+        if (kIsWeb && params['theme'] == 'light') {
+          mode = ThemeMode.light;
+        } else if (kIsWeb && params['theme'] == 'dark') {
+          mode = ThemeMode.dark;
+        } else {
+          switch (settings.themeMode) {
+            case 'light':
+              mode = ThemeMode.light;
+              break;
+            case 'system':
+              mode = ThemeMode.system;
+              break;
+            default:
+              mode = ThemeMode.dark;
+          }
+        }
+        final accent = settings.accent;
+        return MaterialApp(
       title: '酒馆',
       debugShowCheckedModeBanner: false,
-      theme: buildTavernTheme(dark: false),
-      darkTheme: buildTavernTheme(dark: true),
-      themeMode: light ? ThemeMode.light : ThemeMode.dark,
+      theme: buildTavernTheme(dark: false, accent: accent),
+      darkTheme: buildTavernTheme(dark: true, accent: accent),
+      themeMode: mode,
       navigatorObservers: [LiquidGlassNavigatorObserver()],
       scrollBehavior: const _TavernScrollBehavior(),
       builder: (context, child) {
@@ -118,6 +140,8 @@ class TavernApp extends StatelessWidget {
         );
       },
       home: _screenFor(screen, params),
+        );
+      },
     );
   }
 

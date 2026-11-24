@@ -906,6 +906,7 @@ class _CharacterMessageState extends State<_CharacterMessage> {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final settings = AppStore.instance.settings;
     final message = widget.message;
     final meta = _messageMetaLine(message);
     return Opacity(
@@ -916,17 +917,19 @@ class _CharacterMessageState extends State<_CharacterMessage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: 30,
-                height: 26,
-                child: Portrait(
-                  initial: widget.character.initial,
-                  colors: widget.character.colors,
-                  avatarBase64: widget.character.avatarBase64,
-                  radius: 10,
+              if (settings.showAvatar) ...[
+                SizedBox(
+                  width: 30,
+                  height: 26,
+                  child: Portrait(
+                    initial: widget.character.initial,
+                    colors: widget.character.colors,
+                    avatarBase64: widget.character.avatarBase64,
+                    radius: 10,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 9),
+                const SizedBox(width: 9),
+              ],
               Flexible(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1078,27 +1081,30 @@ class _CharacterMessageState extends State<_CharacterMessage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        Text(
-                          message.time ?? '',
-                          style: appText(
-                            8.5,
-                            FontWeight.w400,
-                            p.textTertiary,
-                          ),
-                        ),
-                        if (message.bookmarked) ...[
-                          const SizedBox(width: 5),
-                          Icon(
-                            Icons.bookmark_rounded,
-                            size: 10,
-                            color: p.amber,
-                          ),
+                    if (settings.showTimestamp || message.bookmarked) ...[
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          if (settings.showTimestamp)
+                            Text(
+                              message.time ?? '',
+                              style: appText(
+                                8.5,
+                                FontWeight.w400,
+                                p.textTertiary,
+                              ),
+                            ),
+                          if (message.bookmarked) ...[
+                            if (settings.showTimestamp) const SizedBox(width: 5),
+                            Icon(
+                              Icons.bookmark_rounded,
+                              size: 10,
+                              color: p.amber,
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
+                      ),
+                    ],
                     if (meta != null) ...[
                       const SizedBox(height: 1),
                       Text(
@@ -1121,7 +1127,7 @@ class _CharacterMessageState extends State<_CharacterMessage> {
           if (widget.isLast && !widget.streaming) ...[
             const SizedBox(height: 2),
             Padding(
-              padding: const EdgeInsets.only(left: 39),
+              padding: EdgeInsets.only(left: settings.showAvatar ? 39 : 0),
               child: Row(
                 children: [
                   Glass(
@@ -1214,6 +1220,7 @@ class _UserMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final settings = AppStore.instance.settings;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onLongPress: onLongPress,
@@ -1254,20 +1261,23 @@ class _UserMessage extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 4),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (message.bookmarked) ...[
-              Icon(Icons.bookmark_rounded, size: 10, color: p.amber),
-              const SizedBox(width: 4),
+        if (settings.showTimestamp || message.bookmarked) ...[
+          const SizedBox(height: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (message.bookmarked) ...[
+                Icon(Icons.bookmark_rounded, size: 10, color: p.amber),
+                if (settings.showTimestamp) const SizedBox(width: 4),
+              ],
+              if (settings.showTimestamp)
+                Text(
+                  message.time ?? '',
+                  style: appText(9.5, FontWeight.w400, p.textTertiary),
+                ),
             ],
-            Text(
-              message.time ?? '',
-              style: appText(9.5, FontWeight.w400, p.textTertiary),
-            ),
-          ],
-        ),
+          ),
+        ],
       ],
       ),
     );
@@ -1320,7 +1330,8 @@ class _RichMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = appText(15, FontWeight.w400, color, height: 1.5);
+    final fontSize = AppStore.instance.settings.chatFontSize;
+    final base = appText(fontSize, FontWeight.w400, color, height: 1.5);
     final italic = base.copyWith(color: italicColor);
     final dc = dialogueColor;
     final spans = <TextSpan>[];
