@@ -115,4 +115,55 @@ void main() {
     // 没有状态栏的回复原样保留。
     expect(StatusBar.strip('普通回复，没有状态栏。'), '普通回复，没有状态栏。');
   });
+
+  test('extractStatus parses <state> YAML block', () {
+    const reply = '正文故事。\n<state>\n健康: 90\n理智: 80\n位置: 学校\n</state>';
+    final s = StatusBar.extractStatus(reply);
+    expect(s, isNotNull);
+    expect(s!['健康'], 90);
+    expect(s['位置'], '学校');
+    expect(StatusBar.strip(reply), '正文故事。');
+  });
+
+  test('extractStatus parses <状态栏> pipe table', () {
+    const reply = '故事。\n<状态栏>\n| 健康: 90 | 理智: 80 | 好感: 50 |\n</状态栏>';
+    final s = StatusBar.extractStatus(reply);
+    expect(s!['健康'], 90);
+    expect(s['好感'], 50);
+    expect(StatusBar.strip(reply), '故事。');
+  });
+
+  test('extractStatus parses status code fence', () {
+    const reply = '故事。\n```\n健康: 90\n理智: 80\n```\n';
+    final s = StatusBar.extractStatus(reply);
+    expect(s!['健康'], 90);
+    expect(StatusBar.strip(reply).contains('```'), false);
+  });
+
+  test('extractStatus parses trailing bare pipe table', () {
+    const reply = '故事结尾。\n| 健康: 90 | 心情: 平静 |';
+    final s = StatusBar.extractStatus(reply);
+    expect(s!['健康'], 90);
+    expect(s['心情'], '平静');
+    expect(StatusBar.strip(reply), '故事结尾。');
+  });
+
+  test('strip removes placeholder and route_state markers', () {
+    const reply = '故事。<StatusPlaceHolderImpl/>\n<route_state>ROUTE_STAGE=P1</route_state>';
+    final clean = StatusBar.strip(reply);
+    expect(clean.contains('StatusPlaceHolderImpl'), false);
+    expect(clean.contains('route_state'), false);
+    expect(clean.contains('故事'), true);
+  });
+
+  test('parseContent handles JSON object', () {
+    final s = StatusBar.parseContent('{"健康": 90, "位置": "学校"}');
+    expect(s!['健康'], 90);
+    expect(s['位置'], '学校');
+  });
+
+  test('non-status code fence is preserved', () {
+    const reply = '看这段代码：\n```python\nprint("hello")\nx = 1\n```';
+    expect(StatusBar.strip(reply).contains('print'), true);
+  });
 }

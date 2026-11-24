@@ -4,18 +4,22 @@ import '../data/demo.dart';
 import 'models.dart';
 import 'store.dart';
 
-/// 世界书「状态栏」（MVU 风格变量系统）。
+/// 世界书「状态栏」——兼容多种角色卡格式。
 ///
-/// 一些角色卡的世界书用一棵嵌套变量树 `stat_data` 记录时间、角色状态等，
-/// 初始值放在 `[InitVar]` 条目里，模型则在每条回复末尾追加
-/// `<UpdateVariable><JSONPatch>[…]</JSONPatch></UpdateVariable>` 来更新变量。
+/// 调研社区常见写法后归纳为几类：
+///  * MVU 变量更新：`<UpdateVariable><JSONPatch>[…]</JSONPatch></UpdateVariable>`，
+///    初始值在世界书 `[InitVar]`，输出的是差分，需要累积到变量树。
+///  * 包裹标签整段状态：`<state>`/`<status>`/`<status_bar>`/`<StatusBar>`/
+///    `<状态栏>`/`<角色状态>` 等，里面是 YAML/键值/管道表，输出的是完整状态。
+///  * 代码块状态栏：``` 围栏里的键值或 `| 健康: 90 | 理智: 80 |` 管道表。
+///  * 非 MVU 变量：`{{setvar}}`/`{{getvar}}`/`{{addvar}}` 宏（由 MacroEngine 处理）。
 ///
-/// 这里负责：解析初始值、应用 JSON-Patch 更新、从正文里剥离状态块（正文与
-/// 状态栏分开显示），以及把当前变量格式化回 prompt。状态栏的「标签形态」
+/// 这里负责：识别并剥离各种状态块（正文与状态栏分开显示）、把整段状态解析成
+/// 字段、应用 MVU 差分、解析初始值，以及把当前变量格式化回 prompt。标签形态
 /// （文字描述 / 标签 / 数值进度）由 UI 按值类型自适应渲染。
 class StatusBar {
   static final _updateBlock = RegExp(
-    r'<UpdateVariable>[\s\S]*?</UpdateVariable>',
+    r'<UpdateVariable(?:variable)?>[\s\S]*?</UpdateVariable(?:variable)?>',
     caseSensitive: false,
   );
   static final _jsonPatch = RegExp(
@@ -23,19 +27,164 @@ class StatusBar {
     caseSensitive: false,
   );
 
-  /// 从正文中剥离状态/变量更新块，只留下故事内容（用于显示与发送）。
+  /// 常见的「整段状态」包裹标签（大小写不敏感，含中文标签）。
+  static final _displayBlock = RegExp(
+    r'<(status_bar|statusbar|statusblock|status_top|character_status|statuspanel|状态栏|角色状态|当前状态|status|state|状态)(?:\s[^>]*)?>([\s\S]*?)</\1>',
+    caseSensitive: false,
+  );
+
+  /// MVU 前端占位符与阶段路由标记：只剥离，不作为状态展示。
+  static final _placeholder = RegExp(r'<StatusPlaceHolderImpl\s*/>', caseSensitive: false);
+  static final _routeState = RegExp(r'<route_state>[\s\S]*?</route_state>', caseSensitive: false);
+
+  static final _codeFence = RegExp(r'```[a-zA-Z]*\n?([\s\S]*?)```');
+
+  /// 从正文中剥离各种状态块，只留下故事内容（用于显示与发送）。
   static String strip(String text) {
-    if (!text.contains('<')) return text;
-    var result = text.replaceAll(_updateBlock, '');
-    // 流式输出时状态块可能尚未闭合：把末尾未闭合的 <UpdateVariable>… 也去掉，
-    // 避免原始标签在气泡里闪现。
-    final idx = result.lastIndexOf(RegExp(r'<UpdateVariable>', caseSensitive: false));
+    if (!text.contains('<') && !text.contains('```') && !text.contains('|')) {
+      return text;
+    }
+    var result = text
+        .replaceAll(_updateBlock, '')
+        .replaceAll(_displayBlock, '')
+        .replaceAll(_placeholder, '')
+        .replaceAll(_routeState, '');
+    result = _stripStatusFences(result);
+    result = _stripTrailingPipe(result);
+    // 流式输出时状态块可能尚未闭合：把末尾未闭合的包裹标签也去掉，避免闪现。
+    final open = RegExp(
+      r'<(UpdateVariable(?:variable)?|status_bar|statusbar|statusblock|status_top|character_status|statuspanel|状态栏|角色状态|当前状态|status|state|状态)(?:\s[^>]*)?>',
+      caseSensitive: false,
+    );
+    final idx = result.lastIndexOf(open);
     if (idx >= 0) result = result.substring(0, idx);
     return result.trimRight();
   }
 
-  /// 回复里是否带有状态更新块。
+  /// 回复里是否带有 MVU 变量更新块。
   static bool hasUpdate(String text) => _updateBlock.hasMatch(text);
+
+  /// 提取「整段状态」（非 MVU）：包裹标签 / 状态代码块 / 末尾管道表。
+  /// 返回解析出的字段树；没有可识别的状态块时返回 null。
+  static Map<String, dynamic>? extractStatus(String text) {
+    final m = _displayBlock.firstMatch(text);
+    if (m != null) {
+      final parsed = parseContent(m.group(2) ?? '');
+      if (parsed != null && parsed.isNotEmpty) return parsed;
+    }
+    for (final f in _codeFence.allMatches(text)) {
+      final content = f.group(1) ?? '';
+      if (_looksLikeStatus(content)) {
+        final parsed = parseContent(content);
+        if (parsed != null && parsed.isNotEmpty) return parsed;
+      }
+    }
+    final pipe = _trailingPipeFields(text);
+    if (pipe.length >= 2) return pipe;
+    return null;
+  }
+
+  /// 把状态块内部文本解析成字段树：JSON / 管道表 / 内嵌 <键>值</键> / YAML 键值。
+  static Map<String, dynamic>? parseContent(String content) {
+    final c = content.trim();
+    if (c.isEmpty) return null;
+    if (c.startsWith('{')) {
+      try {
+        final d = jsonDecode(c);
+        if (d is Map && d.isNotEmpty) return Map<String, dynamic>.from(d);
+      } catch (_) {}
+    }
+    if (c.contains('|')) {
+      final pipe = _parsePipe(c);
+      if (pipe.isNotEmpty) return pipe;
+    }
+    final tagFields = <String, dynamic>{};
+    for (final m in RegExp(r'<([\w\u4e00-\u9fff]+)>([^<]*)</\1>').allMatches(c)) {
+      final v = m.group(2)!.trim();
+      if (v.isNotEmpty) tagFields[m.group(1)!] = _parseScalar(v);
+    }
+    if (tagFields.isNotEmpty) return tagFields;
+    final yaml = parseInit(c);
+    if (yaml.isNotEmpty) return yaml;
+    return null;
+  }
+
+  static String _stripStatusFences(String text) {
+    return text.replaceAllMapped(_codeFence, (m) {
+      final content = m.group(1) ?? '';
+      return _looksLikeStatus(content) ? '' : m.group(0)!;
+    });
+  }
+
+  static String _stripTrailingPipe(String text) {
+    final fields = _trailingPipeFields(text);
+    if (fields.length < 2) return text;
+    final lines = text.trimRight().split('\n');
+    var end = lines.length;
+    while (end > 0) {
+      final l = lines[end - 1].trim();
+      if (l.isEmpty) {
+        end--;
+      } else if (l.contains('|') && _parsePipe(l).isNotEmpty) {
+        end--;
+      } else {
+        break;
+      }
+    }
+    return lines.sublist(0, end).join('\n').trimRight();
+  }
+
+  static Map<String, dynamic> _trailingPipeFields(String text) {
+    final lines = text.trimRight().split('\n');
+    final pipeLines = <String>[];
+    for (var i = lines.length - 1; i >= 0; i--) {
+      final l = lines[i].trim();
+      if (l.isEmpty) continue;
+      if (l.contains('|') && _parsePipe(l).isNotEmpty) {
+        pipeLines.insert(0, l);
+      } else {
+        break;
+      }
+    }
+    return pipeLines.isEmpty ? {} : _parsePipe(pipeLines.join('\n'));
+  }
+
+  static Map<String, dynamic> _parsePipe(String content) {
+    final fields = <String, dynamic>{};
+    for (final line in content.split('\n')) {
+      if (!line.contains('|')) continue;
+      for (final cell in line.split('|')) {
+        final kv = _splitKeyValue(cell.trim());
+        if (kv != null) fields[kv.$1] = _parseScalar(kv.$2);
+      }
+    }
+    return fields;
+  }
+
+  static (String, String)? _splitKeyValue(String s) {
+    if (s.isEmpty) return null;
+    for (final sep in [':', '：']) {
+      final i = s.indexOf(sep);
+      if (i > 0) {
+        final key = s.substring(0, i).trim();
+        final val = s.substring(i + sep.length).trim();
+        if (key.isNotEmpty && val.isNotEmpty) return (key, val);
+      }
+    }
+    return null;
+  }
+
+  /// 保守判断一段代码围栏内容是否像状态栏（避免误删普通代码）：
+  /// 管道表 ≥2 字段，或含中文键的键值对 ≥2 个。
+  static bool _looksLikeStatus(String content) {
+    final c = content.trim();
+    if (c.isEmpty) return false;
+    if (c.contains('|') && _parsePipe(c).length >= 2) return true;
+    final parsed = parseContent(c);
+    if (parsed == null || parsed.length < 2) return false;
+    bool hasCjk(String s) => s.runes.any((r) => r >= 0x4E00 && r <= 0x9FFF);
+    return parsed.keys.any(hasCjk);
+  }
 
   /// 提取回复中的 JSON-Patch 操作数组（无则返回空）。
   static List<Map<String, dynamic>> extractOps(String text) {

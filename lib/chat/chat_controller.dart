@@ -55,20 +55,40 @@ class ChatController extends ChangeNotifier {
   void _initStatusBar() {
     if (_session.statData.isNotEmpty) return;
     final init = StatusBar.findInitContent(character);
-    if (init == null || init.trim().isEmpty) return;
-    final parsed = StatusBar.parseInit(init);
-    if (parsed.isNotEmpty) {
-      _session.statData = parsed;
-      _save();
+    if (init != null && init.trim().isNotEmpty) {
+      final parsed = StatusBar.parseInit(init);
+      if (parsed.isNotEmpty) {
+        _session.statData = parsed;
+        _save();
+        return;
+      }
+    }
+    // 整段输出型卡片（无 InitVar）：从最近一条含状态块的消息回填初始状态。
+    for (var i = _session.messages.length - 1; i >= 0; i--) {
+      final m = _session.messages[i];
+      if (m.isUser) continue;
+      final full = StatusBar.extractStatus(m.text);
+      if (full != null && full.isNotEmpty) {
+        _session.statData = full;
+        _save();
+        return;
+      }
     }
   }
 
-  /// 应用回复末尾 <UpdateVariable> 里的 JSONPatch 到会话变量树（状态栏数据源）。
+  /// 应用回复里的状态更新：MVU 差分累积到变量树；整段状态输出则直接替换。
   void _applyStatusUpdate(String text) {
-    if (!StatusBar.hasUpdate(text)) return;
-    final ops = StatusBar.extractOps(text);
-    if (ops.isEmpty) return;
-    _session.statData = StatusBar.applyOps(_session.statData, ops);
+    if (StatusBar.hasUpdate(text)) {
+      final ops = StatusBar.extractOps(text);
+      if (ops.isNotEmpty) {
+        _session.statData = StatusBar.applyOps(_session.statData, ops);
+      }
+      return;
+    }
+    final full = StatusBar.extractStatus(text);
+    if (full != null && full.isNotEmpty) {
+      _session.statData = full;
+    }
   }
 
   void send(String text, {List<ChatAttachment> attachments = const []}) {
