@@ -313,36 +313,44 @@ class _CharacterLibraryPageState extends State<CharacterLibraryPage> {
       intensity: 1.05,
       child: SafeArea(
         bottom: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 6, 20, 40),
-          physics: const BouncingScrollPhysics(),
+        child: Column(
           children: [
-            Row(
-              children: [
-                GlassCircleButton(
-                  icon: Icons.arrow_back_ios_new_rounded,
-                  size: 40,
-                  iconSize: 15,
-                  onTap: () => Navigator.maybePop(context),
-                ),
-                const Spacer(),
-                GlassCircleButton(
-                  icon: Icons.add_rounded,
-                  size: 40,
-                  onTap: () async {
-                    await widget.onImport();
-                    if (mounted) setState(() {});
-                  },
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+              child: Row(
+                children: [
+                  GlassCircleButton(
+                    icon: Icons.arrow_back_ios_new_rounded,
+                    size: 40,
+                    iconSize: 15,
+                    onTap: () => Navigator.maybePop(context),
+                  ),
+                  const Spacer(),
+                  GlassCircleButton(
+                    icon: Icons.add_rounded,
+                    size: 40,
+                    onTap: () async {
+                      await widget.onImport();
+                      if (mounted) setState(() {});
+                    },
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 18),
-            PageHeader(
-              eyebrow: 'LIBRARY',
-              title: '角色库',
-              subtitle: '${AppStore.instance.characters.length} 位角色 · 筛选、收藏与管理。',
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: PageHeader(
+                eyebrow: 'LIBRARY',
+                title: '角色库',
+                subtitle: '${AppStore.instance.characters.length} 位角色 · 筛选、收藏与管理。',
+              ),
             ),
-            const SizedBox(height: 18),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 40),
+                physics: const BouncingScrollPhysics(),
+                children: [
             SearchField(
               hint: '搜索角色或标签',
               controller: _query,
@@ -401,6 +409,9 @@ class _CharacterLibraryPageState extends State<CharacterLibraryPage> {
                   );
                 },
               ),
+          ],
+              ),
+            ),
           ],
         ),
       ),
