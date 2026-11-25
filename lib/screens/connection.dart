@@ -608,7 +608,7 @@ class _ModelSheetState extends State<_ModelSheet> {
   }
 }
 
-class _ConnectionField extends StatelessWidget {
+class _ConnectionField extends StatefulWidget {
   const _ConnectionField({
     required this.label,
     required this.controller,
@@ -624,32 +624,71 @@ class _ConnectionField extends StatelessWidget {
   final bool obscure;
 
   @override
+  State<_ConnectionField> createState() => _ConnectionFieldState();
+}
+
+class _ConnectionFieldState extends State<_ConnectionField> {
+  late bool _hidden = widget.obscure;
+
+  @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final hasText = widget.controller.text.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
       child: Row(
         children: [
-          Icon(icon, size: 17, color: p.textTertiary),
+          Icon(widget.icon, size: 17, color: p.textTertiary),
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
-              controller: controller,
-              obscureText: obscure,
+              controller: widget.controller,
+              obscureText: widget.obscure && _hidden,
               autocorrect: false,
               enableSuggestions: false,
               style: appText(13.5, FontWeight.w500, p.textPrimary),
               cursorColor: p.amber,
+              onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
-                labelText: label,
+                labelText: widget.label,
                 labelStyle: appText(11, FontWeight.w400, p.textTertiary),
-                hintText: hint,
+                hintText: widget.hint,
                 hintStyle: appText(12, FontWeight.w400, p.textTertiary),
               ),
             ),
           ),
+          if (widget.obscure) ...[
+            if (hasText)
+              GestureDetector(
+                onTap: () {
+                  widget.controller.clear();
+                  setState(() {});
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.cancel_rounded,
+                    size: 16,
+                    color: p.textTertiary,
+                  ),
+                ),
+              ),
+            GestureDetector(
+              onTap: () => setState(() => _hidden = !_hidden),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  _hidden
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: 17,
+                  color: p.textSecondary,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

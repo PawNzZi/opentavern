@@ -100,24 +100,29 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     return SafeArea(
       bottom: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 6, 20, 148),
-        physics: const BouncingScrollPhysics(),
+      child: Column(
         children: [
-          PageHeader(
-            eyebrow: _todayLabel(),
-            title: '酒馆',
-            subtitle: '挑一个角色，继续今晚的故事。',
-            trailing: GlassCircleButton(
-              icon: Icons.add_rounded,
-              size: 46,
-              onTap: () async {
-                await widget.onImport();
-                if (mounted) setState(() {});
-              },
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+            child: PageHeader(
+              eyebrow: _todayLabel(),
+              title: '酒馆',
+              subtitle: '挑一个角色，继续今晚的故事。',
+              trailing: GlassCircleButton(
+                icon: Icons.add_rounded,
+                size: 46,
+                onTap: () async {
+                  await widget.onImport();
+                  if (mounted) setState(() {});
+                },
+              ),
             ),
           ),
-          const SizedBox(height: 20),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 148),
+              physics: const BouncingScrollPhysics(),
+              children: [
           SearchField(
             hint: '搜索角色或标签',
             onTap: () => openGlassPage(context, const SearchPage()),
@@ -208,6 +213,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ),
             ),
           ],
+              ],
+            ),
+          ),
         ],
       ),
     );

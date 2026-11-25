@@ -32,12 +32,11 @@ String _uniqueCopyName(String base) {
   return '$base 副本 $index';
 }
 
-/// 复制角色卡与设定并真正落盘；关闭入口时可以顺带返回上一页。
+/// 复制角色卡与设定并真正落盘。
 Future<void> _copyCharacter(
   BuildContext context,
-  DemoCharacter character, {
-  bool closeAfter = false,
-}) async {
+  DemoCharacter character,
+) async {
   final copy = character.copyWith(
     name: _uniqueCopyName(character.name),
     chats: 0,
@@ -47,7 +46,6 @@ Future<void> _copyCharacter(
   await AppStore.instance.addCharacter(copy);
   if (!context.mounted) return;
   showTavernToast(context, '已复制为「${copy.name}」');
-  if (closeAfter) Navigator.of(context).pop();
 }
 
 String _formatDate(int? timestamp) {
@@ -431,12 +429,6 @@ class _CharacterScreenState extends State<CharacterScreen> {
                       }
                     },
                   ),
-                  const SizedBox(width: 8),
-                  GlassCircleButton(
-                    icon: Icons.more_horiz_rounded,
-                    size: 40,
-                    onTap: () => _showMore(context, c),
-                  ),
                 ],
               ),
             ),
@@ -491,17 +483,6 @@ class _CharacterScreenState extends State<CharacterScreen> {
     );
     if (!context.mounted) return;
     showTavernToast(context, uri == null ? '已取消导出' : '角色卡已导出');
-  }
-
-  void _showMore(BuildContext context, DemoCharacter character) {
-    Navigator.of(context).push(
-      CupertinoPageRoute(
-        builder: (_) => _CharacterMorePage(
-          character: character,
-          onExport: () => _exportCharacterMenu(context, character),
-        ),
-      ),
-    );
   }
 
   Future<void> _continueChat(BuildContext context, DemoCharacter c) async {
@@ -1294,97 +1275,6 @@ class _MetaRow extends StatelessWidget {
         Text(
           value,
           style: appText(10.5, FontWeight.w500, p.textSecondary),
-        ),
-      ],
-    );
-  }
-}
-
-class _CharacterMorePage extends StatelessWidget {
-  const _CharacterMorePage({
-    required this.character,
-    required this.onExport,
-  });
-
-  final DemoCharacter character;
-  final VoidCallback onExport;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return DetailPage(
-      eyebrow: 'CHARACTER',
-      title: '更多操作',
-      subtitle: character.name,
-      children: [
-        const SizedBox(height: 12),
-        Glass(
-          radius: 22,
-          blur: 22,
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            children: [
-              SettingRow(
-                icon: Icons.edit_outlined,
-                title: '编辑角色',
-                iconColor: p.amber,
-                onTap: () => Navigator.of(context).push(
-                  CupertinoPageRoute(
-                    builder: (_) => CharacterEditorPage(character: character),
-                  ),
-                ),
-              ),
-              const Hairline(indent: 56),
-              SettingRow(
-                icon: Icons.copy_rounded,
-                title: '复制角色',
-                iconColor: p.sage,
-                onTap: () => _copyCharacter(context, character, closeAfter: true),
-              ),
-              const Hairline(indent: 56),
-              SettingRow(
-                icon: Icons.ios_share_rounded,
-                title: '导出角色卡',
-                value: 'PNG / JSON',
-                iconColor: p.violet,
-                onTap: onExport,
-              ),
-              const Hairline(indent: 56),
-              SettingRow(
-                icon: Icons.delete_outline_rounded,
-                title: '删除角色',
-                value: '同时删除其聊天',
-                iconColor: p.danger,
-                onTap: () async {
-                  final ok = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('删除角色'),
-                      content: Text('删除「${character.name}」及其全部聊天？'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('取消'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('删除'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (ok != true) return;
-                  await AppStore.instance.deleteCharacter(
-                    character,
-                    deleteChats: true,
-                  );
-                  if (context.mounted) {
-                    Navigator.of(context).pop();
-                  }
-                },
-              ),
-            ],
-          ),
         ),
       ],
     );

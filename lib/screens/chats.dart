@@ -182,13 +182,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  Icons.swipe_left_alt_rounded,
+                  Icons.touch_app_rounded,
                   size: 14,
                   color: p.textTertiary,
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '左滑对话可置顶或删除',
+                  '长按对话可置顶或删除',
                   style: appText(11, FontWeight.w400, p.textTertiary),
                 ),
               ],
@@ -213,17 +213,72 @@ class _ChatGroup extends StatelessWidget {
   final ValueChanged<DemoChat> onPin;
   final ValueChanged<DemoChat> onDelete;
 
+  /// 长按对话弹出操作面板：置顶 / 删除。比左滑更稳、更易发现。
+  void _showActions(BuildContext context, DemoChat chat) {
+    final p = AppPalette.of(context);
+    final name = chat.title.isEmpty ? chat.character.name : chat.title;
+    showTavernSheet<void>(
+      context,
+      title: name,
+      subtitle: chat.character.name,
+      heightFactor: .42,
+      child: Column(
+        children: [
+          _ActionTile(
+            icon: chat.pinned
+                ? Icons.push_pin_outlined
+                : Icons.push_pin_rounded,
+            label: chat.pinned ? '取消置顶' : '置顶对话',
+            caption: chat.pinned ? '从置顶列表移回最近' : '固定在列表顶部',
+            color: p.amber,
+            onTap: () {
+              Navigator.of(context).pop();
+              onPin(chat);
+            },
+          ),
+          const SizedBox(height: 10),
+          _ActionTile(
+            icon: Icons.delete_outline_rounded,
+            label: '删除对话',
+            caption: '删除这段对话记录',
+            color: p.danger,
+            onTap: () async {
+              Navigator.of(context).pop();
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('删除对话'),
+                  content: Text('删除「$name」？'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('取消'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('删除'),
+                    ),
+                  ],
+                ),
+              );
+              if (ok == true) onDelete(chat);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         for (var i = 0; i < chats.length; i++) ...[
-          _SwipeChatRow(
+          _ChatRow(
             key: ValueKey(chats[i].sessionId ?? chats[i].character.name),
             chat: chats[i],
             onTap: () => onOpenChat(chats[i]),
-            onPin: () => onPin(chats[i]),
-            onDelete: () => onDelete(chats[i]),
+            onLongPress: () => _showActions(context, chats[i]),
           ),
           if (i != chats.length - 1) const Hairline(indent: 76),
         ],
@@ -232,135 +287,60 @@ class _ChatGroup extends StatelessWidget {
   }
 }
 
-class _SwipeChatRow extends StatefulWidget {
-  const _SwipeChatRow({
-    super.key,
-    required this.chat,
-    required this.onTap,
-    required this.onPin,
-    required this.onDelete,
-  });
-
-  final DemoChat chat;
-  final VoidCallback onTap;
-  final VoidCallback onPin;
-  final VoidCallback onDelete;
-
-  @override
-  State<_SwipeChatRow> createState() => _SwipeChatRowState();
-}
-
-class _SwipeChatRowState extends State<_SwipeChatRow> {
-  static const _max = 144.0;
-  double _offset = 0;
-
-  void _update(DragUpdateDetails details) {
-    setState(() {
-      _offset = (_offset - details.delta.dx).clamp(0.0, _max);
-    });
-  }
-
-  void _end(DragEndDetails details) {
-    final velocity = details.primaryVelocity ?? 0;
-    final open = _offset > 44 || velocity < -300;
-    setState(() => _offset = open ? _max : 0);
-  }
-
-  void _run(VoidCallback action) {
-    setState(() => _offset = 0);
-    action();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: IgnorePointer(
-              ignoring: _offset == 0,
-              child: Opacity(
-                opacity: _offset == 0 ? 0 : 1,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _SwipeAction(
-                      icon: widget.chat.pinned
-                          ? Icons.push_pin_outlined
-                          : Icons.push_pin_rounded,
-                      label: widget.chat.pinned ? '取消' : '置顶',
-                      color: p.amber,
-                      onTap: () => _run(widget.onPin),
-                    ),
-                    _SwipeAction(
-                      icon: Icons.delete_outline_rounded,
-                      label: '删除',
-                      color: p.danger,
-                      onTap: () => _run(widget.onDelete),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Transform.translate(
-            offset: Offset(-_offset, 0),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onHorizontalDragUpdate: _update,
-              onHorizontalDragEnd: _end,
-              child: _ChatRow(
-                chat: widget.chat,
-                onTap: () {
-                  if (_offset > 0) {
-                    setState(() => _offset = 0);
-                  } else {
-                    widget.onTap();
-                  }
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SwipeAction extends StatelessWidget {
-  const _SwipeAction({
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
     required this.icon,
     required this.label,
+    required this.caption,
     required this.color,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
+  final String caption;
   final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    final p = AppPalette.of(context);
+    return Pressable(
       onTap: onTap,
-      child: Container(
-        width: 72,
-        color: color.withValues(alpha: .18),
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      child: Glass(
+        radius: 16,
+        blur: 18,
+        shadow: false,
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+        child: Row(
           children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: appText(10.5, FontWeight.w600, color),
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: .16),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 18, color: color),
             ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: appText(14.5, FontWeight.w600, p.textPrimary),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    caption,
+                    style: appText(10.5, FontWeight.w400, p.textTertiary),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 18, color: p.textTertiary),
           ],
         ),
       ),
@@ -369,17 +349,25 @@ class _SwipeAction extends StatelessWidget {
 }
 
 class _ChatRow extends StatelessWidget {
-  const _ChatRow({required this.chat, required this.onTap});
+  const _ChatRow({
+    super.key,
+    required this.chat,
+    required this.onTap,
+    this.onLongPress,
+  });
 
   final DemoChat chat;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return Pressable(
-      onTap: onTap,
-      child: Padding(
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: Pressable(
+        onTap: onTap,
+        child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
         child: Row(
           children: [
@@ -466,6 +454,7 @@ class _ChatRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
