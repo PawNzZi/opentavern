@@ -54,6 +54,9 @@ class _StatusBarPanelState extends State<StatusBarPanel> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     if (widget.data.isEmpty) return const SizedBox.shrink();
+    final raw = widget.data['__raw__'] is String
+        ? widget.data['__raw__'] as String
+        : null;
     return Glass(
       radius: 18,
       blur: 20,
@@ -75,10 +78,11 @@ class _StatusBarPanelState extends State<StatusBarPanel> {
                 ),
                 const SizedBox(width: 8),
                 if (!_expanded) ...[
-                  for (final (label, value) in _quickStats) ...[
-                    _QuickStat(label: label, value: value),
-                    const SizedBox(width: 6),
-                  ],
+                  if (raw == null)
+                    for (final (label, value) in _quickStats) ...[
+                      _QuickStat(label: label, value: value),
+                      const SizedBox(width: 6),
+                    ],
                   const Spacer(),
                 ] else
                   const Spacer(),
@@ -105,28 +109,39 @@ class _StatusBarPanelState extends State<StatusBarPanel> {
                       constraints: const BoxConstraints(maxHeight: 320),
                       child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (final entry in widget.data.entries) ...[
-                              if (entry.value is Map)
-                                _Group(
-                                  name: entry.key,
-                                  fields:
-                                      Map<String, dynamic>.from(entry.value as Map),
-                                  ranges: widget.ranges,
-                                )
-                              else
-                                _Field(
-                                  label: entry.key,
-                                  value: entry.value,
-                                  path: entry.key,
-                                  ranges: widget.ranges,
+                        child: raw != null
+                            ? Text(
+                                raw,
+                                style: appText(
+                                  11.5,
+                                  FontWeight.w400,
+                                  p.textSecondary,
+                                  height: 1.6,
                                 ),
-                              const SizedBox(height: 9),
-                            ],
-                          ],
-                        ),
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  for (final entry in widget.data.entries)
+                                    if (entry.key != '__raw__') ...[
+                                      if (entry.value is Map)
+                                        _Group(
+                                          name: entry.key,
+                                          fields: Map<String, dynamic>.from(
+                                              entry.value as Map),
+                                          ranges: widget.ranges,
+                                        )
+                                      else
+                                        _Field(
+                                          label: entry.key,
+                                          value: entry.value,
+                                          path: entry.key,
+                                          ranges: widget.ranges,
+                                        ),
+                                      const SizedBox(height: 9),
+                                    ],
+                                ],
+                              ),
                       ),
                     ),
                   )

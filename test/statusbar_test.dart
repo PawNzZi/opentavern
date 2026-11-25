@@ -215,4 +215,41 @@ void main() {
     expect(s!['hp'], 100);
     expect(s['mp'], 50);
   });
+
+  test('Status_block rich status is stripped and shown as readable raw text', () {
+    const reply = '她抬头看了你一眼。\n\n'
+        '<Status_block>\n'
+        '📅 『日期：5月23日 星期三 | ⏰ 时间：晚上21点30分 | 📍 位置：家中客厅』\n'
+        '<details><summary>[角色状态]</summary>\n'
+        '```\n'
+        '👨 『我的状态』\n'
+        '- 🧑‍💼 当前行动：刚下班回到家。\n'
+        '👧 『秦芷柔的状态』\n'
+        '- 🧑‍💼 当前行动：坐在沙发一角。\n'
+        '```\n'
+        '</details>\n'
+        '『剧情发展』\n'
+        '1.[正常]继续观察。\n'
+        '</Status_block>';
+    // 剥离：回复正文里不再有状态块。
+    final stripped = StatusBar.strip(reply);
+    expect(stripped.contains('Status_block'), false);
+    expect(stripped.contains('剧情发展'), false);
+    expect(stripped.contains('她抬头看了你一眼'), true);
+    // 提取：富文本 → __raw__，得到去掉 HTML/围栏的可读文本。
+    final s = StatusBar.extractStatus(reply);
+    expect(s, isNotNull);
+    final raw = s!['__raw__'] as String;
+    expect(raw.contains('日期'), true);
+    expect(raw.contains('秦芷柔'), true);
+    expect(raw.contains('<details>'), false);
+    expect(raw.contains('```'), false);
+  });
+
+  test('simple key-value status still parses to fields (not raw)', () {
+    const reply = '故事。\n<state>\n好感: 90\n心情: 开心\n</state>';
+    final s = StatusBar.extractStatus(reply);
+    expect(s!['好感'], 90);
+    expect(s.containsKey('__raw__'), false);
+  });
 }

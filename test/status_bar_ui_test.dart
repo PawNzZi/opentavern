@@ -46,4 +46,19 @@ void main() {
     await tester.pumpWidget(wrap(const StatusBarPanel(data: {})));
     expect(find.text('状态栏'), findsNothing);
   });
+
+  testWidgets('rich raw status text renders when expanded', (tester) async {
+    const rawText =
+        '📅 『日期：5月23日 星期三』\n[角色状态]\n👨 『我的状态』\n- 当前行动：刚下班。';
+    await tester.pumpWidget(
+      wrap(const StatusBarPanel(data: {'__raw__': rawText})),
+    );
+    expect(find.text('状态栏'), findsOneWidget);
+    // 收起时富文本不渲染。
+    expect(find.textContaining('5月23日'), findsNothing);
+    await tester.tap(find.text('状态栏'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('5月23日'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

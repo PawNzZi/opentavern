@@ -28,8 +28,9 @@ class StatusBar {
   );
 
   /// 常见的「整段状态」包裹标签（大小写不敏感，含中文标签）。
+  /// 含常见下划线变体（Status_block / status_block / FullVariableUpdate 等）。
   static final _displayBlock = RegExp(
-    r'<(status_bar|statusbar|statusblock|status_top|character_status|statuspanel|状态栏|角色状态|当前状态|status|state|状态)(?:\s[^>]*)?>([\s\S]*?)</\1>',
+    r'<(status_block|status_bar|statusbar|statusblock|status_top|status_top_bar|character_status|status_panel|statuspanel|fullvariableupdate|variableupdate|status|state|状态栏|角色状态|当前状态|状态)(?:\s[^>]*)?>([\s\S]*?)</\1>',
     caseSensitive: false,
   );
 
@@ -118,10 +119,50 @@ class StatusBar {
     return m != null ? (m.group(2) ?? t) : t;
   }
 
-  /// 判断一段匹配文本是否为状态块（内容能解析出 ≥2 个字段）。
+  /// 内容是否「富文本」状态栏（含 HTML 结构或代码围栏），这类无法拆成简单字段，
+  /// 按原文展示更忠实。
+  static bool _isRichContent(String content) {
+    if (content.contains('```')) return true;
+    return RegExp(
+      r'</?(details|summary|div|span|br|ul|ol|li|table|tr|td|th|p|b|i|strong|em|section)\b',
+      caseSensitive: false,
+    ).hasMatch(content);
+  }
+
+  /// 清掉富文本里的 HTML 标签/代码围栏，得到可读的状态栏文本。
+  static String _sanitizeRaw(String content) {
+    var c = content;
+    c = c.replaceAll(RegExp(r'```[a-zA-Z]*\n?'), '').replaceAll('```', '');
+    c = c.replaceAllMapped(
+      RegExp(r'<summary>([\s\S]*?)</summary>', caseSensitive: false),
+      (m) => m.group(1) ?? '',
+    );
+    c = c.replaceAll(RegExp(r'<[^>]+>'), '');
+    final lines = c
+        .split('\n')
+        .map((l) => l.trimRight())
+        .where((l) => l.trim().isNotEmpty)
+        .toList();
+    return lines.join('\n').trim();
+  }
+
+  /// 判断一段匹配文本是否为状态块：富文本或能解析出 ≥2 个字段都算。
   static bool _isStatusContent(String inner) {
-    final parsed = parseContent(_unwrap(inner));
+    final c = _unwrap(inner);
+    if (_isRichContent(c)) return true;
+    final parsed = parseContent(c);
     return parsed != null && parsed.length >= 2;
+  }
+
+  /// 把状态块内容转成展示数据：富文本/无法解析 → `{'__raw__': 文本}`，
+  /// 否则返回解析出的字段树。没有内容返回 null。
+  static Map<String, dynamic>? _statusFromContent(String content) {
+    final c = content.trim();
+    if (c.isEmpty) return null;
+    if (_isRichContent(c)) return {'__raw__': _sanitizeRaw(c)};
+    final parsed = parseContent(c);
+    if (parsed != null && parsed.length >= 2) return parsed;
+    return {'__raw__': _sanitizeRaw(c)};
   }
 
   /// 从正文中剥离各种状态块，只留下故事内容（用于显示与发送）。
@@ -152,7 +193,7 @@ class StatusBar {
     result = _stripTrailingPipe(result);
     // 流式输出时状态块可能尚未闭合：把末尾未闭合的包裹标签也去掉，避免闪现。
     final open = RegExp(
-      r'<(UpdateVariable(?:variable)?|status_bar|statusbar|statusblock|status_top|character_status|statuspanel|状态栏|角色状态|当前状态|status|state|状态)(?:\s[^>]*)?>',
+      r'<(UpdateVariable(?:variable)?|status_block|status_bar|statusbar|statusblock|status_top|character_status|statuspanel|fullvariableupdate|variableupdate|status|state|状态栏|角色状态|当前状态|状态)(?:\s[^>]*)?>',
       caseSensitive: false,
     );
     final idx = result.lastIndexOf(open);
@@ -175,21 +216,23 @@ class StatusBar {
       if (m == null) continue;
       final matched = m.group(0) ?? '';
       final inner = m.groupCount >= 1 ? (m.group(1) ?? matched) : matched;
-      final parsed = parseContent(_unwrap(inner));
-      if (parsed != null && parsed.length >= 2) return parsed;
+      final result = _statusFromContent(_unwrap(inner));
+      if (result != null) return result;
     }
     // 2) 常见包裹标签。
     final m = _displayBlock.firstMatch(text);
     if (m != null) {
-      final parsed = parseContent(m.group(2) ?? '');
-      if (parsed != null && parsed.isNotEmpty) return parsed;
+      final result = _statusFromContent(m.group(2) ?? '');
+      if (result != null) return result;
     }
     // 3) 任意自定义标签（内容像状态）。
     for (final t in _anyTagBlock.allMatches(text)) {
       final tag = (t.group(1) ?? '').toLowerCase();
       if (_specialTags.contains(tag)) continue;
-      final parsed = parseContent(t.group(2) ?? '');
-      if (parsed != null && parsed.length >= 2) return parsed;
+      final content = t.group(2) ?? '';
+      if (!_isStatusContent(content)) continue;
+      final result = _statusFromContent(content);
+      if (result != null) return result;
     }
     // 4) 状态代码块。
     for (final f in _codeFence.allMatches(text)) {
@@ -480,6 +523,9 @@ class StatusBar {
 
   /// 把变量树格式化为缩进文本，注入 prompt（{{format_message_variable::stat_data}}）。
   static String format(Map<String, dynamic> data) {
+    // 富文本状态栏直接返回原文。
+    final raw = data['__raw__'];
+    if (raw is String && raw.trim().isNotEmpty) return raw.trim();
     final buffer = StringBuffer();
     void walk(Map<String, dynamic> node, int depth) {
       node.forEach((key, value) {
