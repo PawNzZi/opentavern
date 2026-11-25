@@ -27,10 +27,17 @@ class StatusBar {
     caseSensitive: false,
   );
 
-  /// 常见的「整段状态」包裹标签（大小写不敏感，含中文标签）。
-  /// 含常见下划线变体（Status_block / status_block / FullVariableUpdate 等）。
+  /// 「整段状态」包裹标签：以 `status` 开头的任何标签（status / statusblock /
+  /// status_block / status_bar / status_top … 全部命中），外加常见的明确标签与
+  /// 中文标签。用户建议的「status 前缀关键词」策略，配合白名单覆盖面更广。
   static final _displayBlock = RegExp(
-    r'<(status_block|status_bar|statusbar|statusblock|status_top|status_top_bar|character_status|status_panel|statuspanel|fullvariableupdate|variableupdate|status|state|状态栏|角色状态|当前状态|状态)(?:\s[^>]*)?>([\s\S]*?)</\1>',
+    r'<(status[\w]*|character_status|fullvariableupdate|variableupdate|state|状态栏|角色状态|当前状态|状态)[^>]*>([\s\S]*?)</\1>',
+    caseSensitive: false,
+  );
+
+  /// 常见结构/内联标签：只去掉标签、保留内部文字，避免正文露出原始标签。
+  static final _formattingTags = RegExp(
+    r'</?(maintext|details|summary|div|span|p|br|b|i|em|strong|u|ul|ol|li|h[1-6]|blockquote|table|tr|td|th)\b[^>]*>',
     caseSensitive: false,
   );
 
@@ -39,17 +46,6 @@ class StatusBar {
   static final _routeState = RegExp(r'<route_state>[\s\S]*?</route_state>', caseSensitive: false);
 
   static final _codeFence = RegExp(r'```[a-zA-Z]*\n?([\s\S]*?)```');
-
-  /// 任意包裹标签块（标签名不限，含中文标签），用于适配白名单之外的自定义状态标签。
-  static final _anyTagBlock = RegExp(
-    r'<([A-Za-z_\u4e00-\u9fff][\w\u4e00-\u9fff-]*)[^>]*>([\s\S]*?)</\1>',
-  );
-
-  /// 这些标签由专门逻辑处理，generic 检测时跳过。
-  static const _specialTags = {
-    'updatevariable', 'updatevariablevariable', 'route_state', 'jsonpatch',
-    'analysis', 'start', 'user', 'char', 'system', 'assistant',
-  };
 
   /// 从角色卡自带的 regex_scripts 提取 findRegex 模式。
   ///
@@ -146,22 +142,39 @@ class StatusBar {
     return lines.join('\n').trim();
   }
 
-  /// 判断一段匹配文本是否为状态块：富文本或能解析出 ≥2 个字段都算。
-  static bool _isStatusContent(String inner) {
-    final c = _unwrap(inner);
-    if (_isRichContent(c)) return true;
-    final parsed = parseContent(c);
-    return parsed != null && parsed.length >= 2;
+  /// 字段树的键是否「干净」：只有字母/数字/下划线/中文字符，无 emoji、标点、
+  /// 『』等。避免把正文/富文本硬拆出的乱码字段当成状态栏。
+  static bool _isCleanFields(Map<String, dynamic>? m) {
+    if (m == null || m.length < 2) return false;
+    for (final k in m.keys) {
+      if (k.trim().isEmpty || k.runes.length > 16) return false;
+      for (final r in k.runes) {
+        final ok = (r >= 0x30 && r <= 0x39) || // 0-9
+            (r >= 0x41 && r <= 0x5A) || // A-Z
+            (r >= 0x61 && r <= 0x7A) || // a-z
+            r == 0x5F || // _
+            r == 0x20 || // space
+            (r >= 0x4E00 && r <= 0x9FFF) || // CJK
+            (r >= 0x3040 && r <= 0x30FF); // 假名
+        if (!ok) return false;
+      }
+    }
+    return true;
   }
 
-  /// 把状态块内容转成展示数据：富文本/无法解析 → `{'__raw__': 文本}`，
+  /// 判断一段匹配文本是否为状态块（供卡自带 regex 剥离用）：内容能拆出干净字段。
+  static bool _isStatusContent(String inner) {
+    return _isCleanFields(parseContent(_unwrap(inner)));
+  }
+
+  /// 把状态块内容转成展示数据：富文本/无法拆成干净字段 → `{'__raw__': 文本}`，
   /// 否则返回解析出的字段树。没有内容返回 null。
   static Map<String, dynamic>? _statusFromContent(String content) {
     final c = content.trim();
     if (c.isEmpty) return null;
     if (_isRichContent(c)) return {'__raw__': _sanitizeRaw(c)};
     final parsed = parseContent(c);
-    if (parsed != null && parsed.length >= 2) return parsed;
+    if (_isCleanFields(parsed)) return parsed;
     return {'__raw__': _sanitizeRaw(c)};
   }
 
@@ -183,17 +196,13 @@ class StatusBar {
         return _isStatusContent(matched) ? '' : matched;
       });
     }
-    // 任意自定义标签的状态块（白名单之外）。
-    result = result.replaceAllMapped(_anyTagBlock, (m) {
-      final tag = (m.group(1) ?? '').toLowerCase();
-      if (_specialTags.contains(tag)) return m.group(0)!;
-      return _isStatusContent(m.group(2) ?? '') ? '' : m.group(0)!;
-    });
+    // 展开常见结构/内联标签，避免正文里露出 <maintext>/<details>/<em> 等原始标签。
+    result = result.replaceAll(_formattingTags, '');
     result = _stripStatusFences(result);
     result = _stripTrailingPipe(result);
     // 流式输出时状态块可能尚未闭合：把末尾未闭合的包裹标签也去掉，避免闪现。
     final open = RegExp(
-      r'<(UpdateVariable(?:variable)?|status_block|status_bar|statusbar|statusblock|status_top|character_status|statuspanel|fullvariableupdate|variableupdate|status|state|状态栏|角色状态|当前状态|状态)(?:\s[^>]*)?>',
+      r'<(UpdateVariable(?:variable)?|status[\w]*|character_status|fullvariableupdate|variableupdate|state|状态栏|角色状态|当前状态|状态)[^>]*>',
       caseSensitive: false,
     );
     final idx = result.lastIndexOf(open);
@@ -225,16 +234,7 @@ class StatusBar {
       final result = _statusFromContent(m.group(2) ?? '');
       if (result != null) return result;
     }
-    // 3) 任意自定义标签（内容像状态）。
-    for (final t in _anyTagBlock.allMatches(text)) {
-      final tag = (t.group(1) ?? '').toLowerCase();
-      if (_specialTags.contains(tag)) continue;
-      final content = t.group(2) ?? '';
-      if (!_isStatusContent(content)) continue;
-      final result = _statusFromContent(content);
-      if (result != null) return result;
-    }
-    // 4) 状态代码块。
+    // 3) 状态代码块。
     for (final f in _codeFence.allMatches(text)) {
       final content = f.group(1) ?? '';
       if (_looksLikeStatus(content)) {

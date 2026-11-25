@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/macros.dart';
 import '../design/glass.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
@@ -19,10 +20,16 @@ class StatusBarPanel extends StatefulWidget {
     super.key,
     required this.data,
     this.ranges = const {},
+    this.charName = '',
+    this.userName = '',
   });
 
   final Map<String, dynamic> data;
   final Map<String, num> ranges;
+
+  /// 用于展开状态内容里的 {{char}} / {{user}} 身份宏。
+  final String charName;
+  final String userName;
 
   @override
   State<StatusBarPanel> createState() => _StatusBarPanelState();
@@ -30,6 +37,28 @@ class StatusBarPanel extends StatefulWidget {
 
 class _StatusBarPanelState extends State<StatusBarPanel> {
   bool _expanded = false;
+
+  String _expand(String s) => s.isEmpty
+      ? s
+      : MacroEngine.expandIdentity(
+          s,
+          charName: widget.charName,
+          userName: widget.userName,
+        );
+
+  Map<String, dynamic> _expandData(Map<String, dynamic> m) {
+    final out = <String, dynamic>{};
+    m.forEach((k, v) {
+      if (v is String) {
+        out[k] = _expand(v);
+      } else if (v is Map) {
+        out[k] = _expandData(Map<String, dynamic>.from(v));
+      } else {
+        out[k] = v;
+      }
+    });
+    return out;
+  }
 
   /// 收集最多 3 个数值字段用于收起时的速览徽章。
   List<(String, num)> get _quickStats {
@@ -54,9 +83,8 @@ class _StatusBarPanelState extends State<StatusBarPanel> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     if (widget.data.isEmpty) return const SizedBox.shrink();
-    final raw = widget.data['__raw__'] is String
-        ? widget.data['__raw__'] as String
-        : null;
+    final data = _expandData(widget.data);
+    final raw = data['__raw__'] is String ? data['__raw__'] as String : null;
     return Glass(
       radius: 18,
       blur: 20,
@@ -122,7 +150,7 @@ class _StatusBarPanelState extends State<StatusBarPanel> {
                             : Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  for (final entry in widget.data.entries)
+                                  for (final entry in data.entries)
                                     if (entry.key != '__raw__') ...[
                                       if (entry.value is Map)
                                         _Group(

@@ -61,4 +61,18 @@ void main() {
     expect(find.textContaining('5月23日'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('status panel expands {{user}} / {{char}} identity macros',
+      (tester) async {
+    await tester.pumpWidget(wrap(const StatusBarPanel(
+      data: {'__raw__': '👤 {{user}} 与 {{char}} 的状态'},
+      charName: '秦芷柔',
+      userName: '可乐',
+    )));
+    await tester.tap(find.text('状态栏'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('可乐'), findsOneWidget);
+    expect(find.textContaining('秦芷柔'), findsOneWidget);
+    expect(find.textContaining('{{user}}'), findsNothing);
+  });
 }

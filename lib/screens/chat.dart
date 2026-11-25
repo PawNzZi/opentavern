@@ -279,6 +279,15 @@ class _ChatScreenState extends State<ChatScreen> {
     showTavernToast(context, text);
   }
 
+  /// 状态栏里展开 {{user}} 用的显示名（与聊天气泡渲染保持一致）。
+  String get _statusUserName {
+    final s = AppStore.instance.settings;
+    final n = s.userName.trim().isNotEmpty
+        ? s.userName.trim()
+        : s.personaName.trim();
+    return n.isEmpty ? 'User' : n;
+  }
+
   void _showMessageMenu(ChatMessage message) {
     showGeneralDialog<void>(
       context: context,
@@ -569,6 +578,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: StatusBarPanel(
                           data: _chat.session.statData,
                           ranges: _statusRanges,
+                          charName: c.name,
+                          userName: _statusUserName,
                         ),
                       ),
                     Expanded(

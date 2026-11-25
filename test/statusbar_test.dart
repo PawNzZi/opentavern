@@ -167,12 +167,26 @@ void main() {
     expect(StatusBar.strip(reply).contains('print'), true);
   });
 
-  test('unknown custom wrapper tag is detected by its content', () {
-    const reply = '故事。\n<角色面板>\n好感: 50\n心情: 开心\n位置: 家\n</角色面板>';
+  test('status-prefixed custom tag is detected (status keyword strategy)', () {
+    const reply = '故事。\n<status_custom>\n好感: 50\n心情: 开心\n</status_custom>';
     final s = StatusBar.extractStatus(reply);
     expect(s!['好感'], 50);
     expect(s['心情'], '开心');
     expect(StatusBar.strip(reply), '故事。');
+  });
+
+  test('maintext narrative is preserved (no blank bubble), tags unwrapped', () {
+    const greeting = '<maintext>\n她笑了，伸手<em></em>拍了拍你。\n</maintext>\n'
+        '<details><summary>摘要</summary>\n时间：下午\n地点：家里\n</details>\n'
+        '<Status_block>\n状态栏:\n  日期: "今天"\n</Status_block>';
+    final stripped = StatusBar.strip(greeting);
+    expect(stripped.contains('她笑了'), true);
+    expect(stripped.contains('<maintext>'), false);
+    expect(stripped.contains('<em>'), false);
+    expect(stripped.contains('<details>'), false);
+    expect(stripped.contains('摘要'), true);
+    expect(stripped.contains('Status_block'), false);
+    expect(stripped.trim().isEmpty, false);
   });
 
   test('card regex_scripts drive detection and stripping', () {
