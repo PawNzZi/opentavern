@@ -117,21 +117,26 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
     return SafeArea(
       bottom: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 6, 20, 148),
-        physics: const BouncingScrollPhysics(),
+      child: Column(
         children: [
-          PageHeader(
-            eyebrow: 'YOUR STORIES',
-            title: '对话',
-            subtitle: '${visible.length} 段故事，等你回来。',
-            trailing: GlassCircleButton(
-              icon: Icons.search_rounded,
-              size: 46,
-              onTap: widget.onSearch,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+            child: PageHeader(
+              eyebrow: 'YOUR STORIES',
+              title: '对话',
+              subtitle: '${visible.length} 段故事，等你回来。',
+              trailing: GlassCircleButton(
+                icon: Icons.search_rounded,
+                size: 46,
+                onTap: widget.onSearch,
+              ),
             ),
           ),
-          const SizedBox(height: 20),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 148),
+              physics: const BouncingScrollPhysics(),
+              children: [
           SearchField(
             hint: '搜索对话或角色',
             controller: _query,
@@ -192,6 +197,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   style: appText(11, FontWeight.w400, p.textTertiary),
                 ),
               ],
+            ),
+          ),
+        ],
             ),
           ),
         ],

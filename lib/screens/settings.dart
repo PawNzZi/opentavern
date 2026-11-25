@@ -71,16 +71,21 @@ class SettingsScreen extends StatelessWidget {
     );
     return SafeArea(
       bottom: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 6, 20, 168),
-        physics: const BouncingScrollPhysics(),
+      child: Column(
         children: [
-          const PageHeader(
-            eyebrow: 'LOCAL FIRST',
-            title: '设置',
-            subtitle: '所有数据只留在这台设备上。',
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 6, 20, 0),
+            child: PageHeader(
+              eyebrow: 'LOCAL FIRST',
+              title: '设置',
+              subtitle: '所有数据只留在这台设备上。',
+            ),
           ),
-          const SizedBox(height: 20),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 168),
+              physics: const BouncingScrollPhysics(),
+              children: [
           Glass(
             radius: 26,
             blur: 26,
@@ -365,6 +370,9 @@ class SettingsScreen extends StatelessWidget {
             child: Text(
               '本地运行 · 无账号 · 无追踪',
               style: appText(10.5, FontWeight.w400, p.textTertiary),
+            ),
+          ),
+        ],
             ),
           ),
         ],
