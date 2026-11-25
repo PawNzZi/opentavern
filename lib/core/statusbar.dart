@@ -39,8 +39,94 @@ class StatusBar {
 
   static final _codeFence = RegExp(r'```[a-zA-Z]*\n?([\s\S]*?)```');
 
+  /// 任意包裹标签块（标签名不限，含中文标签），用于适配白名单之外的自定义状态标签。
+  static final _anyTagBlock = RegExp(
+    r'<([A-Za-z_\u4e00-\u9fff][\w\u4e00-\u9fff-]*)[^>]*>([\s\S]*?)</\1>',
+  );
+
+  /// 这些标签由专门逻辑处理，generic 检测时跳过。
+  static const _specialTags = {
+    'updatevariable', 'updatevariablevariable', 'route_state', 'jsonpatch',
+    'analysis', 'start', 'user', 'char', 'system', 'assistant',
+  };
+
+  /// 从角色卡自带的 regex_scripts 提取 findRegex 模式。
+  ///
+  /// 调研结论：状态栏的识别规则写在卡自己的 `data.extensions.regex_scripts`
+  /// 里，硬编码标签白名单永远追不上新卡。这里把卡作者定义的匹配模式拿来用，
+  /// 才能对任意卡自适应。rawJson 为整卡 JSON（DemoCharacter.rawJson）。
+  static List<RegExp> cardPatterns(Map<String, dynamic>? rawJson) {
+    if (rawJson == null) return const [];
+    final data = rawJson['data'] is Map ? rawJson['data'] as Map : rawJson;
+    final ext = data['extensions'];
+    dynamic scripts;
+    if (ext is Map) scripts = ext['regex_scripts'];
+    scripts ??= data['regex_scripts'];
+    if (scripts is! List) return const [];
+    final out = <RegExp>[];
+    for (final s in scripts) {
+      if (s is! Map) continue;
+      final re = _compileFind((s['findRegex'] ?? '').toString());
+      if (re != null) out.add(re);
+    }
+    return out;
+  }
+
+  /// 按角色名取卡自带状态识别模式（带缓存），供显示层剥离使用。
+  static final Map<String, List<RegExp>> _nameCache = {};
+  static List<RegExp> patternsForCharacterName(String name) {
+    final cached = _nameCache[name];
+    if (cached != null) return cached;
+    DemoCharacter? c;
+    for (final ch in AppStore.instance.characters) {
+      if (ch.name == name) {
+        c = ch;
+        break;
+      }
+    }
+    final patterns = cardPatterns(c?.rawJson);
+    _nameCache[name] = patterns;
+    return patterns;
+  }
+
+  static RegExp? _compileFind(String find) {    var pattern = find.trim();
+    if (pattern.isEmpty) return null;
+    var flags = '';
+    if (pattern.startsWith('/') && pattern.lastIndexOf('/') > 0) {
+      final last = pattern.lastIndexOf('/');
+      flags = pattern.substring(last + 1);
+      pattern = pattern.substring(1, last);
+    }
+    try {
+      return RegExp(
+        pattern,
+        caseSensitive: !flags.contains('i'),
+        multiLine: flags.contains('m'),
+        dotAll: flags.contains('s'),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 去掉单层外层包裹标签，取内部内容。
+  static String _unwrap(String block) {
+    final t = block.trim();
+    final m = RegExp(
+      r'^<([A-Za-z_\u4e00-\u9fff][\w\u4e00-\u9fff-]*)[^>]*>([\s\S]*?)</\1>$',
+    ).firstMatch(t);
+    return m != null ? (m.group(2) ?? t) : t;
+  }
+
+  /// 判断一段匹配文本是否为状态块（内容能解析出 ≥2 个字段）。
+  static bool _isStatusContent(String inner) {
+    final parsed = parseContent(_unwrap(inner));
+    return parsed != null && parsed.length >= 2;
+  }
+
   /// 从正文中剥离各种状态块，只留下故事内容（用于显示与发送）。
-  static String strip(String text) {
+  /// [cardPatterns] 为角色卡自带 regex_scripts 的匹配模式（可选）。
+  static String strip(String text, {List<RegExp> cardPatterns = const []}) {
     if (!text.contains('<') && !text.contains('```') && !text.contains('|')) {
       return text;
     }
@@ -49,6 +135,19 @@ class StatusBar {
         .replaceAll(_displayBlock, '')
         .replaceAll(_placeholder, '')
         .replaceAll(_routeState, '');
+    // 卡自带规则：只剥离匹配出来确属状态块的部分，避免误删正文。
+    for (final re in cardPatterns) {
+      result = result.replaceAllMapped(re, (m) {
+        final matched = m.group(0) ?? '';
+        return _isStatusContent(matched) ? '' : matched;
+      });
+    }
+    // 任意自定义标签的状态块（白名单之外）。
+    result = result.replaceAllMapped(_anyTagBlock, (m) {
+      final tag = (m.group(1) ?? '').toLowerCase();
+      if (_specialTags.contains(tag)) return m.group(0)!;
+      return _isStatusContent(m.group(2) ?? '') ? '' : m.group(0)!;
+    });
     result = _stripStatusFences(result);
     result = _stripTrailingPipe(result);
     // 流式输出时状态块可能尚未闭合：把末尾未闭合的包裹标签也去掉，避免闪现。
@@ -64,14 +163,35 @@ class StatusBar {
   /// 回复里是否带有 MVU 变量更新块。
   static bool hasUpdate(String text) => _updateBlock.hasMatch(text);
 
-  /// 提取「整段状态」（非 MVU）：包裹标签 / 状态代码块 / 末尾管道表。
-  /// 返回解析出的字段树；没有可识别的状态块时返回 null。
-  static Map<String, dynamic>? extractStatus(String text) {
+  /// 提取「整段状态」（非 MVU）：卡自带规则 / 包裹标签 / 任意自定义标签 /
+  /// 状态代码块 / 末尾管道表。返回解析出的字段树；无可识别状态块时返回 null。
+  static Map<String, dynamic>? extractStatus(
+    String text, {
+    List<RegExp> cardPatterns = const [],
+  }) {
+    // 1) 卡自带 regex 规则优先（最贴合该卡）。
+    for (final re in cardPatterns) {
+      final m = re.firstMatch(text);
+      if (m == null) continue;
+      final matched = m.group(0) ?? '';
+      final inner = m.groupCount >= 1 ? (m.group(1) ?? matched) : matched;
+      final parsed = parseContent(_unwrap(inner));
+      if (parsed != null && parsed.length >= 2) return parsed;
+    }
+    // 2) 常见包裹标签。
     final m = _displayBlock.firstMatch(text);
     if (m != null) {
       final parsed = parseContent(m.group(2) ?? '');
       if (parsed != null && parsed.isNotEmpty) return parsed;
     }
+    // 3) 任意自定义标签（内容像状态）。
+    for (final t in _anyTagBlock.allMatches(text)) {
+      final tag = (t.group(1) ?? '').toLowerCase();
+      if (_specialTags.contains(tag)) continue;
+      final parsed = parseContent(t.group(2) ?? '');
+      if (parsed != null && parsed.length >= 2) return parsed;
+    }
+    // 4) 状态代码块。
     for (final f in _codeFence.allMatches(text)) {
       final content = f.group(1) ?? '';
       if (_looksLikeStatus(content)) {
@@ -79,6 +199,7 @@ class StatusBar {
         if (parsed != null && parsed.isNotEmpty) return parsed;
       }
     }
+    // 5) 末尾管道表。
     final pipe = _trailingPipeFields(text);
     if (pipe.length >= 2) return pipe;
     return null;
@@ -104,8 +225,18 @@ class StatusBar {
       if (v.isNotEmpty) tagFields[m.group(1)!] = _parseScalar(v);
     }
     if (tagFields.isNotEmpty) return tagFields;
+    // 【键】值 / [键] 值 形式。
+    final bracket = <String, dynamic>{};
+    for (final m in RegExp(r'[【\[]([^】\]\n]+)[】\]]\s*[:：=]?\s*([^\n【\[]+)')
+        .allMatches(c)) {
+      final v = m.group(2)!.trim();
+      if (v.isNotEmpty) bracket[m.group(1)!.trim()] = _parseScalar(v);
+    }
+    if (bracket.length >= 2) return bracket;
     final yaml = parseInit(c);
     if (yaml.isNotEmpty) return yaml;
+    final flat = _parseFlat(c);
+    if (flat.length >= 2) return flat;
     return null;
   }
 
@@ -153,8 +284,23 @@ class StatusBar {
     final fields = <String, dynamic>{};
     for (final line in content.split('\n')) {
       if (!line.contains('|')) continue;
-      for (final cell in line.split('|')) {
-        final kv = _splitKeyValue(cell.trim());
+      final cells = line
+          .split('|')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (cells.isEmpty) continue;
+      // 跳过 markdown 分隔行（--- / :--:）。
+      if (cells.every((e) => RegExp(r'^[-:\s]+$').hasMatch(e))) continue;
+      // 两列 markdown 表：| 键 | 值 |。
+      if (cells.length == 2 &&
+          _splitKeyValue(cells[0]) == null &&
+          _splitKeyValue(cells[1]) == null) {
+        fields[cells[0]] = _parseScalar(cells[1]);
+        continue;
+      }
+      for (final cell in cells) {
+        final kv = _splitKeyValue(cell);
         if (kv != null) fields[kv.$1] = _parseScalar(kv.$2);
       }
     }
@@ -163,7 +309,7 @@ class StatusBar {
 
   static (String, String)? _splitKeyValue(String s) {
     if (s.isEmpty) return null;
-    for (final sep in [':', '：']) {
+    for (final sep in [':', '：', '=']) {
       final i = s.indexOf(sep);
       if (i > 0) {
         final key = s.substring(0, i).trim();
@@ -172,6 +318,19 @@ class StatusBar {
       }
     }
     return null;
+  }
+
+  /// 扁平行解析：`键: 值` / `键：值` / `键=值` / `- 键: 值`，忽略缩进。
+  static Map<String, dynamic> _parseFlat(String content) {
+    final fields = <String, dynamic>{};
+    for (final raw in content.split('\n')) {
+      var line = raw.trim();
+      if (line.startsWith('- ')) line = line.substring(2).trim();
+      if (line.startsWith('* ')) line = line.substring(2).trim();
+      final kv = _splitKeyValue(line);
+      if (kv != null) fields[kv.$1] = _parseScalar(kv.$2);
+    }
+    return fields;
   }
 
   /// 保守判断一段代码围栏内容是否像状态栏（避免误删普通代码）：

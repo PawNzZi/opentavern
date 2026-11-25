@@ -31,6 +31,9 @@ class ChatController extends ChangeNotifier {
   final DemoCharacter character;
   late final ChatSession _session;
 
+  /// 角色卡自带 regex_scripts 的状态识别模式（适配任意卡的关键）。
+  late final List<RegExp> _cardPatterns = StatusBar.cardPatterns(character.rawJson);
+
   List<ChatMessage> get messages => _session.messages;
   ChatSession get session => _session;
 
@@ -67,7 +70,7 @@ class ChatController extends ChangeNotifier {
     for (var i = _session.messages.length - 1; i >= 0; i--) {
       final m = _session.messages[i];
       if (m.isUser) continue;
-      final full = StatusBar.extractStatus(m.text);
+      final full = StatusBar.extractStatus(m.text, cardPatterns: _cardPatterns);
       if (full != null && full.isNotEmpty) {
         _session.statData = full;
         _save();
@@ -85,7 +88,7 @@ class ChatController extends ChangeNotifier {
       }
       return;
     }
-    final full = StatusBar.extractStatus(text);
+    final full = StatusBar.extractStatus(text, cardPatterns: _cardPatterns);
     if (full != null && full.isNotEmpty) {
       _session.statData = full;
     }

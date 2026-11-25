@@ -166,4 +166,53 @@ void main() {
     const reply = '看这段代码：\n```python\nprint("hello")\nx = 1\n```';
     expect(StatusBar.strip(reply).contains('print'), true);
   });
+
+  test('unknown custom wrapper tag is detected by its content', () {
+    const reply = '故事。\n<角色面板>\n好感: 50\n心情: 开心\n位置: 家\n</角色面板>';
+    final s = StatusBar.extractStatus(reply);
+    expect(s!['好感'], 50);
+    expect(s['心情'], '开心');
+    expect(StatusBar.strip(reply), '故事。');
+  });
+
+  test('card regex_scripts drive detection and stripping', () {
+    final rawJson = {
+      'data': {
+        'extensions': {
+          'regex_scripts': [
+            {
+              'findRegex': r'/<自定义状态>[\s\S]*?</自定义状态>/g',
+              'replaceString': '',
+            },
+          ],
+        },
+      },
+    };
+    final patterns = StatusBar.cardPatterns(rawJson);
+    expect(patterns, isNotEmpty);
+    const reply = '正文。\n<自定义状态>\n体力: 80\n魔力: 60\n</自定义状态>';
+    final s = StatusBar.extractStatus(reply, cardPatterns: patterns);
+    expect(s!['体力'], 80);
+    expect(s['魔力'], 60);
+    expect(StatusBar.strip(reply, cardPatterns: patterns), '正文。');
+  });
+
+  test('markdown two-column table parses', () {
+    const reply = '故事。\n```\n| 健康 | 90 |\n| 理智 | 80 |\n```';
+    final s = StatusBar.extractStatus(reply);
+    expect(s!['健康'], 90);
+    expect(s['理智'], 80);
+  });
+
+  test('bracket 【键】值 format parses', () {
+    final s = StatusBar.parseContent('【好感】50\n【心情】开心');
+    expect(s!['好感'], 50);
+    expect(s['心情'], '开心');
+  });
+
+  test('key=value format parses', () {
+    final s = StatusBar.parseContent('hp=100\nmp=50');
+    expect(s!['hp'], 100);
+    expect(s['mp'], 50);
+  });
 }

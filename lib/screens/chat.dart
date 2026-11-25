@@ -34,8 +34,11 @@ String _renderDisplayText(ChatMessage message, String characterName) {
       : settings.personaName.trim().isNotEmpty
           ? settings.personaName.trim()
           : 'User';
-  // 状态栏单独渲染：正文里若带 <UpdateVariable> 状态块，显示时剥离，只留内容。
-  final cleaned = StatusBar.strip(message.text);
+  // 状态栏单独渲染：正文里若带状态块，显示时剥离，只留内容（含卡自带规则）。
+  final cleaned = StatusBar.strip(
+    message.text,
+    cardPatterns: StatusBar.patternsForCharacterName(characterName),
+  );
   final expanded = MacroEngine.expandIdentity(
     cleaned,
     charName: characterName,

@@ -279,6 +279,7 @@ class PromptBuilder {
     var history = <Map<String, dynamic>>[];
     var dropped = 0;
     var imageCount = 0;
+    final cardPatterns = StatusBar.cardPatterns(character.rawJson);
 
     for (var i = session.messages.length - 1; i >= 0; i--) {
       final m = session.messages[i];
@@ -286,8 +287,8 @@ class PromptBuilder {
       if (m.text.trim().isEmpty && m.attachments.isEmpty) continue;
       // 历史消息以原始文本存储，发送前才展开宏，这样 {{user}} / {{char}}
       // 不会原样进入上下文，同时聊天记录仍保留用户输入的原文。
-      // 状态块（<UpdateVariable>）单独渲染，发送时剥离以节省上下文。
-      var content = macro(StatusBar.strip(m.text));
+      // 状态块单独渲染，发送时剥离以节省上下文（含卡自带 regex 规则）。
+      var content = macro(StatusBar.strip(m.text, cardPatterns: cardPatterns));
       content = m.isUser ? _formatUserRoleplay(content) : content;
       content = applyRegexScripts(
         content,
