@@ -42,6 +42,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
   bool _loadingModels = false;
   String? _modelError;
 
+  /// 切换服务商时程序化填充输入框，期间不触发自动获取。
+  bool _switching = false;
+
   @override
   void initState() {
     super.initState();
@@ -65,9 +68,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
     );
     _base.addListener(_onEndpointChanged);
     _key.addListener(_onEndpointChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _fetchModels();
-    });
+    // 不在进入页面时自动获取模型：只在填写密钥后（防抖）与手动点箭头时获取。
   }
 
   @override
@@ -82,6 +83,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
   }
 
   void _onEndpointChanged() {
+    if (_switching) return;
     _fetchDebounce?.cancel();
     _fetchDebounce = Timer(const Duration(milliseconds: 700), () {
       if (mounted) _fetchModels();
@@ -193,7 +195,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
       subtitle: _models.isEmpty
           ? (_modelError ?? '没有可用模型')
           : '${_models.length} 个可用模型',
-      heightFactor: .62,
+      heightFactor: .68,
       child: _ModelSheet(
         models: _models,
         current: _model.text,
@@ -211,6 +213,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
     _stashCurrent();
     final incoming = _profiles[_providerKey(label)];
     final preset = _presets[label];
+    _switching = true;
     setState(() {
       _provider = label;
       if (incoming != null && !incoming.isEmpty) {
@@ -225,10 +228,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
       _models = const [];
       _modelError = null;
     });
+    _switching = false;
+    // 切换服务商不自动获取模型；由用户填密钥或点箭头触发。
     _fetchDebounce?.cancel();
-    _fetchDebounce = Timer(const Duration(milliseconds: 350), () {
-      if (mounted) _fetchModels();
-    });
   }
 
   Future<void> _save() async {
@@ -451,7 +453,7 @@ class _ModelPicker extends StatelessWidget {
   }
 }
 
-class _ModelSheet extends StatelessWidget {
+class _ModelSheet extends StatefulWidget {
   const _ModelSheet({
     required this.models,
     required this.current,
@@ -463,9 +465,33 @@ class _ModelSheet extends StatelessWidget {
   final String? error;
 
   @override
+  State<_ModelSheet> createState() => _ModelSheetState();
+}
+
+class _ModelSheetState extends State<_ModelSheet> {
+  final _query = TextEditingController();
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  /// 本地模糊搜索：按空白拆词，每个词都要（不区分大小写）命中模型名。
+  List<String> get _filtered {
+    final q = _query.text.trim().toLowerCase();
+    if (q.isEmpty) return widget.models;
+    final tokens = q.split(RegExp(r'\s+')).where((t) => t.isNotEmpty);
+    return widget.models.where((m) {
+      final lower = m.toLowerCase();
+      return tokens.every((t) => lower.contains(t));
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    if (models.isEmpty) {
+    if (widget.models.isEmpty) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(6, 16, 6, 20),
         child: Column(
@@ -473,53 +499,111 @@ class _ModelSheet extends StatelessWidget {
             Icon(Icons.cloud_off_rounded, size: 24, color: p.textTertiary),
             const SizedBox(height: 8),
             Text(
-              error ?? '没有获取到可用模型',
+              widget.error ?? '没有获取到可用模型',
               textAlign: TextAlign.center,
               style: appText(12.5, FontWeight.w400, p.textSecondary),
             ),
             const SizedBox(height: 4),
             Text(
-              '关闭后点右侧刷新按钮重试',
+              '关闭后点模型下拉箭头重试',
               style: appText(10.5, FontWeight.w400, p.textTertiary),
             ),
           ],
         ),
       );
     }
-    return Column(
-      children: [
-        for (final model in models)
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.of(context).pop(model),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: p.divider, width: .6),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      model,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: appText(
-                        13.5,
-                        model == current ? FontWeight.w600 : FontWeight.w400,
-                        model == current ? p.amber : p.textPrimary,
-                      ),
+    final filtered = _filtered;
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * .46,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: p.textPrimary.withValues(alpha: .06),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.search_rounded, size: 16, color: p.textTertiary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _query,
+                    onChanged: (_) => setState(() {}),
+                    style: appText(13, FontWeight.w400, p.textPrimary),
+                    cursorColor: p.amber,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      border: InputBorder.none,
+                      hintText: '搜索模型…',
+                      hintStyle: appText(12.5, FontWeight.w400, p.textTertiary),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
-                  if (model == current)
-                    Icon(Icons.check_rounded, size: 18, color: p.amber),
-                ],
-              ),
+                ),
+                if (_query.text.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _query.clear();
+                      setState(() {});
+                    },
+                    child: Icon(Icons.close_rounded, size: 16, color: p.textTertiary),
+                  ),
+              ],
             ),
           ),
-      ],
+          const SizedBox(height: 8),
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      '没有匹配的模型',
+                      style: appText(12, FontWeight.w400, p.textTertiary),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.zero,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, i) {
+                      final model = filtered[i];
+                      final selected = model == widget.current;
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => Navigator.of(context).pop(model),
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(color: p.divider, width: .6),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  model,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: appText(
+                                    13.5,
+                                    selected ? FontWeight.w600 : FontWeight.w400,
+                                    selected ? p.amber : p.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              if (selected)
+                                Icon(Icons.check_rounded, size: 18, color: p.amber),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

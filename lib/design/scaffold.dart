@@ -270,6 +270,8 @@ class SettingRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: appText(15, FontWeight.w500, p.textPrimary),
                   ),
                   if (subtitle != null) ...[
@@ -285,11 +287,22 @@ class SettingRow extends StatelessWidget {
               ),
             ),
             if (trailing != null) trailing!,
-            if (value != null)
-              Text(
-                value!,
-                style: appText(13, FontWeight.w400, p.textTertiary),
+            if (value != null) ...[
+              const SizedBox(width: 8),
+              // 右侧灰色描述限宽 + 省略号，避免长文本把左侧标题挤压。
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * .4,
+                ),
+                child: Text(
+                  value!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: appText(13, FontWeight.w400, p.textTertiary),
+                ),
               ),
+            ],
             if (chevron) ...[
               const SizedBox(width: 6),
               Icon(
