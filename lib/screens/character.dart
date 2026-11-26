@@ -19,6 +19,7 @@ import 'automation.dart';
 import 'character_editor.dart';
 import 'lore.dart';
 import 'presets.dart';
+import 'provider_picker.dart';
 import 'chat.dart';
 
 /// 复制角色时生成不会互相覆盖的名字。
@@ -542,17 +543,12 @@ class _CharacterScreenState extends State<CharacterScreen> {
     bool configured(String id) =>
         (api.profiles[id]?.apiKey.trim().isNotEmpty ?? false) ||
         (id == api.provider && api.apiKey.trim().isNotEmpty);
-    final selected = await showTavernSheet<String>(
+    final selected = await showProviderPicker(
       context,
-      title: 'AI 供应商',
-      subtitle: '仅对此角色生效 · 默认跟随全局',
-      heightFactor: .62,
-      child: _ProviderPickerBody(
-        providers: kProviderOrder,
-        configured: configured,
-        current: c.providerOverride.trim(),
-        globalProvider: api.provider,
-      ),
+      providers: kProviderOrder,
+      configured: configured,
+      current: c.providerOverride.trim(),
+      globalProvider: api.provider,
     );
     if (selected == null || !mounted) return;
     final latest = AppStore.instance.characterByName(c.name) ?? c;
@@ -1547,97 +1543,4 @@ class _GreetingOptionState extends State<_GreetingOption> {
   }
 }
 
-/// 角色卡「AI 供应商」选择面板：跟随全局 + 各服务商（带配置状态）。
-class _ProviderPickerBody extends StatelessWidget {
-  const _ProviderPickerBody({
-    required this.providers,
-    required this.configured,
-    required this.current,
-    required this.globalProvider,
-  });
-
-  final List<String> providers;
-  final bool Function(String) configured;
-  final String current;
-  final String globalProvider;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    Widget row({
-      required IconData icon,
-      required String title,
-      required String subtitle,
-      required bool selected,
-      required VoidCallback onTap,
-    }) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: p.divider, width: .6),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: selected ? p.amber : p.textTertiary,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: appText(
-                        14,
-                        selected ? FontWeight.w600 : FontWeight.w500,
-                        selected ? p.amber : p.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: appText(10.5, FontWeight.w400, p.textTertiary),
-                    ),
-                  ],
-                ),
-              ),
-              if (selected)
-                Icon(Icons.check_rounded, size: 18, color: p.amber),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final globalLabel = kProviderLabels[globalProvider] ?? globalProvider;
-    return ListView(
-      padding: EdgeInsets.zero,
-      physics: const BouncingScrollPhysics(),
-      children: [
-        row(
-          icon: Icons.public_rounded,
-          title: '跟随全局',
-          subtitle: '当前全局：$globalLabel',
-          selected: current.isEmpty,
-          onTap: () => Navigator.of(context).pop(''),
-        ),
-        for (final id in providers)
-          row(
-            icon: Icons.smart_toy_outlined,
-            title: kProviderLabels[id] ?? id,
-            subtitle: configured(id) ? '已配置' : '未配置密钥',
-            selected: current == id,
-            onTap: () => Navigator.of(context).pop(id),
-          ),
-      ],
-    );
-  }
-}
+/// 角色卡「AI 供应商」选择面板见 `provider_picker.dart`。
