@@ -404,6 +404,42 @@ class APISettings {
   }
 }
 
+/// 服务商标识 → 显示名。
+const Map<String, String> kProviderLabels = {
+  'anthropic': 'Claude',
+  'openai': 'OpenAI',
+  'gemini': 'Gemini',
+  'deepseek': 'DeepSeek',
+  'openrouter': 'OpenRouter',
+  'suixiang': '随想',
+  'custom': '自定义',
+};
+
+/// 服务商标识的稳定展示顺序。
+const List<String> kProviderOrder = [
+  'anthropic',
+  'openai',
+  'gemini',
+  'deepseek',
+  'openrouter',
+  'suixiang',
+  'custom',
+];
+
+/// 各服务商的默认地址与默认模型（未配置密钥时兜底用）。
+const Map<String, (String, String)> kProviderDefaults = {
+  'anthropic': ('https://api.anthropic.com', 'claude-sonnet-4-5'),
+  'openai': ('https://api.openai.com/v1', 'gpt-4o-mini'),
+  'gemini': (
+    'https://generativelanguage.googleapis.com/v1beta',
+    'gemini-2.5-flash'
+  ),
+  'deepseek': ('https://api.deepseek.com/v1', 'deepseek-chat'),
+  'openrouter': ('https://openrouter.ai/api/v1', 'openrouter/auto'),
+  'suixiang': ('https://www.sui-xiang.net', ''),
+  'custom': ('', ''),
+};
+
 /// 默认的系统段落顺序，贴近 SillyTavern 的 prompt 顺序。
 ///
 /// [PromptBuilder] 按这个顺序把非空段落拼进第一条 system 消息；其中

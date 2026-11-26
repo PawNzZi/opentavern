@@ -31,6 +31,8 @@ class DemoCharacter {
     this.avatarBase64,
     this.rawJson,
     this.createdAt,
+    this.providerOverride = '',
+    this.modelOverride = '',
   });
 
   final String name;
@@ -59,6 +61,12 @@ class DemoCharacter {
   final Map<String, dynamic>? rawJson;
   final int? createdAt;
 
+  /// 该角色单独指定 AI 服务商（'' = 跟随全局）。
+  final String providerOverride;
+
+  /// 该角色单独指定模型（'' = 用服务商档案/全局的模型）。
+  final String modelOverride;
+
   DemoCharacter copyWith({
     String? name,
     String? creator,
@@ -83,6 +91,8 @@ class DemoCharacter {
     List<String>? alternateGreetings,
     String? avatarBase64,
     int? createdAt,
+    String? providerOverride,
+    String? modelOverride,
   }) {
     return DemoCharacter(
       name: name ?? this.name,
@@ -109,6 +119,8 @@ class DemoCharacter {
       alternateGreetings: alternateGreetings ?? this.alternateGreetings,
       avatarBase64: avatarBase64 ?? this.avatarBase64,
       createdAt: createdAt ?? this.createdAt,
+      providerOverride: providerOverride ?? this.providerOverride,
+      modelOverride: modelOverride ?? this.modelOverride,
       rawJson: rawJson,
     );
   }
@@ -185,6 +197,8 @@ class DemoCharacter {
         'avatarBase64': avatarBase64,
         'rawJson': rawJson,
         'createdAt': createdAt,
+        'providerOverride': providerOverride,
+        'modelOverride': modelOverride,
       };
 
   factory DemoCharacter.fromJson(Map<String, dynamic> json) {
@@ -223,6 +237,8 @@ class DemoCharacter {
           ? Map<String, dynamic>.from(json['rawJson'] as Map)
           : null,
       createdAt: (json['createdAt'] as num?)?.toInt(),
+      providerOverride: (json['providerOverride'] ?? '').toString(),
+      modelOverride: (json['modelOverride'] ?? '').toString(),
     );
   }
 

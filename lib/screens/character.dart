@@ -537,6 +537,44 @@ class _CharacterScreenState extends State<CharacterScreen> {
     );
   }
 
+  Future<void> _pickProvider(DemoCharacter c) async {
+    final api = AppStore.instance.settings.api;
+    bool configured(String id) =>
+        (api.profiles[id]?.apiKey.trim().isNotEmpty ?? false) ||
+        (id == api.provider && api.apiKey.trim().isNotEmpty);
+    final selected = await showTavernSheet<String>(
+      context,
+      title: 'AI 供应商',
+      subtitle: '仅对此角色生效 · 默认跟随全局',
+      heightFactor: .62,
+      child: _ProviderPickerBody(
+        providers: kProviderOrder,
+        configured: configured,
+        current: c.providerOverride.trim(),
+        globalProvider: api.provider,
+      ),
+    );
+    if (selected == null || !mounted) return;
+    final latest = AppStore.instance.characterByName(c.name) ?? c;
+    await AppStore.instance.addCharacter(
+      // 换服务商后清空角色级模型，改用新服务商的默认/档案模型。
+      latest.copyWith(providerOverride: selected, modelOverride: ''),
+    );
+    if (!mounted) return;
+    setState(() {});
+    if (selected.isEmpty) {
+      showTavernToast(context, '已改为跟随全局服务商');
+    } else if (!configured(selected)) {
+      final label = kProviderLabels[selected] ?? selected;
+      showTavernToast(context, '已指定「$label」，尚未配置密钥，请到「API 连接」填写');
+    } else {
+      showTavernToast(
+        context,
+        '已为「${c.name}」指定 ${kProviderLabels[selected] ?? selected}',
+      );
+    }
+  }
+
   Widget _tabContent(
     BuildContext context,
     DemoCharacter c,
@@ -827,6 +865,25 @@ class _CharacterScreenState extends State<CharacterScreen> {
                       ],
                     ),
             ),
+            SettingsGroup(
+              title: 'AI 连接',
+              children: [
+                SettingRow(
+                  icon: Icons.hub_outlined,
+                  title: '服务商',
+                  subtitle: c.providerOverride.trim().isEmpty
+                      ? '默认跟随全局设置'
+                      : '仅此角色使用该服务商',
+                  value: c.providerOverride.trim().isEmpty
+                      ? '跟随全局'
+                      : (kProviderLabels[c.providerOverride] ??
+                          c.providerOverride),
+                  iconColor: p.amber,
+                  onTap: () => _pickProvider(c),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
             SettingsGroup(
               title: '管理',
               children: [
@@ -1484,6 +1541,101 @@ class _GreetingOptionState extends State<_GreetingOption> {
                 ),
               ],
             ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 角色卡「AI 供应商」选择面板：跟随全局 + 各服务商（带配置状态）。
+class _ProviderPickerBody extends StatelessWidget {
+  const _ProviderPickerBody({
+    required this.providers,
+    required this.configured,
+    required this.current,
+    required this.globalProvider,
+  });
+
+  final List<String> providers;
+  final bool Function(String) configured;
+  final String current;
+  final String globalProvider;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    Widget row({
+      required IconData icon,
+      required String title,
+      required String subtitle,
+      required bool selected,
+      required VoidCallback onTap,
+    }) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: p.divider, width: .6),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: selected ? p.amber : p.textTertiary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: appText(
+                        14,
+                        selected ? FontWeight.w600 : FontWeight.w500,
+                        selected ? p.amber : p.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: appText(10.5, FontWeight.w400, p.textTertiary),
+                    ),
+                  ],
+                ),
+              ),
+              if (selected)
+                Icon(Icons.check_rounded, size: 18, color: p.amber),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final globalLabel = kProviderLabels[globalProvider] ?? globalProvider;
+    return ListView(
+      padding: EdgeInsets.zero,
+      physics: const BouncingScrollPhysics(),
+      children: [
+        row(
+          icon: Icons.public_rounded,
+          title: '跟随全局',
+          subtitle: '当前全局：$globalLabel',
+          selected: current.isEmpty,
+          onTap: () => Navigator.of(context).pop(''),
+        ),
+        for (final id in providers)
+          row(
+            icon: Icons.smart_toy_outlined,
+            title: kProviderLabels[id] ?? id,
+            subtitle: configured(id) ? '已配置' : '未配置密钥',
+            selected: current == id,
+            onTap: () => Navigator.of(context).pop(id),
           ),
       ],
     );

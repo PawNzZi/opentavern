@@ -216,6 +216,41 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 按名字取最新的角色对象（角色卡可能被编辑/重新导入）。
+  DemoCharacter? characterByName(String name) {
+    for (final c in characters) {
+      if (c.name == name) return c;
+    }
+    return null;
+  }
+
+  /// 某角色实际使用的 API 配置：角色指定的服务商/模型优先，否则跟随全局。
+  APISettings apiForCharacter(DemoCharacter? character) {
+    final global = settings.api;
+    if (character == null) return global;
+    final provider = character.providerOverride.trim();
+    if (provider.isEmpty) {
+      // 跟随全局，但角色可单独覆盖模型。
+      final model = character.modelOverride.trim();
+      return model.isEmpty ? global : global.copyWith(model: model);
+    }
+    final profile = global.profiles[provider];
+    final defaults = kProviderDefaults[provider];
+    var result = global.copyWith(
+      provider: provider,
+      baseUrl: (profile != null && profile.baseUrl.trim().isNotEmpty)
+          ? profile.baseUrl
+          : (defaults != null ? defaults.$1 : global.baseUrl),
+      apiKey: profile != null ? profile.apiKey : '',
+      model: (profile != null && profile.model.trim().isNotEmpty)
+          ? profile.model
+          : (defaults != null ? defaults.$2 : global.model),
+    );
+    final model = character.modelOverride.trim();
+    if (model.isNotEmpty) result = result.copyWith(model: model);
+    return result;
+  }
+
   PromptPreset? presetForCharacter(DemoCharacter character) {
     if (character.preset.trim().isNotEmpty) {
       for (final preset in presets) {

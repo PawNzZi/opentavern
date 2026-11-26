@@ -123,18 +123,20 @@ class ChatController extends ChangeNotifier {
     _generationStartedAt = DateTime.now();
     final baseSettings = AppStore.instance.settings;
     final preset = AppStore.instance.presetForCharacter(character);
-    _activeSettings = preset == null
-        ? baseSettings
-        : baseSettings.copyWith(
-            api: baseSettings.api.copyWith(
-              temperature: preset.temperature,
-              // 预设 maxTokens<=0 表示「跟随全局生成参数」，避免默认预设
-              // 悄悄把回复长度压回 512 导致长回复（含结尾心理描写）被截断。
-              maxTokens: preset.maxTokens > 0
-                  ? preset.maxTokens
-                  : baseSettings.api.maxTokens,
-            ),
-          );
+    // 角色卡可单独指定服务商/模型；未指定时跟随全局。用最新角色对象，避免
+    // 角色页改了供应商后聊天里仍用旧值。
+    final latestCharacter =
+        AppStore.instance.characterByName(character.name) ?? character;
+    var api = AppStore.instance.apiForCharacter(latestCharacter);
+    if (preset != null) {
+      api = api.copyWith(
+        temperature: preset.temperature,
+        // 预设 maxTokens<=0 表示「跟随全局生成参数」，避免默认预设
+        // 悄悄把回复长度压回 512 导致长回复（含结尾心理描写）被截断。
+        maxTokens: preset.maxTokens > 0 ? preset.maxTokens : api.maxTokens,
+      );
+    }
+    _activeSettings = baseSettings.copyWith(api: api);
 
     if (!regenerate && !continuation) {
       final message = ChatMessage(

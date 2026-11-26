@@ -22,6 +22,7 @@ import '../design/scaffold.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
 import 'chat_info.dart';
+import 'model_picker.dart';
 import 'status_bar.dart';
 
 String _renderDisplayText(ChatMessage message, String characterName) {
@@ -176,6 +177,29 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  /// 点击顶栏模型：按当前有效服务商拉取模型，选择后记到该角色（不动其他角色）。
+  Future<void> _openModelPickerForChat() async {
+    final latest =
+        AppStore.instance.characterByName(widget.character.name) ??
+            widget.character;
+    final api = AppStore.instance.apiForCharacter(latest);
+    final provider = api.provider;
+    final label = kProviderLabels[provider] ?? provider;
+    final selected = await showModelPicker(
+      context,
+      api: api,
+      current: api.model.trim(),
+      subtitle: '$label · 选择模型',
+    );
+    if (selected == null || !mounted) return;
+    await AppStore.instance.addCharacter(
+      latest.copyWith(modelOverride: selected),
+    );
+    if (!mounted) return;
+    setState(() {});
+    showTavernToast(context, '已切换模型：$selected');
   }
 
   Future<void> _pickFile(BuildContext sheetContext) async {
@@ -570,6 +594,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         character: c,
                         generating: _chat.isGenerating,
                         onMore: _openInfo,
+                        onModelTap: _openModelPickerForChat,
                       ),
                     ),
                     if (_chat.session.statData.isNotEmpty)
@@ -778,15 +803,23 @@ class _ChatTopBar extends StatelessWidget {
     required this.character,
     required this.generating,
     required this.onMore,
+    required this.onModelTap,
   });
 
   final DemoCharacter character;
   final bool generating;
   final VoidCallback onMore;
+  final VoidCallback onModelTap;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    // 有效连接：角色指定服务商/模型优先，否则跟随全局（取最新角色对象）。
+    final latest = AppStore.instance.characterByName(character.name) ?? character;
+    final api = AppStore.instance.apiForCharacter(latest);
+    final model = api.model.trim();
+    final providerLabel = kProviderLabels[api.provider] ?? api.provider;
+    final configured = api.configured;
     return Glass(
       radius: 24,
       blur: 28,
@@ -837,48 +870,62 @@ class _ChatTopBar extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: generating
                             ? p.amber
-                            : (AppStore.instance.settings.api.configured
-                                ? p.sage
-                                : p.danger),
+                            : (configured ? p.sage : p.danger),
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 5),
-                    Text(
-                      generating
-                          ? '正在生成…'
-                          : (AppStore.instance.settings.api.configured
-                              ? '在线'
-                              : '离线'),
-                      style: appText(10, FontWeight.w500, p.amber),
+                    Flexible(
+                      child: Text(
+                        generating
+                            ? '正在生成…'
+                            : (configured
+                                ? '在线 · $providerLabel'
+                                : '未连接 · $providerLabel'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: appText(10, FontWeight.w500, p.amber),
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          Glass(
-            radius: 12,
-            blur: 16,
-            shadow: false,
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.auto_awesome_rounded, size: 11, color: p.amber),
-                const SizedBox(width: 5),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 112),
-                  child: Text(
-                    AppStore.instance.settings.api.model.trim().isEmpty
-                        ? '未配置模型'
-                        : AppStore.instance.settings.api.model,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: appText(10, FontWeight.w600, p.textSecondary),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onModelTap,
+            child: Glass(
+              radius: 12,
+              blur: 16,
+              shadow: false,
+              padding: const EdgeInsets.fromLTRB(9, 5, 6, 5),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome_rounded, size: 11, color: p.amber),
+                  const SizedBox(width: 5),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 116),
+                    child: Text(
+                      model.isEmpty ? '未配置模型' : model,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: appText(
+                        10,
+                        FontWeight.w600,
+                        model.isEmpty ? p.danger : p.textSecondary,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 14,
+                    color: p.textTertiary,
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(width: 6),
