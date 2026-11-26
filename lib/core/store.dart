@@ -9,6 +9,24 @@ import 'card_import.dart';
 import 'lore_io.dart';
 import 'models.dart';
 
+/// 在给定基础设置上叠加角色的自定义人格（纯函数，便于在「传入 settings」的
+/// 场景复用，例如 PromptBuilder 用的是调用方给的 settings 而非全局单例）。
+///
+/// 自定义人格名同时作为该角色的 {{user}} 身份：本 App 里人格名就是可编辑的
+/// {{user}}，因此人格描述/提示词里的 {{user}} 会被替换成它。
+AppSettings applyCharacterPersona(AppSettings base, DemoCharacter character) {
+  final name = character.personaNameOverride.trim();
+  final desc = character.personaDescriptionOverride.trim();
+  if (name.isEmpty && desc.isEmpty) return base;
+  var eff = base.copyWith(
+    personaDescription: desc.isNotEmpty ? desc : base.personaDescription,
+  );
+  if (name.isNotEmpty) {
+    eff = eff.copyWith(userName: name, personaName: name);
+  }
+  return eff;
+}
+
 /// Small local-first persistence layer. Everything lives in one folder under
 /// the app documents directory; no server is involved.
 class AppStore extends ChangeNotifier {
@@ -250,6 +268,13 @@ class AppStore extends ChangeNotifier {
     if (model.isNotEmpty) result = result.copyWith(model: model);
     return result;
   }
+
+  /// 某角色实际使用的人格设置：角色自定义人格优先，否则跟随全局。
+  ///
+  /// 自定义人格名同时作为该角色的 {{user}}（本 App 里人格名即可编辑的
+  /// {{user}} 身份），因此人格文本/提示词里的 {{user}} 会被正确替换成它。
+  AppSettings settingsForCharacter(DemoCharacter character) =>
+      applyCharacterPersona(settings, character);
 
   PromptPreset? presetForCharacter(DemoCharacter character) {
     if (character.preset.trim().isNotEmpty) {

@@ -17,6 +17,7 @@ import '../design/theme.dart';
 import '../design/toast.dart';
 import 'automation.dart';
 import 'character_editor.dart';
+import 'editors.dart';
 import 'lore.dart';
 import 'presets.dart';
 import 'provider_picker.dart';
@@ -538,6 +539,10 @@ class _CharacterScreenState extends State<CharacterScreen> {
     );
   }
 
+  bool _hasCustomPersona(DemoCharacter c) =>
+      c.personaNameOverride.trim().isNotEmpty ||
+      c.personaDescriptionOverride.trim().isNotEmpty;
+
   Future<void> _pickProvider(DemoCharacter c) async {
     final api = AppStore.instance.settings.api;
     bool configured(String id) =>
@@ -876,6 +881,26 @@ class _CharacterScreenState extends State<CharacterScreen> {
                           c.providerOverride),
                   iconColor: p.amber,
                   onTap: () => _pickProvider(c),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SettingsGroup(
+              title: '人格',
+              children: [
+                SettingRow(
+                  icon: Icons.face_retouching_natural_outlined,
+                  title: '角色人格',
+                  subtitle: '默认跟随全局人格 · 自定义仅此角色生效',
+                  value: _hasCustomPersona(c) ? '已自定义' : '跟随全局',
+                  iconColor: p.amber,
+                  onTap: () async {
+                    await openGlassPage(
+                      context,
+                      CharacterPersonaPage(character: c),
+                    );
+                    if (mounted) setState(() {});
+                  },
                 ),
               ],
             ),

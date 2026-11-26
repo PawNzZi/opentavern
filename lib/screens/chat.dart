@@ -29,11 +29,14 @@ String _renderDisplayText(ChatMessage message, String characterName) {
   if (message.text.isEmpty) return message.text;
   // 聊天气泡以原文存储，渲染时才展开身份宏：{{user}} / {{char}} 不会在
   // 界面上露出占位符，同时也不会像 prompt 那样重掷 {{random}} / {{time}}。
-  final settings = AppStore.instance.settings;
-  final userName = settings.userName.trim().isNotEmpty
-      ? settings.userName.trim()
-      : settings.personaName.trim().isNotEmpty
-          ? settings.personaName.trim()
+  final character = AppStore.instance.characterByName(characterName);
+  final eff = character != null
+      ? AppStore.instance.settingsForCharacter(character)
+      : AppStore.instance.settings;
+  final userName = eff.userName.trim().isNotEmpty
+      ? eff.userName.trim()
+      : eff.personaName.trim().isNotEmpty
+          ? eff.personaName.trim()
           : 'User';
   // 状态栏单独渲染：正文里若带状态块，显示时剥离，只留内容（含卡自带规则）。
   final cleaned = StatusBar.strip(
@@ -305,7 +308,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// 状态栏里展开 {{user}} 用的显示名（与聊天气泡渲染保持一致）。
   String get _statusUserName {
-    final s = AppStore.instance.settings;
+    final s = AppStore.instance.settingsForCharacter(widget.character);
     final n = s.userName.trim().isNotEmpty
         ? s.userName.trim()
         : s.personaName.trim();

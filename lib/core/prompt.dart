@@ -94,6 +94,9 @@ class PromptBuilder {
       }
       if (lastAny.isNotEmpty && lastUser.isNotEmpty) break;
     }
+    // 角色自定义人格：仅影响该角色的 {{user}} 身份与人格段落，其它角色不受影响。
+    // 用调用方传入的 settings 叠加，而不是读全局单例（测试/预览会传自定义 settings）。
+    final eff = applyCharacterPersona(settings, character);
     String macro(String input) {
       // 状态栏变量树通过 {{format_message_variable::stat_data}} 注入，
       // 让模型在更新变量前能读到当前值。
@@ -104,7 +107,7 @@ class PromptBuilder {
       return MacroEngine.expand(
         withStat,
         character: character,
-        settings: settings,
+        settings: eff,
         variables: session.variables,
         userInput: lastUser,
         lastMessage: lastAny,
@@ -121,10 +124,10 @@ class PromptBuilder {
         : '预设「${preset.name}」';
     final effectiveAuthorNote =
         session.authorNoteOverride ? session.authorNote : settings.authorNote;
-    final userLabel = settings.userName.trim().isNotEmpty
-        ? settings.userName.trim()
-        : settings.personaName.trim().isNotEmpty
-            ? settings.personaName.trim()
+    final userLabel = eff.userName.trim().isNotEmpty
+        ? eff.userName.trim()
+        : eff.personaName.trim().isNotEmpty
+            ? eff.personaName.trim()
             : 'User';
     final rawSummary = session.summary.trim();
     final summaryText = rawSummary.isEmpty ? '' : macro(rawSummary).trim();
@@ -151,7 +154,7 @@ class PromptBuilder {
       character.personality,
       character.scenario,
       userLabel,
-      settings.personaDescription,
+      eff.personaDescription,
       effectiveAuthorNote,
       summaryText,
       recentText,
@@ -223,10 +226,10 @@ class PromptBuilder {
     if (loreAfter.isNotEmpty) {
       sections['worldInfoAfter'] = '\n[世界设定 · 角色后]\n$loreAfter';
     }
-    if (settings.personaDescription.trim().isNotEmpty) {
+    if (eff.personaDescription.trim().isNotEmpty) {
       sections['personaDescription'] =
           '\n[用户设定]\n名字：$userLabel\n'
-          '${macro(settings.personaDescription).trim()}';
+          '${macro(eff.personaDescription).trim()}';
     }
     if (character.exampleDialogue.trim().isNotEmpty) {
       sections['dialogueExamples'] =

@@ -33,6 +33,8 @@ class DemoCharacter {
     this.createdAt,
     this.providerOverride = '',
     this.modelOverride = '',
+    this.personaNameOverride = '',
+    this.personaDescriptionOverride = '',
   });
 
   final String name;
@@ -67,6 +69,12 @@ class DemoCharacter {
   /// 该角色单独指定模型（'' = 用服务商档案/全局的模型）。
   final String modelOverride;
 
+  /// 该角色自定义人格名（'' = 跟随全局人格）。
+  final String personaNameOverride;
+
+  /// 该角色自定义人格描述（'' = 跟随全局人格）。
+  final String personaDescriptionOverride;
+
   DemoCharacter copyWith({
     String? name,
     String? creator,
@@ -93,6 +101,8 @@ class DemoCharacter {
     int? createdAt,
     String? providerOverride,
     String? modelOverride,
+    String? personaNameOverride,
+    String? personaDescriptionOverride,
   }) {
     return DemoCharacter(
       name: name ?? this.name,
@@ -121,6 +131,10 @@ class DemoCharacter {
       createdAt: createdAt ?? this.createdAt,
       providerOverride: providerOverride ?? this.providerOverride,
       modelOverride: modelOverride ?? this.modelOverride,
+      personaNameOverride:
+          personaNameOverride ?? this.personaNameOverride,
+      personaDescriptionOverride:
+          personaDescriptionOverride ?? this.personaDescriptionOverride,
       rawJson: rawJson,
     );
   }
@@ -199,6 +213,8 @@ class DemoCharacter {
         'createdAt': createdAt,
         'providerOverride': providerOverride,
         'modelOverride': modelOverride,
+        'personaNameOverride': personaNameOverride,
+        'personaDescriptionOverride': personaDescriptionOverride,
       };
 
   factory DemoCharacter.fromJson(Map<String, dynamic> json) {
@@ -239,6 +255,9 @@ class DemoCharacter {
       createdAt: (json['createdAt'] as num?)?.toInt(),
       providerOverride: (json['providerOverride'] ?? '').toString(),
       modelOverride: (json['modelOverride'] ?? '').toString(),
+      personaNameOverride: (json['personaNameOverride'] ?? '').toString(),
+      personaDescriptionOverride:
+          (json['personaDescriptionOverride'] ?? '').toString(),
     );
   }
 

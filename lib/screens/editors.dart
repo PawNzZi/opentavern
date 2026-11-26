@@ -104,6 +104,162 @@ class _PersonaEditorSheetState extends State<PersonaEditorSheet> {
   }
 }
 
+/// 角色卡专属人格编辑器：只作用于当前角色，默认跟随全局人格。
+///
+/// 本 App 里「人格名」就是可编辑的 {{user}} 身份，所以自定义人格名会作为该
+/// 角色的 {{user}}，人格描述里的 {{user}} 也会替换成它。
+class CharacterPersonaPage extends StatefulWidget {
+  const CharacterPersonaPage({super.key, required this.character});
+
+  final DemoCharacter character;
+
+  @override
+  State<CharacterPersonaPage> createState() => _CharacterPersonaPageState();
+}
+
+class _CharacterPersonaPageState extends State<CharacterPersonaPage> {
+  late final TextEditingController _name;
+  late final TextEditingController _description;
+  late final bool _hadCustom;
+  late final String _globalName;
+  late final String _globalDesc;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = AppStore.instance.settings;
+    final c = widget.character;
+    _globalName = s.personaName.trim().isNotEmpty
+        ? s.personaName.trim()
+        : s.userName.trim();
+    _globalDesc = s.personaDescription;
+    _hadCustom = c.personaNameOverride.trim().isNotEmpty ||
+        c.personaDescriptionOverride.trim().isNotEmpty;
+    _name = TextEditingController(
+      text: _hadCustom ? c.personaNameOverride : _globalName,
+    );
+    _description = TextEditingController(
+      text: _hadCustom ? c.personaDescriptionOverride : _globalDesc,
+    );
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final latest = AppStore.instance.characterByName(widget.character.name) ??
+        widget.character;
+    final name = _name.text.trim();
+    final desc = _description.text.trim();
+    if (name.isEmpty && desc.isEmpty) {
+      await _restore(latest);
+      return;
+    }
+    await AppStore.instance.addCharacter(latest.copyWith(
+      personaNameOverride: name,
+      personaDescriptionOverride: desc,
+    ));
+    if (!mounted) return;
+    showTavernToast(context, '角色人格已保存');
+    Navigator.of(context).maybePop();
+  }
+
+  Future<void> _restore(DemoCharacter latest) async {
+    await AppStore.instance.addCharacter(latest.copyWith(
+      personaNameOverride: '',
+      personaDescriptionOverride: '',
+    ));
+    if (!mounted) return;
+    showTavernToast(context, '已恢复跟随全局人格');
+    Navigator.of(context).maybePop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return SheetStage(
+      title: '角色人格',
+      subtitle: '仅对「${widget.character.name}」生效 · 默认跟随全局',
+      heightFactor: .88,
+      footer: GlassPrimaryButton(
+        label: '保存人格',
+        icon: Icons.check_rounded,
+        onTap: _save,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 56,
+                height: 56,
+                child: Portrait(
+                  initial: _name.text.isEmpty
+                      ? '人'
+                      : _name.text.characters.first,
+                  colors: const [
+                    Color(0xFF8C4A3F),
+                    Color(0xFFD98E5F),
+                    Color(0xFF3B1E2A),
+                  ],
+                  radius: 17,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '这个身份只用于当前角色卡：{{user}} 会替换成这里的人格名。',
+                  style:
+                      appText(11, FontWeight.w400, p.textTertiary, height: 1.5),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _LiveField(
+            label: '名字',
+            controller: _name,
+            hint: _globalName.isEmpty ? '旅人' : _globalName,
+          ),
+          _LiveField(
+            label: '描述',
+            controller: _description,
+            hint: _globalDesc.isEmpty
+                ? '这个角色眼里的「你」是怎样的？'
+                : _globalDesc,
+            maxLines: 5,
+          ),
+          if (_hadCustom) ...[
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: () {
+                final latest =
+                    AppStore.instance.characterByName(widget.character.name) ??
+                        widget.character;
+                _restore(latest);
+              },
+              child: Text(
+                '恢复跟随全局人格',
+                style: appText(12, FontWeight.w500, p.amber),
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            '自定义人格保存后只作用于「${widget.character.name}」，其它角色仍用全局人格。',
+            style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class RegexEditorSheet extends StatefulWidget {
   const RegexEditorSheet({super.key, this.script});
   final RegexScript? script;
