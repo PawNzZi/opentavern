@@ -67,6 +67,64 @@ void main() {
       final p = await write('ascii.txt', utf8.encode('Hello world\nChapter 1\n'));
       expect(await NovelTextStream.detectEncoding(p), NovelEncoding.utf8);
     });
+
+    test('极短中文 GBK 文件（只有两个汉字）→ GBK 而不是 Latin-1', () async {
+      // 自动探测的启发式在短文件上最容易出错：这是本次修正的核心用例。
+      final p = await write('short-gbk.txt', const GbkCodec().encode('你好'));
+      expect(await NovelTextStream.detectEncoding(p), NovelEncoding.gb18030);
+    });
+
+    test('短中文 GBK 带 ASCII 标点 → GBK', () async {
+      final p =
+          await write('short2.txt', const GbkCodec().encode('你好,\n世界!'));
+      expect(await NovelTextStream.detectEncoding(p), NovelEncoding.gb18030);
+    });
+
+    test('纯 ASCII 短文件不误判成 GBK', () async {
+      final p = await write('short-ascii.txt', utf8.encode('ok hi'));
+      expect(await NovelTextStream.detectEncoding(p), NovelEncoding.utf8);
+    });
+  });
+
+  group('buildIndex 手动指定编码', () {
+    test('强制 gb18030：跳过探测，索引与读回流程自洽', () async {
+      // 无 BOM UTF-8 中文自动探测会得 utf8；手动指定 gb18030 必须生效。
+      final bytes = utf8.encode('第一章 风起\n李明看着远方。\n第二章 云涌\n王芳低声道。\n');
+      final p = await write('forced.txt', bytes);
+      final index =
+          await NovelTextStream.buildIndex(p, encoding: NovelEncoding.gb18030);
+      expect(index.encoding, NovelEncoding.gb18030);
+      // 按错误编码解码会得到乱码，但流程必须通：读回不抛异常。
+      for (final ch in index.chapters) {
+        final text = await NovelTextStream.readChapter(p, index, ch);
+        expect(text, isNotNull);
+      }
+    });
+
+    test('强制 utf8 与自动探测结果一致', () async {
+      final bytes = utf8.encode('第一章 风起\n李明看着远方。\n');
+      final p = await write('forced-utf8.txt', bytes);
+      final auto = await NovelTextStream.buildIndex(p);
+      final forced =
+          await NovelTextStream.buildIndex(p, encoding: NovelEncoding.utf8);
+      expect(forced.encoding, NovelEncoding.utf8);
+      expect(forced.chapters.length, auto.chapters.length);
+      expect(forced.totalChars, auto.totalChars);
+    });
+
+    test('NovelJobConfig.encodingOverride 契约往返', () {
+      const c = NovelJobConfig(
+        filePath: 'x',
+        fileName: 'x.txt',
+        encodingOverride: 'gb18030',
+      );
+      final back = NovelJobConfig.fromJson(c.toJson());
+      expect(back.encodingOverride, 'gb18030');
+      // 默认值：空字符串 = 自动探测。
+      const d = NovelJobConfig(filePath: 'y', fileName: 'y.txt');
+      expect(d.encodingOverride, '');
+      expect(NovelJobConfig.fromJson(d.toJson()).encodingOverride, '');
+    });
   });
 
   group('buildIndex + readChapter', () {

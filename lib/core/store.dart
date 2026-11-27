@@ -317,6 +317,21 @@ class AppStore extends ChangeNotifier {
     return activePreset;
   }
 
+  /// 角色绑定的世界书：按正向绑定（character.lorebook = 书名/ID）优先，
+  /// 找不到再按反向绑定（book.linked == 角色名）兜底。未绑定返回 null。
+  Lorebook? lorebookForCharacter(DemoCharacter character) {
+    final key = character.lorebook.trim();
+    if (key.isNotEmpty && key != '未绑定') {
+      for (final b in lorebooks) {
+        if (b.name == key || b.id == key) return b;
+      }
+    }
+    for (final b in lorebooks) {
+      if (b.linked == character.name && b.entries.isNotEmpty) return b;
+    }
+    return null;
+  }
+
   PromptPreset? get activePreset {
     for (final preset in presets) {
       if (preset.id == activePresetId) return preset;

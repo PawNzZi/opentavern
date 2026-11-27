@@ -69,20 +69,24 @@ class NovelTextStream {
   }
 
   /// 读前 64KB 样本探测编码。BOM 优先；无 BOM 先严格 UTF-8（裁掉样本末尾
-  /// 被截断的多字节序列再试），失败则 GBK 试解并按中文字符占比判断，
-  /// 占比不合理回落 Latin-1；纯 ASCII 一律按 UTF-8。
+  /// 被截断的多字节序列再试），失败则 GBK 试解，按「非 ASCII 解码结果里
+  /// CJK 系字符的占比」判断，占比不合理回落 Latin-1；纯 ASCII 一律按 UTF-8。
+  ///
+  /// 短文件（样本即全文）放宽绝对数量门槛：极短的中文 GBK 文件（哪怕
+  /// 只有「你好」两个汉字）也不该误判成 Latin-1。
   static Future<NovelEncoding> detectEncoding(String path) async {
     final raf = await File(path).open();
     try {
       final size = await raf.length();
       final sample = await raf.read(min(_sampleBytes, size));
-      return _detectFromSample(sample);
+      return _detectFromSample(sample, wholeFile: size <= _sampleBytes);
     } finally {
       await raf.close();
     }
   }
 
-  static NovelEncoding _detectFromSample(Uint8List sample) {
+  static NovelEncoding _detectFromSample(Uint8List sample,
+      {bool wholeFile = false}) {
     if (sample.length >= 3 &&
         sample[0] == 0xEF &&
         sample[1] == 0xBB &&
@@ -102,16 +106,43 @@ class NovelTextStream {
     } on FormatException {
       // 不是合法 UTF-8，继续往下试。
     }
+    // GBK 试解，统计「非 ASCII 解码结果里 CJK 系字符的占比」。
+    // 用这个比例而不是「占全部字符的比例」：短中文 GBK 文件里 ASCII
+    // 标点/换行会稀释总数，而 Latin-1 西文重音文本解 GBK 会产生大量
+    // 替换符（U+FFFD）和零星伪 CJK，占比天然上不去。
     final decoded = const GbkCodec(allowInvalid: true).decode(sample);
     var cjk = 0;
+    var cjkIsh = 0;
+    var nonAscii = 0;
+    var fffd = 0;
     for (final r in decoded.runes) {
-      if (r >= 0x4E00 && r <= 0x9FFF) cjk++;
+      if (r > 0x7F) nonAscii++;
+      if (r == 0xFFFD) fffd++;
+      if (r >= 0x4E00 && r <= 0x9FFF) {
+        cjk++;
+        cjkIsh++;
+      } else if (_isCjkIsh(r)) {
+        cjkIsh++;
+      }
     }
-    if (cjk >= 4 && cjk * 100 >= decoded.length * 8) {
+    // 短文件（样本=全文）放宽绝对数量门槛：两个汉字也认。
+    final minCjk = wholeFile ? 2 : 4;
+    if (cjk >= minCjk &&
+        nonAscii > 0 &&
+        cjkIsh * 100 >= nonAscii * 60 &&
+        fffd * 5 < nonAscii) {
       return NovelEncoding.gb18030;
     }
     return NovelEncoding.latin1;
   }
+
+  /// CJK 系字符（含 CJK 标点与全角形式），GBK 中文文本的主体。
+  static bool _isCjkIsh(int rune) =>
+      (rune >= 0x3000 && rune <= 0x303F) || // CJK 标点
+      (rune >= 0x4E00 && rune <= 0x9FFF) || // 汉字
+      (rune >= 0xFF00 && rune <= 0xFFEF) || // 全角形式
+      (rune >= 0x3400 && rune <= 0x4DBF) || // 扩展 A
+      (rune >= 0xF900 && rune <= 0xFAFF); // 兼容表意
 
   /// 样本末尾可能截断多字节字符：把不完整序列裁掉再做严格试解。
   static Uint8List _trimIncompleteUtf8(Uint8List bytes) {
@@ -145,20 +176,26 @@ class NovelTextStream {
   /// 识别不到任何标题时按约 6000 字兜底切段（在行边界切，标题 `第N段`），
   /// 保证下游一定能工作。第一个标题之前的非空内容并入「开篇」章。
   /// [shouldStop] 返回 true 时尽快抛 [NovelCancelledException]。
+  ///
+  /// [encoding] 手动指定编码（最高优先级，跳过探测）：自动探测对极短
+  /// 中文 GBK 文件是启发式，用户手动指定是确定性的兜底。UTF-16 的
+  /// 偏移对齐逻辑照常按 2 字节工作。
   static Future<ChapterIndex> buildIndex(
     String path, {
     int chunkBytes = 1 << 20,
+    NovelEncoding? encoding,
     void Function(int doneBytes, int totalBytes)? onProgress,
     bool Function()? shouldStop,
   }) async {
     final file = File(path);
     final size = await file.length();
     final modifiedMs = (await file.lastModified()).millisecondsSinceEpoch;
-    final encoding = await detectEncoding(path);
-    final scanner = _ChapterScanner(encoding, size);
+    // 手动指定 > 自动探测。
+    final enc = encoding ?? await detectEncoding(path);
+    final scanner = _ChapterScanner(enc, size);
     final raf = await file.open();
     try {
-      final wide = encoding.isWide;
+      final wide = enc.isWide;
       final step = max(16, chunkBytes);
       var done = 0;
       var carry = Uint8List(0); // UTF-16 的 2 字节对齐余字节。
@@ -201,7 +238,7 @@ class NovelTextStream {
             file.uri.pathSegments.isEmpty ? path : file.uri.pathSegments.last,
         fileSize: size,
         modifiedMs: modifiedMs,
-        encoding: encoding,
+        encoding: enc,
         chapters: scanner.chapters,
         totalChars: scanner.totalChars,
       );

@@ -1,13 +1,18 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../core/lore_io.dart';
 import '../core/models.dart';
 import '../core/novel/job_store.dart';
 import '../core/novel/novel_controller.dart';
 import '../core/novel/novel_types.dart';
 import '../core/novel/publish.dart';
+import '../core/novel/text_stream.dart';
 import '../core/store.dart';
 import '../design/glass.dart';
 import '../design/scaffold.dart';
@@ -36,6 +41,16 @@ class _NovelImportPageState extends State<NovelImportPage> {
   String _fileName = '';
   int _fileSize = 0;
   List<String> _avatars = [];
+
+  /// 选料预览：探测到的编码与估算字数（docx/pdf 转换前未知）。
+  String _fileEncoding = '';
+  int _estChars = 0;
+
+  /// 手动指定编码（空 = 自动）。短 GBK 文件探测的确定性兜底。
+  String _encodingOverride = '';
+
+  /// token 预算上限，0 = 不限。达到后停止抽取、用已有块成稿。
+  int _tokenBudget = 0;
 
   ScanMode _mode = ScanMode.smart;
   int _maxBlocks = 120;
@@ -94,11 +109,27 @@ class _NovelImportPageState extends State<NovelImportPage> {
       return;
     }
     final size = await File(path).length();
+    // 选料预览：探测编码 + 估算字数（纯本地，不花 token）。
+    String encoding = '';
+    var estChars = 0;
+    if (ext == 'txt' || ext == 'md' || ext == 'markdown' || ext == 'text') {
+      try {
+        final detected = await NovelTextStream.detectEncoding(path);
+        encoding = detected.label;
+        // 粗估：UTF-8 中文 ≈3 字节/字；GBK ≈2；UTF-16 恒 2。
+        final perChar = detected.isWide
+            ? 2
+            : (detected == NovelEncoding.gb18030 ? 2 : 3);
+        estChars = size ~/ perChar;
+      } catch (_) {}
+    }
     if (!mounted) return;
     setState(() {
       _filePath = path!;
       _fileName = file.name;
       _fileSize = size;
+      _fileEncoding = encoding;
+      _estChars = estChars;
     });
   }
 
@@ -162,6 +193,8 @@ class _NovelImportPageState extends State<NovelImportPage> {
         modelOverride: _model,
         avatarPaths: _avatars,
         extraInstruction: _extra.text.trim(),
+        tokenBudget: _tokenBudget,
+        encodingOverride: _encodingOverride,
       );
 
   Future<void> _start() async {
@@ -177,9 +210,37 @@ class _NovelImportPageState extends State<NovelImportPage> {
     if (_mode == ScanMode.full) {
       final ok = await _confirmFullScan();
       if (ok != true) return;
+    } else if (_tokenBudget <= 0 && _estChars > 3000000) {
+      // 超大文件不设预算也要提醒一下，避免误触发大账单。
+      final ok = await _confirmNoBudget();
+      if (ok != true) return;
     }
     await _gen.start(_config);
   }
+
+  Future<bool?> _confirmNoBudget() => showTavernSheet<bool>(
+        context,
+        title: '建议设置 token 预算',
+        subtitle: '这份文件非常大',
+        heightFactor: .4,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            HintCard(
+              text: '文件约 ${(_estChars / 10000).toStringAsFixed(0)} 万字，'
+                  '即使智能采样也可能消耗大量 token。建议在「生成」里设置'
+                  'token 预算上限，烧完自动用已有内容成稿。',
+              icon: Icons.payments_outlined,
+            ),
+            const SizedBox(height: 12),
+            GlassPrimaryButton(
+              label: '仍要继续',
+              icon: Icons.play_arrow_rounded,
+              onTap: () => Navigator.of(context).pop(true),
+            ),
+          ],
+        ),
+      );
 
   Future<bool?> _confirmFullScan() {
     final mb = _fileSize / 1024 / 1024;
@@ -286,6 +347,81 @@ class _NovelImportPageState extends State<NovelImportPage> {
     );
   }
 
+  /// 多卡一次性打包成 zip（一张卡一张 PNG，都内嵌同一本世界书）。
+  Future<void> _exportZip() async {
+    final result = _gen.result;
+    if (result == null) return;
+    final selected = result.cards.where((c) => c.selected).toList();
+    if (selected.isEmpty) {
+      showTavernToast(context, '请先勾选要导出的角色卡');
+      return;
+    }
+    final book = draftToLorebook(
+      result,
+      linkedCharacterName: selected.first.name,
+    );
+    final archive = Archive();
+    for (final draft in selected) {
+      final character = await draftToCharacter(draft, bookName: book.name);
+      final bytes = await buildCardPng(character, book: book);
+      final safe = character.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      archive.addFile(ArchiveFile('$safe.png', bytes.length, bytes));
+    }
+    // 顺手把世界书 JSON 一起放进去，方便单独导入到别的工具。
+    final json = utf8.encode(
+      const JsonEncoder.withIndent('  ').convert(lorebookToWorldJson(book)),
+    );
+    final safeBook = book.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    archive.addFile(ArchiveFile('$safeBook.json', json.length, json));
+
+    final zipped = ZipEncoder().encode(archive);
+    if (zipped == null) {
+      if (!mounted) return;
+      showTavernToast(context, '打包失败');
+      return;
+    }
+    final uri = await FilePickerPlatform.instance.saveFile(
+      fileName: '${_gen.runningConfig?.fileName.replaceAll(RegExp(r'\.[A-Za-z0-9]+$'), '') ?? 'novel'}-cards.zip',
+      bytes: Uint8List.fromList(zipped),
+      mimeType: 'application/zip',
+      dialogTitle: '打包导出（角色卡 + 世界书）',
+    );
+    if (!mounted) return;
+    showTavernToast(
+      context,
+      uri == null ? '已取消导出' : '已打包 ${selected.length} 张角色卡 + 世界书',
+    );
+  }
+
+  /// 单独导出世界书 JSON（SillyTavern `worlds/*.json` 兼容）。
+  Future<void> _exportLoreJson() async {
+    final result = _gen.result;
+    if (result == null) return;
+    final book = draftToLorebook(
+      result,
+      linkedCharacterName: _firstSelectedCardName(result),
+    );
+    if (book.entries.isEmpty) {
+      showTavernToast(context, '没有勾选任何世界书条目');
+      return;
+    }
+    final bytes = utf8.encode(
+      const JsonEncoder.withIndent('  ').convert(lorebookToWorldJson(book)),
+    );
+    final safe = book.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final uri = await FilePickerPlatform.instance.saveFile(
+      fileName: '$safe.json',
+      bytes: Uint8List.fromList(bytes),
+      mimeType: 'application/json',
+      dialogTitle: '导出世界书 JSON',
+    );
+    if (!mounted) return;
+    showTavernToast(
+      context,
+      uri == null ? '已取消导出' : '已导出世界书（${book.entries.length} 条）',
+    );
+  }
+
   // ------------------------------------------------------------ 构建
 
   @override
@@ -313,11 +449,33 @@ class _NovelImportPageState extends State<NovelImportPage> {
                       onTap: _saving ? null : _save,
                     ),
                     const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GlassPill(
+                            label: '导出 PNG',
+                            icon: Icons.image_outlined,
+                            height: 40,
+                            onTap: _exportAll,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: GlassPill(
+                            label: '打包 zip',
+                            icon: Icons.folder_zip_outlined,
+                            height: 40,
+                            onTap: _exportZip,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     GlassPill(
-                      label: '导出 PNG（含世界书）',
-                      icon: Icons.image_outlined,
+                      label: '导出世界书 JSON',
+                      icon: Icons.data_object_rounded,
                       height: 40,
-                      onTap: _exportAll,
+                      onTap: _exportLoreJson,
                     ),
                   ],
                 )
@@ -337,7 +495,6 @@ class _NovelImportPageState extends State<NovelImportPage> {
   // ------------------------------------------------------ 配置阶段
 
   List<Widget> _configSection(AppPalette p) {
-    final resumable = _jobs.where((j) => j.resumable).toList();
     return [
       SettingsGroup(
         title: '素材',
@@ -345,9 +502,7 @@ class _NovelImportPageState extends State<NovelImportPage> {
           SettingRow(
             icon: Icons.description_outlined,
             title: '小说 / 文档',
-            subtitle: _filePath.isEmpty
-                ? '支持 txt / md / docx / pdf，大文件流式读取'
-                : '${(_fileSize / 1024 / 1024).toStringAsFixed(1)} MB',
+            subtitle: _materialPreview(),
             value: _fileName.isEmpty ? '未选择' : _fileName,
             iconColor: p.amber,
             onTap: _pickFile,
@@ -361,6 +516,19 @@ class _NovelImportPageState extends State<NovelImportPage> {
             iconColor: p.violet,
             onTap: _pickAvatars,
           ),
+          if (_fileEncoding.isNotEmpty) ...[
+            const Hairline(indent: 56),
+            SettingRow(
+              icon: Icons.translate_rounded,
+              title: '编码',
+              subtitle: _fileEncoding,
+              value: _encodingOverride.isEmpty
+                  ? '自动'
+                  : _encodingOverrideLabel(_encodingOverride),
+              iconColor: p.sage,
+              onTap: _pickEncoding,
+            ),
+          ],
         ],
       ),
       const SizedBox(height: 12),
@@ -420,6 +588,16 @@ class _NovelImportPageState extends State<NovelImportPage> {
             onPlus: () =>
                 setState(() => _concurrency = (_concurrency + 1).clamp(1, 4)),
           ),
+          const Hairline(indent: 14),
+          StepperRow(
+            title: 'token 预算',
+            subtitle: '烧完即停止抽取，用已有块成稿',
+            value: _tokenBudgetLabel(),
+            onMinus: () => setState(
+                () => _tokenBudget = (_tokenBudget - 100000).clamp(0, 5000000)),
+            onPlus: () => setState(
+                () => _tokenBudget = (_tokenBudget + 100000).clamp(0, 5000000)),
+          ),
         ],
       ),
       const SizedBox(height: 14),
@@ -449,27 +627,189 @@ class _NovelImportPageState extends State<NovelImportPage> {
       ),
       const SizedBox(height: 14),
       _extraField(p),
-      if (resumable.isNotEmpty) ...[
+      if (_jobs.isNotEmpty) ...[
         const SizedBox(height: 14),
         SettingsGroup(
-          title: '继续上次生成',
+          title: '历史任务',
           children: [
-            for (var i = 0; i < resumable.length; i++) ...[
+            for (var i = 0; i < _jobs.length; i++) ...[
               if (i > 0) const Hairline(indent: 56),
-              SettingRow(
-                icon: Icons.history_rounded,
-                title: resumable[i].fileName,
-                subtitle: '已完成 ${resumable[i].doneBlocks}'
-                    '/${resumable[i].totalBlocks} 块',
-                value: '续跑',
-                iconColor: p.amber,
-                onTap: () => _gen.resumeJob(resumable[i].id),
-              ),
+              _jobTile(p, _jobs[i]),
             ],
           ],
         ),
       ],
     ];
+  }
+
+  String _tokenBudgetLabel() => _budgetLabel(_tokenBudget);
+
+  static String _budgetLabel(int budget) => budget <= 0
+      ? '不限'
+      : budget >= 1000000
+          ? '${(budget / 1000000).toStringAsFixed(1)}M'
+          : '${budget ~/ 1000}k';
+
+  /// 单个历史任务：主体行按状态给「查看结果 / 续跑 / 重试失败块」，
+  /// 旁边给删除。已完成有结果的回看是纯本地读取，不花 token。
+  Widget _jobTile(AppPalette p, NovelJobSummary job) {
+    final Widget trailing;
+    if (job.hasResult) {
+      trailing = GlassPill(
+        label: '查看',
+        icon: Icons.visibility_outlined,
+        height: 30,
+        onTap: () async {
+          final ok = await _gen.openJob(job.id);
+          if (!mounted) return;
+          if (!ok) showTavernToast(context, '该任务没有可回看的结果');
+        },
+      );
+    } else if (job.resumable) {
+      trailing = GlassPill(
+        label: '续跑',
+        icon: Icons.play_arrow_rounded,
+        height: 30,
+        onTap: () => _gen.resumeJob(job.id, overrides: _config),
+      );
+    } else if (job.retryable) {
+      trailing = GlassPill(
+        label: '重试失败块',
+        icon: Icons.refresh_rounded,
+        height: 30,
+        onTap: () =>
+            _gen.resumeJob(job.id, retryFinished: true, overrides: _config),
+      );
+    } else {
+      trailing = const SizedBox.shrink();
+    }
+    final status = job.finished
+        ? (job.failedBlocks > 0 ? '已完成 · ${job.failedBlocks} 块失败' : '已完成')
+        : '中断于 ${job.doneBlocks}/${job.totalBlocks} 块'
+            '${job.failedBlocks > 0 ? ' · ${job.failedBlocks} 块失败' : ''}';
+    return Column(
+      children: [
+        SettingRow(
+          icon: Icons.history_rounded,
+          title: job.fileName,
+          subtitle: status,
+          iconColor: job.finished ? p.sage : p.amber,
+          onTap: job.hasResult
+              ? () async {
+                  final ok = await _gen.openJob(job.id);
+                  if (!mounted) return;
+                  if (!ok) showTavernToast(context, '该任务没有可回看的结果');
+                }
+              : job.resumable
+                  ? () => _gen.resumeJob(job.id, overrides: _config)
+                  : job.retryable
+                      ? () => _gen.resumeJob(job.id,
+                          retryFinished: true, overrides: _config)
+                      : null,
+        ),
+        SizedBox(
+          height: 34,
+          child: Row(
+            children: [
+              const Spacer(),
+              trailing,
+              const SizedBox(width: 14),
+              Pressable(
+                onTap: () async {
+                  await _gen.deleteJob(job.id);
+                  await _loadJobs();
+                },
+                child: Icon(Icons.delete_outline_rounded,
+                    size: 16, color: p.danger),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _materialPreview() {
+    if (_filePath.isEmpty) return '支持 txt / md / docx / pdf，大文件流式读取';
+    final mb = (_fileSize / 1024 / 1024).toStringAsFixed(1);
+    if (_fileEncoding.isEmpty) {
+      return '$mb MB · 字数转换后统计';
+    }
+    final chars = _estChars >= 10000
+        ? '${(_estChars / 10000).toStringAsFixed(1)} 万字'
+        : '$_estChars 字';
+    return '$mb MB · $_fileEncoding · 约 $chars';
+  }
+
+  Future<void> _pickEncoding() async {
+    final p = AppPalette.of(context);
+    final options = <(String, String)>[
+      ('', '自动探测'),
+      (NovelEncoding.utf8.name, 'UTF-8'),
+      (NovelEncoding.gb18030.name, 'GBK / GB18030'),
+      (NovelEncoding.utf16le.name, 'UTF-16 LE'),
+      (NovelEncoding.utf16be.name, 'UTF-16 BE'),
+      (NovelEncoding.latin1.name, 'Latin-1'),
+    ];
+    final picked = await showTavernSheet<String>(
+      context,
+      title: '文件编码',
+      subtitle: '自动探测失败或结果不对时手动指定',
+      heightFactor: .5,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (id, label) in options)
+            _encodingOption(p, id, label),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _encodingOverride = picked);
+  }
+
+  Widget _encodingOption(AppPalette p, String id, String label) {
+    final selected = _encodingOverride == id;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.of(context).pop(id),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: p.divider, width: .6),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.translate_rounded,
+              size: 18,
+              color: selected ? p.amber : p.textTertiary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: appText(
+                  14,
+                  selected ? FontWeight.w600 : FontWeight.w500,
+                  selected ? p.amber : p.textPrimary,
+                ),
+              ),
+            ),
+            if (selected) Icon(Icons.check_rounded, size: 18, color: p.amber),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _encodingOverrideLabel(String name) {
+    for (final e in NovelEncoding.values) {
+      if (e.name == name) return e.label;
+    }
+    return name;
   }
 
   String _effectiveModelLabel() {
@@ -559,7 +899,10 @@ class _NovelImportPageState extends State<NovelImportPage> {
                 ),
                 const SizedBox(width: 22),
                 MiniStat(
-                  value: _compact(pr.tokensUsed),
+                  value: _compact(pr.tokensUsed) +
+                      ((_gen.runningConfig?.tokenBudget ?? 0) > 0
+                          ? ' / ${_budgetLabel(_gen.runningConfig!.tokenBudget)}'
+                          : ''),
                   label: 'tokens',
                 ),
                 const SizedBox(width: 22),
@@ -670,8 +1013,9 @@ class _NovelImportPageState extends State<NovelImportPage> {
       if (result.failedBlocks.isNotEmpty) ...[
         const SizedBox(height: 10),
         HintCard(
-          text: '${result.failedBlocks.length} 块抽取失败已跳过，'
-              '设定可能不完整。可重新生成或续跑补齐。',
+          text: '${result.failedBlocks.length} 块抽取失败已跳过，设定可能不完整。'
+              '回到配置页，在「历史任务」里点「重试失败块」即可只补跑这几块'
+              '（已完成的块不会重复消耗）。',
           icon: Icons.info_outline_rounded,
           color: p.danger,
         ),
@@ -719,12 +1063,42 @@ class _NovelImportPageState extends State<NovelImportPage> {
                 ));
               }),
               const SizedBox(width: 10),
+              // 立绘缩略图：点它可以直接给这张卡换立绘。
+              Pressable(
+                onTap: () => _assignAvatar(result, index),
+                child: SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: Portrait(
+                    initial: card.name.isEmpty
+                        ? '?'
+                        : card.name.characters.first,
+                    colors: [
+                      p.amber.withValues(alpha: .55),
+                      p.violet.withValues(alpha: .55),
+                    ],
+                    avatarBase64: _avatarBase64Of(card.avatarPath),
+                    radius: 10,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 9),
               Expanded(
-                child: Text(
-                  card.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: appText(14.5, FontWeight.w600, p.textPrimary),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      card.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: appText(14.5, FontWeight.w600, p.textPrimary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      card.avatarPath.isEmpty ? '未指定立绘' : '已指定立绘',
+                      style: appText(9.5, FontWeight.w400, p.textTertiary),
+                    ),
+                  ],
                 ),
               ),
               GlassPill(
@@ -756,6 +1130,54 @@ class _NovelImportPageState extends State<NovelImportPage> {
       ),
     );
   }
+
+  /// 缩略图缓存：同一路径只读一次。
+  final Map<String, String?> _avatarCache = {};
+
+  /// 缩略图用：读立绘文件的 base64。只在文件较小（<600KB）时才真读，
+  /// 否则退回占位图——预览缩略图不值得在大图上同步 IO 卡 UI。
+  String? _avatarBase64Of(String path) {
+    if (path.isEmpty) return null;
+    if (_avatarCache.containsKey(path)) return _avatarCache[path];
+    String? out;
+    try {
+      final file = File(path);
+      if (file.existsSync() && file.lengthSync() <= 600 * 1024) {
+        out = base64Encode(file.readAsBytesSync());
+      }
+    } catch (_) {
+      out = null;
+    }
+    _avatarCache[path] = out;
+    return out;
+  }
+
+  /// 给单张卡指定/更换立绘。
+  Future<void> _assignAvatar(GenResult result, int index) async {
+    final file = await FilePickerPlatform.instance.pickFile();
+    if (file == null || file.path == null || !mounted) return;
+    final cards = [...result.cards];
+    cards[index] = cards[index].copyWith(avatarPath: file.path!);
+    _avatarCache.remove(file.path);
+    _gen.updateResult(_copyResult(result, cards: cards));
+    setState(() {});
+  }
+
+  GenResult _copyResult(
+    GenResult result, {
+    List<DraftCard>? cards,
+    List<DraftLoreEntry>? lore,
+    String? bookName,
+  }) =>
+      GenResult(
+        bookName: bookName ?? result.bookName,
+        cards: cards ?? result.cards,
+        lore: lore ?? result.lore,
+        tokensUsed: result.tokensUsed,
+        failedBlocks: result.failedBlocks,
+        scannedBlocks: result.scannedBlocks,
+        totalBlocks: result.totalBlocks,
+      );
 
   Widget _loreTile(AppPalette p, GenResult result, int index) {
     final entry = result.lore[index];
@@ -855,11 +1277,17 @@ class _NovelImportPageState extends State<NovelImportPage> {
     final personality = TextEditingController(text: card.personality);
     final scenario = TextEditingController(text: card.scenario);
     final greeting = TextEditingController(text: card.firstMes);
+    final example = TextEditingController(text: card.mesExample);
+    final alts = TextEditingController(
+      text: card.alternateGreetings.join(_altSeparator),
+    );
+    final system = TextEditingController(text: card.systemPrompt);
+    final tags = TextEditingController(text: card.tags.join('、'));
     final saved = await showTavernSheet<bool>(
       context,
       title: '编辑角色卡',
       subtitle: card.name,
-      heightFactor: .88,
+      heightFactor: .92,
       child: Column(
         children: [
           _editField('名字', name),
@@ -867,6 +1295,10 @@ class _NovelImportPageState extends State<NovelImportPage> {
           _editField('性格', personality, lines: 3),
           _editField('场景', scenario, lines: 2),
           _editField('开场白', greeting, lines: 6),
+          _editField('对话示例（可用 <START> 分组）', example, lines: 6),
+          _editField('备选开场白（用 --- 分隔多条）', alts, lines: 5),
+          _editField('系统提示词（可留空）', system, lines: 4),
+          _editField('标签（用、或, 分隔）', tags),
           const SizedBox(height: 12),
           GlassPrimaryButton(
             label: '保存修改',
@@ -884,48 +1316,91 @@ class _NovelImportPageState extends State<NovelImportPage> {
         personality: personality.text,
         scenario: scenario.text,
         firstMes: greeting.text,
+        mesExample: example.text,
+        alternateGreetings: alts.text
+            .split(RegExp(r'\n\s*-{3,}\s*\n'))
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
+        systemPrompt: system.text,
+        tags: tags.text
+            .split(RegExp(r'[、,，]'))
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
       );
-      _gen.updateResult(GenResult(
-        bookName: result.bookName,
-        cards: cards,
-        lore: result.lore,
-        tokensUsed: result.tokensUsed,
-        failedBlocks: result.failedBlocks,
-        scannedBlocks: result.scannedBlocks,
-        totalBlocks: result.totalBlocks,
-      ));
+      _gen.updateResult(_copyResult(result, cards: cards));
     }
     name.dispose();
     desc.dispose();
     personality.dispose();
     scenario.dispose();
     greeting.dispose();
+    example.dispose();
+    alts.dispose();
+    system.dispose();
+    tags.dispose();
   }
+
+  static const _altSeparator = '\n---\n';
 
   Future<void> _editLore(GenResult result, int index) async {
     final entry = result.lore[index];
     final name = TextEditingController(text: entry.name);
     final keys = TextEditingController(text: entry.keys.join(', '));
+    final secondary = TextEditingController(text: entry.secondaryKeys.join(', '));
     final content = TextEditingController(text: entry.content);
     var constant = entry.constant;
+    var position = entry.position;
+    var order = entry.order;
+    var depth = entry.depth;
     final saved = await showTavernSheet<bool>(
       context,
       title: '编辑世界书条目',
       subtitle: entry.name,
-      heightFactor: .74,
+      heightFactor: .9,
       child: StatefulBuilder(
         builder: (context, setSheet) => Column(
           children: [
             _editField('条目名', name),
             _editField('触发关键词（逗号分隔）', keys, lines: 2),
+            _editField('次要关键词（可选，逗号分隔）', secondary, lines: 2),
             _editField('正文', content, lines: 6),
-            const SizedBox(height: 8),
             SwitchLine(
               title: '常驻条目',
               subtitle: '不依赖关键词，始终注入',
               value: constant,
               onChanged: (v) => setSheet(() => constant = v),
             ),
+            SegmentLine(
+              title: '插入位置',
+              options: const ['角色前', '角色后', '按深度'],
+              index: position == 'after'
+                  ? 1
+                  : position == 'at_depth'
+                      ? 2
+                      : 0,
+              onChanged: (i) => setSheet(() => position = const [
+                    'before',
+                    'after',
+                    'at_depth',
+                  ][i]),
+            ),
+            StepperRow(
+              title: '插入顺序',
+              subtitle: '数值越小越靠前',
+              value: '$order',
+              onMinus: () => setSheet(() => order = (order - 10).clamp(0, 1000)),
+              onPlus: () => setSheet(() => order = (order + 10).clamp(0, 1000)),
+            ),
+            if (position == 'at_depth')
+              StepperRow(
+                title: '插入深度',
+                value: '$depth',
+                onMinus: () =>
+                    setSheet(() => depth = (depth - 1).clamp(0, 20)),
+                onPlus: () => setSheet(() => depth = (depth + 1).clamp(0, 20)),
+              ),
             const SizedBox(height: 12),
             GlassPrimaryButton(
               label: '保存修改',
@@ -940,28 +1415,27 @@ class _NovelImportPageState extends State<NovelImportPage> {
       final lore = [...result.lore];
       lore[index] = entry.copyWith(
         name: name.text.trim(),
-        keys: keys.text
-            .split(RegExp(r'[,，]'))
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList(),
+        keys: _splitList(keys.text),
+        secondaryKeys: _splitList(secondary.text),
         content: content.text,
         constant: constant,
+        position: position,
+        order: order,
+        depth: depth,
       );
-      _gen.updateResult(GenResult(
-        bookName: result.bookName,
-        cards: result.cards,
-        lore: lore,
-        tokensUsed: result.tokensUsed,
-        failedBlocks: result.failedBlocks,
-        scannedBlocks: result.scannedBlocks,
-        totalBlocks: result.totalBlocks,
-      ));
+      _gen.updateResult(_copyResult(result, lore: lore));
     }
     name.dispose();
     keys.dispose();
+    secondary.dispose();
     content.dispose();
   }
+
+  static List<String> _splitList(String raw) => raw
+      .split(RegExp(r'[,，、]'))
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
 
   Widget _editField(String label, TextEditingController c, {int lines = 1}) {
     final p = AppPalette.of(context);
@@ -992,6 +1466,13 @@ class _NovelImportPageState extends State<NovelImportPage> {
         ],
       ),
     );
+  }
+
+  static String _firstSelectedCardName(GenResult result) {
+    for (final c in result.cards) {
+      if (c.selected) return c.name;
+    }
+    return result.cards.isEmpty ? '' : result.cards.first.name;
   }
 
   static String _compact(int n) {

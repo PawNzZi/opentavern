@@ -42,6 +42,7 @@ class NovelJob {
   final bool finished;
 
   NovelJob copyWith({
+    NovelJobConfig? config,
     ChapterIndex? index,
     NovelStats? stats,
     List<int>? selectedChapters,
@@ -52,7 +53,7 @@ class NovelJob {
   }) =>
       NovelJob(
         id: id,
-        config: config,
+        config: config ?? this.config,
         createdAt: createdAt,
         updatedAt: DateTime.now().millisecondsSinceEpoch,
         index: index ?? this.index,
@@ -117,6 +118,7 @@ class NovelJobSummary {
     required this.totalBlocks,
     required this.finished,
     required this.hasResult,
+    this.failedBlocks = 0,
   });
 
   final String id;
@@ -127,7 +129,12 @@ class NovelJobSummary {
   final bool finished;
   final bool hasResult;
 
+  /// 抽取失败的块数（重试入口的依据）。
+  final int failedBlocks;
+
   bool get resumable => !finished && totalBlocks > 0;
+
+  bool get retryable => finished && failedBlocks > 0;
 }
 
 class NovelJobStore {
@@ -260,6 +267,7 @@ class NovelJobStore {
           totalBlocks: job.totalBlocks,
           finished: job.finished,
           hasResult: await _resultFile(id).exists(),
+          failedBlocks: job.failedBlocks.length,
         ));
       }
       out.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -271,6 +279,15 @@ class NovelJobStore {
     if (!available) return;
     try {
       final dir = jobDir(id);
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } catch (_) {}
+  }
+
+  /// 清掉某任务已缓存的块（编码/切章参数变化后旧块坐标失效时用）。
+  Future<void> clearBlocks(String id) async {
+    if (!available) return;
+    try {
+      final dir = _blocksDir(id);
       if (await dir.exists()) await dir.delete(recursive: true);
     } catch (_) {}
   }

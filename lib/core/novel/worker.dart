@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
 
 import '../models.dart';
@@ -88,6 +89,8 @@ Future<void> novelWorkerMain(Map<String, dynamic> message) async {
       sendPort.send({'type': 'error', 'message': e.toString()});
     }
   } finally {
+    // 任何退出路径（成功/取消/出错）都清掉 docx/pdf 的临时 txt。
+    await runner.cleanupTemp();
     control.close();
   }
 }
@@ -130,7 +133,19 @@ class _WorkerRun {
   int _extractStartMs = 0;
   int _extractDoneAtStart = 0;
 
+  /// docx/pdf 转出的临时 txt 路径（txt 原文件为 null）。任务结束要清理。
+  String? _tempTextPath;
+
+  /// 预算是否已烧完（烧完后停止抽取，用已有块成稿）。
+  bool _budgetExhausted = false;
+
   bool get shouldStop => cancelled;
+
+  /// 当前总 token 消耗（真实值优先，估算兜底）。
+  int get usedTokens => tokensUsed + generator.tokensUsed;
+
+  bool get overBudget =>
+      config.tokenBudget > 0 && usedTokens >= config.tokenBudget;
 
   void log(String line) {
     logs.add(line);
@@ -198,7 +213,11 @@ class _WorkerRun {
     setPhase(GenPhase.indexing);
     currentLabel = '准备文本…';
     emit(force: true);
+    // docx/pdf 每次都会转出新的临时 txt：先把旧的任务级临时目录扫掉，
+    // 避免长期使用后越积越多（单任务串行，不会误删正在用的目录）。
+    await sweepTempExtracts();
     final textPath = await NovelTextStream.prepareTextFile(config.filePath);
+    _tempTextPath = textPath == config.filePath ? null : textPath;
 
     ChapterIndex? index = job.index;
     if (index != null) {
@@ -208,8 +227,20 @@ class _WorkerRun {
     }
     if (index == null) {
       log('开始读取并切章：${config.fileName}');
+      // 手动指定的编码优先于自动探测（短 GBK 文件的兜底）。
+      NovelEncoding? encOverride;
+      final encName = config.encodingOverride.trim();
+      if (encName.isNotEmpty) {
+        for (final e in NovelEncoding.values) {
+          if (e.name == encName) {
+            encOverride = e;
+            break;
+          }
+        }
+      }
       index = await NovelTextStream.buildIndex(
         textPath,
+        encoding: encOverride,
         onProgress: (done, total) {
           phaseFraction = total == 0 ? 0 : done / total;
           currentLabel = '读取中 ${(phaseFraction * 100).toStringAsFixed(0)}%';
@@ -328,6 +359,11 @@ class _WorkerRun {
 
     await _pool(pending, config.concurrency.clamp(1, 4), (plan) async {
       await waitIfPaused();
+      // 预算闸门：烧完就不再发新请求，用已有块直接成稿。
+      if (overBudget) {
+        _budgetExhausted = true;
+        return;
+      }
       currentLabel = plan.chapterTitle.isEmpty
           ? '第${plan.chapterIndex + 1}章'
           : plan.chapterTitle;
@@ -366,10 +402,14 @@ class _WorkerRun {
     });
 
     if (cancelled) throw const NovelStoppedException();
+    if (_budgetExhausted) {
+      log('已达 token 预算（${_compactTokens(usedTokens)}/${_compactTokens(config.tokenBudget)}），'
+          '用已完成的 $doneBlocks 块继续成稿');
+    }
     if (done.isEmpty) {
       throw Exception('所有块都抽取失败，请检查 API 配置或网络后重试');
     }
-    tokensUsed += generator.tokensUsed;
+    tokensUsed = usedTokens;
     job = job.copyWith(tokensUsed: tokensUsed, failedBlocks: failedIds);
     await store.saveJob(job);
 
@@ -381,9 +421,45 @@ class _WorkerRun {
         .map((b) => done[b.id])
         .whereType<BlockExtraction>()
         .toList();
-    final characters = NovelGenerator.mergeCharacters(ordered);
+    var characters = NovelGenerator.mergeCharacters(ordered);
     final lore = NovelGenerator.mergeLore(ordered);
-    log('归并后：${characters.length} 个人物 · ${lore.length} 条设定');
+    log('本地归并：${characters.length} 个人物 · ${lore.length} 条设定');
+
+    // L2.5 人物消歧：让模型把「姓名/称谓/别名」指同一个人的条目合并。
+    // 失败时保守地保持原样（宁可重复也不合并错人）。
+    if (characters.length >= 2) {
+      await waitIfPaused();
+      currentLabel = 'AI 人物消歧';
+      phaseFraction = .6;
+      emit(force: true);
+      final before = characters.length;
+      try {
+        characters = await generator.resolveCharacterAliases(
+          characters,
+          shouldStop: () => shouldStop,
+        );
+        if (characters.length != before) {
+          log('消歧合并：$before → ${characters.length} 个人物');
+        }
+      } on NovelStoppedException {
+        rethrow;
+      } catch (e) {
+        log('· 消歧失败（保持本地归并结果）：$e');
+      }
+      characters.sort((a, b) => b.mentions.compareTo(a.mentions));
+    }
+
+    // 剧情梗概：块级 summary 按章节顺序串成一条线，喂给成稿阶段，
+    // 让开场白/性格贴合人物经历而不是只有静态设定。
+    final plotParts = ordered
+        .where((b) => b.summary.trim().isNotEmpty)
+        .map((b) => b.summary.trim())
+        .toList();
+    var plotSummary = plotParts.join('\n');
+    if (plotSummary.length > 1600) plotSummary = plotSummary.substring(0, 1600);
+    log('剧情梗概 ${plotParts.length} 段'
+        '${plotParts.isEmpty ? '' : '（${plotSummary.length} 字）'}');
+
     final worldSummary = lore
         .take(12)
         .map((l) => '${l.topic}：${l.content}')
@@ -406,6 +482,7 @@ class _WorkerRun {
       final card = await generator.composeCard(
         character: targets[i],
         worldSummary: worldSummary,
+        plotSummary: plotSummary,
         extraInstruction: config.extraInstruction,
         avatarPath: avatar,
         shouldStop: () => shouldStop,
@@ -431,7 +508,7 @@ class _WorkerRun {
       bookName: bookName,
       cards: cards,
       lore: entries,
-      tokensUsed: tokensUsed + generator.tokensUsed,
+      tokensUsed: usedTokens,
       failedBlocks: failedIds,
       scannedBlocks: done.length,
       totalBlocks: totalBlocks,
@@ -445,6 +522,40 @@ class _WorkerRun {
     currentLabel = '完成';
     emit(force: true);
     sendPort.send({'type': 'result', 'result': result.toJson()});
+    await cleanupTemp();
+  }
+
+  /// 清理 docx/pdf 转出的临时 txt 目录（幂等，失败不影响主流程）。
+  Future<void> cleanupTemp() async {
+    final temp = _tempTextPath;
+    _tempTextPath = null;
+    if (temp == null) return;
+    try {
+      final dir = File(temp).parent;
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } catch (_) {}
+  }
+
+  /// 扫掉历史遗留的 novel_extract_* 临时目录（当前任务的新目录还没建，全清）。
+  Future<void> sweepTempExtracts() async {
+    try {
+      final tmp = Directory.systemTemp;
+      if (!await tmp.exists()) return;
+      await for (final entity in tmp.list()) {
+        if (entity is! Directory) continue;
+        final name = entity.uri.pathSegments.where((s) => s.isNotEmpty).last;
+        if (!name.startsWith('novel_extract_')) continue;
+        try {
+          await entity.delete(recursive: true);
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  static String _compactTokens(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(0)}k';
+    return '$n';
   }
 
   /// 有限并发池：单 isolate 内 `i++` 不会被打断，安全。

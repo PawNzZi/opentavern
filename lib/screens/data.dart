@@ -149,7 +149,8 @@ class DataPage extends StatelessWidget {
     try {
       for (var i = 0; i < characters.length; i++) {
         final character = characters[i];
-        final bytes = await buildCharacterCardPng(character);
+        final book = AppStore.instance.lorebookForCharacter(character);
+        final bytes = await buildCharacterCardPng(character, book: book);
         final safe = character.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
         archive.addFile(ArchiveFile('$safe.png', bytes.length, bytes));
         progress.value = i + 1;

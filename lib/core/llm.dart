@@ -18,9 +18,16 @@ class LLMException implements Exception {
 /// Direct client-side model access. The app is single-user and local-only, so
 /// the API key never leaves the device except in the request to the provider.
 class LLMClient {
+  /// [onUsage]：服务商返回真实 token 用量时回调（OpenAI 的 usage 字段、
+  /// Claude 的 message_start/message_delta、Gemini 的 usageMetadata）。
+  /// 并非所有兼容网关都支持，调用方需要保留本地估算兜底。
+  /// [shouldAbort]：流式传输中轮询，返回 true 时立即停止消费并关闭连接
+  /// （真正的请求级取消，而不是只在块之间检查）。
   Stream<String> stream({
     required AppSettings settings,
     required List<Map<String, dynamic>> messages,
+    void Function(int inputTokens, int outputTokens)? onUsage,
+    bool Function()? shouldAbort,
   }) async* {
     final api = settings.api;
     if (api.baseUrl.trim().isEmpty || api.model.trim().isEmpty) {
@@ -29,12 +36,15 @@ class LLMClient {
     Stream<String> source;
     switch (api.provider) {
       case 'anthropic':
-        source = _anthropic(api, messages);
+        source = _anthropic(api, messages,
+            onUsage: onUsage, shouldAbort: shouldAbort);
       case 'gemini':
-        source = _gemini(api, messages);
+        source = _gemini(api, messages,
+            onUsage: onUsage, shouldAbort: shouldAbort);
       default:
         // openai / deepseek / openrouter / suixiang / custom 都走 OpenAI 兼容协议。
-        source = _openAI(api, messages);
+        source = _openAI(api, messages,
+            onUsage: onUsage, shouldAbort: shouldAbort);
     }
     if (api.streaming) {
       yield* source;
@@ -159,8 +169,10 @@ class LLMClient {
 
   Stream<String> _openAI(
     APISettings api,
-    List<Map<String, dynamic>> messages,
-  ) async* {
+    List<Map<String, dynamic>> messages, {
+    void Function(int inputTokens, int outputTokens)? onUsage,
+    bool Function()? shouldAbort,
+  }) async* {
     final client = http.Client();
     try {
       final base = _trim(api.baseUrl);
@@ -185,8 +197,13 @@ class LLMClient {
           'temperature': api.temperature,
           'max_tokens': api.maxTokens,
           'stream': true,
+          // 只要调用方要真实用量才加：部分自建网关不认识该字段会 400。
+          if (onUsage != null)
+            'stream_options': {'include_usage': true},
         });
+      if (shouldAbort != null && shouldAbort()) return;
       final response = await client.send(request);
+      if (shouldAbort != null && shouldAbort()) return;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final body = await response.stream.bytesToString();
         throw LLMException(
@@ -197,11 +214,19 @@ class LLMClient {
       await for (final line in response.stream
           .transform(utf8.decoder)
           .transform(const LineSplitter())) {
+        if (shouldAbort != null && shouldAbort()) return;
         final trimmed = line.trim();
         if (!trimmed.startsWith('data:')) continue;
         final data = trimmed.substring(5).trim();
         if (data == '[DONE]') break;
         final decoded = _tryJson(data);
+        // usage 只出现在最后一块（choices 为空），必须放在 choices 检查之前。
+        final usage = decoded?['usage'];
+        if (usage is Map && onUsage != null) {
+          final input = (usage['prompt_tokens'] as num?)?.toInt() ?? 0;
+          final output = (usage['completion_tokens'] as num?)?.toInt() ?? 0;
+          if (input > 0 || output > 0) onUsage(input, output);
+        }
         final choices = decoded?['choices'];
         if (choices is! List || choices.isEmpty) continue;
         final delta = choices.first['delta'];
@@ -215,8 +240,10 @@ class LLMClient {
 
   Stream<String> _anthropic(
     APISettings api,
-    List<Map<String, dynamic>> messages,
-  ) async* {
+    List<Map<String, dynamic>> messages, {
+    void Function(int inputTokens, int outputTokens)? onUsage,
+    bool Function()? shouldAbort,
+  }) async* {
     if (api.apiKey.trim().isEmpty) {
       throw LLMException('Claude 需要在设置中填写 API Key');
     }
@@ -252,7 +279,9 @@ class LLMClient {
           'messages': bodyMessages,
           'stream': true,
         });
+      if (shouldAbort != null && shouldAbort()) return;
       final response = await client.send(request);
+      if (shouldAbort != null && shouldAbort()) return;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final body = await response.stream.bytesToString();
         throw LLMException(
@@ -260,18 +289,37 @@ class LLMClient {
           statusCode: response.statusCode,
         );
       }
+      var inputTokens = 0;
+      var outputTokens = 0;
       await for (final line in response.stream
           .transform(utf8.decoder)
           .transform(const LineSplitter())) {
+        if (shouldAbort != null && shouldAbort()) return;
         final trimmed = line.trim();
         if (!trimmed.startsWith('data:')) continue;
         final decoded = _tryJson(trimmed.substring(5).trim());
         if (decoded == null) continue;
-        if (decoded['type'] == 'content_block_delta') {
+        final type = decoded['type'];
+        if (type == 'message_start') {
+          final message = decoded['message'];
+          final usage = message is Map ? message['usage'] : null;
+          if (usage is Map) {
+            inputTokens = (usage['input_tokens'] as num?)?.toInt() ?? 0;
+          }
+        } else if (type == 'message_delta') {
+          final usage = decoded['usage'];
+          if (usage is Map) {
+            final out = (usage['output_tokens'] as num?)?.toInt() ?? 0;
+            if (out > 0) outputTokens = out;
+          }
+        } else if (type == 'content_block_delta') {
           final delta = decoded['delta'];
           final text = delta is Map ? delta['text'] : null;
           if (text is String && text.isNotEmpty) yield text;
         }
+      }
+      if (onUsage != null && (inputTokens > 0 || outputTokens > 0)) {
+        onUsage(inputTokens, outputTokens);
       }
     } finally {
       client.close();
@@ -280,8 +328,10 @@ class LLMClient {
 
   Stream<String> _gemini(
     APISettings api,
-    List<Map<String, dynamic>> messages,
-  ) async* {
+    List<Map<String, dynamic>> messages, {
+    void Function(int inputTokens, int outputTokens)? onUsage,
+    bool Function()? shouldAbort,
+  }) async* {
     if (api.apiKey.trim().isEmpty) {
       throw LLMException('Gemini 需要在设置中填写 API Key');
     }
@@ -319,7 +369,9 @@ class LLMClient {
             'maxOutputTokens': api.maxTokens,
           },
         });
+      if (shouldAbort != null && shouldAbort()) return;
       final response = await client.send(request);
+      if (shouldAbort != null && shouldAbort()) return;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final body = await response.stream.bytesToString();
         throw LLMException(
@@ -327,13 +379,23 @@ class LLMClient {
           statusCode: response.statusCode,
         );
       }
+      var inputTokens = 0;
+      var outputTokens = 0;
       await for (final line in response.stream
           .transform(utf8.decoder)
           .transform(const LineSplitter())) {
+        if (shouldAbort != null && shouldAbort()) return;
         final trimmed = line.trim();
         if (!trimmed.startsWith('data:')) continue;
         final decoded = _tryJson(trimmed.substring(5).trim());
         if (decoded == null) continue;
+        final usage = decoded['usageMetadata'];
+        if (usage is Map) {
+          final inTok = (usage['promptTokenCount'] as num?)?.toInt() ?? 0;
+          final outTok = (usage['candidatesTokenCount'] as num?)?.toInt() ?? 0;
+          if (inTok > 0) inputTokens = inTok;
+          if (outTok > 0) outputTokens = outTok;
+        }
         final candidates = decoded['candidates'];
         if (candidates is! List || candidates.isEmpty) continue;
         final content = candidates.first['content'];
@@ -344,6 +406,9 @@ class LLMClient {
             if (text is String && text.isNotEmpty) yield text;
           }
         }
+      }
+      if (onUsage != null && (inputTokens > 0 || outputTokens > 0)) {
+        onUsage(inputTokens, outputTokens);
       }
     } finally {
       client.close();

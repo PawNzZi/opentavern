@@ -444,7 +444,8 @@ class _CharacterScreenState extends State<CharacterScreen> {
     BuildContext context,
     DemoCharacter character,
   ) async {
-    final bytes = await buildCharacterCardPng(character);
+    final book = AppStore.instance.lorebookForCharacter(character);
+    final bytes = await buildCharacterCardPng(character, book: book);
     final uri = await FilePickerPlatform.instance.saveFile(
       fileName: '${character.name}.png',
       bytes: bytes,
@@ -452,7 +453,14 @@ class _CharacterScreenState extends State<CharacterScreen> {
       dialogTitle: '导出角色卡 PNG',
     );
     if (!context.mounted) return;
-    showTavernToast(context, uri == null ? '已取消导出' : 'PNG 角色卡已导出');
+    showTavernToast(
+      context,
+      uri == null
+          ? '已取消导出'
+          : book == null
+              ? 'PNG 角色卡已导出'
+              : 'PNG 角色卡已导出（含世界书 ${book.entries.length} 条）',
+    );
   }
 
   Future<void> _exportCharacterMenu(

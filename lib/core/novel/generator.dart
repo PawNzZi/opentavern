@@ -111,8 +111,17 @@ class NovelGenerator {
   final LLMClient _client;
   final AppSettings _settings;
 
-  /// 累计消耗 tokens（估算值，用于进度面板显示）。
-  int tokensUsed = 0;
+  /// 服务商真实上报的 token 用量（provider 支持时才有）。
+  int _realTokens = 0;
+
+  /// 服务商不报 usage 时的本地估算量。
+  int _estTokens = 0;
+
+  /// 该网关是否支持 usage 字段（遇到 400 就自动关掉，不影响生成）。
+  bool _usageSupported = true;
+
+  /// 累计消耗 tokens：真实值优先，缺失的调用用估算兜底。
+  int get tokensUsed => _realTokens + _estTokens;
 
   AppSettings get settings => _settings;
 
@@ -253,19 +262,118 @@ class NovelGenerator {
     return out;
   }
 
+  // ---------------------------------------------------------------- L2.5
+
+  /// LLM 人物消歧：本地规则只能合并「名字/别名完全重合」的条目，
+  /// 「秦芷柔 / 芷柔 / 小姨子」这类不同形的称谓要靠模型分组。
+  ///
+  /// 输入按戏份排序的人物候选，输出合并后的列表。失败/结果不可信时
+  /// 原样返回输入（宁可保守也不合并错人）。
+  Future<List<MergedCharacter>> resolveCharacterAliases(
+    List<MergedCharacter> merged, {
+    int maxCandidates = 30,
+    bool Function()? shouldStop,
+  }) async {
+    if (merged.length < 2) return merged;
+    final candidates = merged.take(maxCandidates).toList();
+    final listing = StringBuffer();
+    for (var i = 0; i < candidates.length; i++) {
+      final c = candidates[i];
+      listing.writeln('$i. ${c.name}'
+          '${c.aliases.isEmpty ? '' : '（别名：${c.aliases.take(6).join('、')}）'}'
+          ' — 出场 $c.mentions 块');
+    }
+
+    try {
+      final json = await _callJson([
+        {
+          'role': 'system',
+          'content': '你是小说人物消歧器。只输出 JSON。\n'
+              '下面是同一部小说里抽出的不同人物名/称谓。把指代**同一个人**的'
+              '编号分到同一组；不同的人绝不能合并；拿不准的保持单独一组。\n'
+              '判断依据：称谓关系（如「小姨子」对「姓名」）、别名简称、'
+              '同一上下文互换出现。输出格式：{"groups":[[0,3],[1],[2,5,6]]}，'
+              '每个编号恰好出现一次，覆盖 0 到 ${candidates.length - 1}。',
+        },
+        {'role': 'user', 'content': listing.toString()},
+      ], shouldStop: shouldStop);
+
+      // 校验分组：编号必须唯一且在范围内，否则视为不可信。
+      final groupsRaw = json['groups'];
+      if (groupsRaw is! List) return merged;
+      final seen = <int>{};
+      final groups = <List<int>>[];
+      for (final raw in groupsRaw) {
+        if (raw is! List) return merged;
+        final group = <int>[];
+        for (final v in raw) {
+          final idx = v is num ? v.toInt() : int.tryParse('$v');
+          if (idx == null || idx < 0 || idx >= candidates.length) {
+            return merged;
+          }
+          if (seen.contains(idx)) return merged;
+          seen.add(idx);
+          group.add(idx);
+        }
+        groups.add(group);
+      }
+      if (seen.length != candidates.length) return merged;
+      // 没有任何多成员组 = 不改变结果，直接返回。
+      if (!groups.any((g) => g.length > 1)) return merged;
+
+      MergedCharacter merge(List<MergedCharacter> members) {
+        final ordered = [...members]
+          ..sort((a, b) => b.mentions.compareTo(a.mentions));
+        final canonical = ordered.first;
+        final out = MergedCharacter(
+          name: canonical.name,
+          aliases: {...canonical.aliases},
+          mentions: members.fold<int>(0, (a, m) => a + m.mentions),
+          appearance: [...canonical.appearance],
+          personality: [...canonical.personality],
+          relationship: [...canonical.relationship],
+          speechStyle: [...canonical.speechStyle],
+          role: canonical.role,
+        );
+        for (final m in ordered.skip(1)) {
+          out.aliases.addAll(m.aliases);
+          if (!out.aliases.contains(m.name)) out.aliases.add(m.name);
+          out.appearance.addAll(m.appearance);
+          out.personality.addAll(m.personality);
+          out.relationship.addAll(m.relationship);
+          out.speechStyle.addAll(m.speechStyle);
+          if (out.role.isEmpty) out.role = m.role;
+        }
+        out.aliases.remove(out.name);
+        return out;
+      }
+
+      final out = <MergedCharacter>[
+        for (final g in groups)
+          if (g.length == 1) candidates[g.first] else merge([for (final i in g) candidates[i]]),
+      ];
+      // 未进候选列表的尾部人物原样保留。
+      out.addAll(merged.skip(maxCandidates));
+      return out;
+    } catch (_) {
+      return merged;
+    }
+  }
+
   // ---------------------------------------------------------------- L3
 
   /// 成稿一张角色卡。LLM 失败时用归并档案本地兜底，保证用户总能拿到结果。
   Future<DraftCard> composeCard({
     required MergedCharacter character,
     required String worldSummary,
+    String plotSummary = '',
     String extraInstruction = '',
     String avatarPath = '',
     bool Function()? shouldStop,
   }) async {
     final prompt = StringBuffer()
       ..writeln('你是 SillyTavern 角色卡作者。只输出 JSON，不要解释。')
-      ..writeln('根据人物档案与世界观，写一张可直接用于角色扮演的中文角色卡。')
+      ..writeln('根据人物档案、世界观与剧情梗概，写一张可直接用于角色扮演的中文角色卡。')
       ..writeln('字段：name, description(角色设定,400-800字), personality(性格,150字内), '
           'scenario(场景,100字内), first_mes(开场白,300-600字,带动作与心理描写), '
           'mes_example(对话示例,用 <START> 分隔,2-3 组), '
@@ -273,6 +381,7 @@ class NovelGenerator {
           'system_prompt(可留空), tags(数组,3-5 个中文标签)。')
       ..writeln('要求：忠于原设定，不要新增无依据的设定；可用 {{user}} 指代用户、'
           '{{char}} 指代角色；开场白用第二人称视角把 {{user}} 带入场景；'
+          '剧情梗概只用来把握人物经历与语气，不要把整段剧情复述进卡片；'
           '不要输出状态栏/变量脚本。')
       ..writeln('输出格式：{"name":"...","description":"...","personality":"...",'
           '"scenario":"...","first_mes":"...","mes_example":"...",'
@@ -286,7 +395,8 @@ class NovelGenerator {
       {
         'role': 'user',
         'content': '【人物档案】\n${character.profileText}\n\n'
-            '【世界观摘要】\n${worldSummary.isEmpty ? '（无）' : worldSummary}',
+            '【世界观摘要】\n${worldSummary.isEmpty ? '（无）' : worldSummary}'
+            '${plotSummary.trim().isEmpty ? '' : '\n\n【剧情梗概】\n${plotSummary.trim()}'}',
       },
     ];
 
@@ -410,42 +520,68 @@ class NovelGenerator {
   // ------------------------------------------------------------- 内部
 
   /// 调一次模型并解析 JSON。带指数退避重试（429/5xx/网络抖动）。
+  ///
+  /// 支持真实用量回传（网关不认识 stream_options 报 400 时自动降级为纯估算，
+  /// 不烧重试次数）；`shouldStop` 同时作为请求级中止信号传给底层 HTTP 客户端。
   Future<Map<String, dynamic>> _callJson(
     List<Map<String, dynamic>> messages, {
     bool Function()? shouldStop,
     int attempts = 3,
   }) async {
     Object? lastError;
-    for (var i = 0; i < attempts; i++) {
+    var failures = 0;
+    while (failures < attempts) {
       if (shouldStop != null && shouldStop()) {
         throw const NovelStoppedException();
       }
+      final wantUsage = _usageSupported;
       try {
         final buffer = StringBuffer();
+        var usageReported = false;
         await for (final chunk in _client.stream(
           settings: _settings,
           messages: messages,
+          onUsage: wantUsage
+              ? (input, output) {
+                  usageReported = true;
+                  _realTokens += input + output;
+                }
+              : null,
+          shouldAbort: shouldStop,
         )) {
           if (shouldStop != null && shouldStop()) {
             throw const NovelStoppedException();
           }
           buffer.write(chunk);
         }
+        if (shouldStop != null && shouldStop()) {
+          throw const NovelStoppedException();
+        }
         final text = buffer.toString();
-        tokensUsed += estimateNovelTokens(text) +
-            messages.fold<int>(
-              0,
-              (a, m) => a + estimateNovelTokens((m['content'] ?? '').toString()),
-            );
+        if (!usageReported) {
+          // 网关没报 usage 的调用：本地估算兜底。
+          _estTokens += estimateNovelTokens(text) +
+              messages.fold<int>(
+                0,
+                (a, m) =>
+                    a + estimateNovelTokens((m['content'] ?? '').toString()),
+              );
+        }
         final parsed = parseLooseJson(text);
         if (parsed == null) throw LLMException('模型没有返回可解析的 JSON');
         return parsed;
       } catch (e) {
         if (e is NovelStoppedException) rethrow;
+        // 有些自建网关不认识 stream_options 字段会直接 400：关掉再试，不计失败。
+        if (wantUsage && e is LLMException && e.statusCode == 400) {
+          _usageSupported = false;
+          continue;
+        }
         lastError = e;
-        if (i < attempts - 1) {
+        failures++;
+        if (failures < attempts) {
           // 指数退避：1s / 2s / 4s，避开 429 限流。
-          await Future<void>.delayed(Duration(seconds: 1 << i));
+          await Future<void>.delayed(Duration(seconds: 1 << (failures - 1)));
         }
       }
     }

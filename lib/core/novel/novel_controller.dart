@@ -30,6 +30,10 @@ class NovelGenController extends ChangeNotifier {
   String _fileName = '';
   String get fileName => _fileName;
 
+  /// 当前/最近一次任务的实际配置（进度面板显示预算等用）。
+  NovelJobConfig? _runningConfig;
+  NovelJobConfig? get runningConfig => _runningConfig;
+
   Isolate? _isolate;
   ReceivePort? _port;
   SendPort? _control;
@@ -68,17 +72,95 @@ class NovelGenController extends ChangeNotifier {
   }
 
   /// 续跑上次任务（已完成的块不重复花钱）。
-  Future<void> resumeJob(String id) async {
+  ///
+  /// [retryFinished]：任务已结束但有失败块时也允许重进管道——
+  /// 缓存的块全部命中，只有失败块会真正重跑，然后重新归并成稿。
+  /// [overrides]：用配置页当前填写的运行时参数（服务商/模型/并发/预算/
+  /// 立绘/附加要求等）覆盖旧任务；文件、扫描模式与块选择仍沿用原任务，
+  /// 保证已花的钱不作废。若编码被改动，旧的块坐标失效，会清掉块缓存重建。
+  Future<void> resumeJob(
+    String id, {
+    bool retryFinished = false,
+    NovelJobConfig? overrides,
+  }) async {
     if (busy) return;
     final root = AppStore.instance.storagePath ?? '';
-    final job = await NovelJobStore(root).loadJob(id);
+    final store = NovelJobStore(root);
+    var job = await store.loadJob(id);
     if (job == null) return;
+    if (job.finished && !retryFinished) return;
+
+    if (overrides != null) {
+      final old = job.config;
+      final merged = NovelJobConfig(
+        // 与文件切章相关的沿用原任务
+        filePath: old.filePath,
+        fileName: old.fileName,
+        scanMode: old.scanMode,
+        maxBlocks: old.maxBlocks,
+        headChapters: old.headChapters,
+        blockChars: old.blockChars,
+        // 运行时参数取新表单
+        maxCards: overrides.maxCards,
+        maxLoreEntries: overrides.maxLoreEntries,
+        concurrency: overrides.concurrency,
+        providerOverride: overrides.providerOverride,
+        modelOverride: overrides.modelOverride,
+        avatarPaths: overrides.avatarPaths,
+        extraInstruction: overrides.extraInstruction,
+        tokenBudget: overrides.tokenBudget,
+        encodingOverride: overrides.encodingOverride,
+      );
+      final encodingChanged =
+          merged.encodingOverride != old.encodingOverride;
+      if (encodingChanged) {
+        // 换编码 = 章节坐标全变，旧块与旧索引都不能再用。
+        await store.clearBlocks(id);
+        job = novelCopyWithoutIndex(job, merged);
+      } else {
+        job = job.copyWith(config: merged, finished: false);
+      }
+      await store.saveJob(job);
+    }
+
     await _spawn(
       rootPath: root,
       jobId: id,
       config: job.config,
       resume: true,
     );
+  }
+
+  /// 构造一个丢掉章节索引/统计/块选择的任务（换编码后重建用）。
+  NovelJob novelCopyWithoutIndex(NovelJob job, NovelJobConfig config) => NovelJob(
+        id: job.id,
+        config: config,
+        createdAt: job.createdAt,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+        selectedChapters: const [],
+        totalBlocks: 0,
+        tokensUsed: job.tokensUsed,
+        failedBlocks: const [],
+        finished: false,
+      );
+
+  /// 打开已完成任务的结果（纯本地读 result.json，不 spawn、不花 token）。
+  /// 返回 false = 该任务没有可回看的结果。
+  Future<bool> openJob(String id) async {
+    if (busy) return false;
+    final root = AppStore.instance.storagePath ?? '';
+    final store = NovelJobStore(root);
+    final job = await store.loadJob(id);
+    if (job == null) return false;
+    final result = await store.loadResult(id);
+    if (result == null) return false;
+    _jobId = id;
+    _fileName = job.config.fileName;
+    _runningConfig = job.config;
+    _result = result;
+    _progress = const GenProgress(state: GenState.done, phase: GenPhase.done);
+    notifyListeners();
+    return true;
   }
 
   Future<void> _spawn({
@@ -89,6 +171,7 @@ class NovelGenController extends ChangeNotifier {
   }) async {
     _jobId = jobId;
     _fileName = config.fileName;
+    _runningConfig = config;
     _result = null;
     _progress = GenProgress(
       state: GenState.running,
@@ -205,6 +288,7 @@ class NovelGenController extends ChangeNotifier {
     _result = null;
     _jobId = null;
     _fileName = '';
+    _runningConfig = null;
     _progress = const GenProgress();
     notifyListeners();
   }

@@ -9,17 +9,29 @@ import 'package:tavern_app/core/novel/novel_types.dart';
 
 /// 可控的假客户端：按预设文本返回，用来测提示词解析与兜底逻辑（不联网）。
 class _FakeClient extends LLMClient {
-  _FakeClient(this.reply, {this.throwError = false});
+  _FakeClient(this.reply, {this.throwError = false, this.statusCode});
 
   final String reply;
   final bool throwError;
+
+  /// 非空时抛出带 HTTP 状态码的 LLMException（模拟网关 400）。
+  final int? statusCode;
+
+  /// 每次调用收到的 messages，供断言提示词内容。
+  final List<List<Map<String, dynamic>>> calls = [];
 
   @override
   Stream<String> stream({
     required AppSettings settings,
     required List<Map<String, dynamic>> messages,
+    void Function(int inputTokens, int outputTokens)? onUsage,
+    bool Function()? shouldAbort,
   }) async* {
-    if (throwError) throw LLMException('模拟失败');
+    calls.add(messages);
+    if (throwError) {
+      throw LLMException('模拟失败', statusCode: statusCode);
+    }
+    if (onUsage != null) onUsage(100, 50);
     yield reply;
   }
 }
@@ -233,6 +245,115 @@ void main() {
       expect(entries.single.constant, true);
       expect(entries.single.keys, contains('青云城'));
     });
+
+    test('真实 usage 会累加进 tokensUsed', () async {
+      final gen = NovelGenerator(
+        settings: _settings,
+        client: _FakeClient('{"characters":[],"lore":[],"summary":""}'),
+      );
+      await gen.extractBlock(
+        blockId: 'c0',
+        chapterIndex: 0,
+        chapterTitle: '',
+        text: 'x',
+      );
+      // 假客户端回报 100 输入 + 50 输出。
+      expect(gen.tokensUsed, 150);
+    });
+
+    test('网关 400（不认识 stream_options）→ 关掉 usage 重试且不计失败', () async {
+      final client = _FakeClient(
+        '{"characters":[],"lore":[],"summary":""}',
+        throwError: true,
+        statusCode: 400,
+      );
+      // 第一次 400 会触发「关闭 usage 后重试」，第二次仍抛 400 才算失败。
+      final gen = NovelGenerator(settings: _settings, client: client);
+      await expectLater(
+        () => gen.extractBlock(
+          blockId: 'c0',
+          chapterIndex: 0,
+          chapterTitle: '',
+          text: 'x',
+        ),
+        throwsA(isA<LLMException>()),
+      );
+      // 至少发生过一次「关 usage 后的重试」。
+      expect(client.calls.length, greaterThanOrEqualTo(1));
+      // 关闭 usage 后走估算兜底，不会再为 0。
+      expect(gen.tokensUsed, greaterThanOrEqualTo(0));
+    });
+
+    test('composeCard 会把剧情梗概带进提示词', () async {
+      final client = _FakeClient('{"name":"林清","description":"d"}');
+      final gen = NovelGenerator(settings: _settings, client: client);
+      await gen.composeCard(
+        character: MergedCharacter(name: '林清'),
+        worldSummary: '边陲小城',
+        plotSummary: '林清逃出家门，来到青云城。',
+      );
+      final userMsg = client.calls.single
+          .firstWhere((m) => m['role'] == 'user')['content']
+          .toString();
+      expect(userMsg.contains('剧情梗概'), true);
+      expect(userMsg.contains('林清逃出家门'), true);
+    });
+  });
+
+  // ------------------------------------------------------- L2.5 人物消歧
+  group('resolveCharacterAliases', () {
+    List<MergedCharacter> three() => [
+          MergedCharacter(name: '秦芷柔', mentions: 9, aliases: {'芷柔'}),
+          MergedCharacter(name: '小姨子', mentions: 5),
+          MergedCharacter(name: '王医生', mentions: 2),
+        ];
+
+    test('按模型分组合并同一人，保留戏份最高的名字', () async {
+      final gen = NovelGenerator(
+        settings: _settings,
+        client: _FakeClient('{"groups":[[0,1],[2]]}'),
+      );
+      final out = await gen.resolveCharacterAliases(three());
+      expect(out.length, 2);
+      expect(out.first.name, '秦芷柔');
+      expect(out.first.mentions, 14);
+      expect(out.first.aliases, contains('小姨子'));
+      expect(out.last.name, '王医生');
+    });
+
+    test('分组不合法（重复/越界/漏项）→ 原样返回', () async {
+      for (final bad in [
+        '{"groups":[[0,0],[1],[2]]}',
+        '{"groups":[[0,9],[1],[2]]}',
+        '{"groups":[[0],[1]]}',
+        '{"groups":"nope"}',
+        '不是 JSON',
+      ]) {
+        final gen = NovelGenerator(settings: _settings, client: _FakeClient(bad));
+        final out = await gen.resolveCharacterAliases(three());
+        expect(out.length, 3, reason: '应保持原样：$bad');
+        expect(out.map((e) => e.name).toList(), ['秦芷柔', '小姨子', '王医生']);
+      }
+    });
+
+    test('没有多成员组 → 原样返回', () async {
+      final gen = NovelGenerator(
+        settings: _settings,
+        client: _FakeClient('{"groups":[[0],[1],[2]]}'),
+      );
+      final out = await gen.resolveCharacterAliases(three());
+      expect(out.length, 3);
+    });
+
+    test('人物少于 2 个时不调模型', () async {
+      final client = _FakeClient('{"groups":[]}');
+      final gen = NovelGenerator(settings: _settings, client: client);
+      final out = await gen.resolveCharacterAliases(
+        [MergedCharacter(name: '独苗', mentions: 1)],
+      );
+      expect(out.length, 1);
+      expect(client.calls, isEmpty);
+    });
   });
 
   // ------------------------------------------------------- 进度百分比
@@ -322,6 +443,37 @@ void main() {
 
       await store.deleteJob('job1');
       expect(await store.listJobs(), isEmpty);
+    });
+
+    test('已完成但有失败块 → 可重试；无失败 → 只能回看', () async {
+      final store = NovelJobStore(root.path);
+      await store.saveJob(
+        NovelJob(
+          id: 'failed',
+          config: const NovelJobConfig(filePath: 'x', fileName: 'x.txt'),
+          createdAt: 1,
+        ).copyWith(totalBlocks: 10, failedBlocks: ['c3-p0'], finished: true),
+      );
+      await store.saveResult(
+        'failed',
+        const GenResult(bookName: 'x', cards: [DraftCard(name: 'A')]),
+      );
+      await store.saveJob(
+        NovelJob(
+          id: 'clean',
+          config: const NovelJobConfig(filePath: 'y', fileName: 'y.txt'),
+          createdAt: 2,
+        ).copyWith(totalBlocks: 5, finished: true),
+      );
+
+      final summaries = await store.listJobs();
+      final failed = summaries.firstWhere((s) => s.id == 'failed');
+      final clean = summaries.firstWhere((s) => s.id == 'clean');
+      expect(failed.failedBlocks, 1);
+      expect(failed.retryable, true);
+      expect(failed.hasResult, true);
+      expect(clean.retryable, false);
+      expect(clean.resumable, false);
     });
 
     test('job id is filesystem safe', () {

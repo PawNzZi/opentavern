@@ -187,6 +187,8 @@ class NovelJobConfig {
     this.modelOverride = '',
     this.avatarPaths = const [],
     this.extraInstruction = '',
+    this.tokenBudget = 0,
+    this.encodingOverride = '',
   });
 
   final String filePath;
@@ -217,6 +219,13 @@ class NovelJobConfig {
   /// 用户附加要求（例如「只生成女性角色」）。
   final String extraInstruction;
 
+  /// token 预算上限，0 = 不限。达到上限后停止抽取，用已有结果成稿。
+  final int tokenBudget;
+
+  /// 手动指定编码（[NovelEncoding].name），空 = 自动探测。
+  /// 极短中文 GBK 文件的自动探测是启发式，给用户一个确定性的兜底。
+  final String encodingOverride;
+
   NovelJobConfig copyWith({
     ScanMode? scanMode,
     int? maxBlocks,
@@ -229,6 +238,8 @@ class NovelJobConfig {
     String? modelOverride,
     List<String>? avatarPaths,
     String? extraInstruction,
+    int? tokenBudget,
+    String? encodingOverride,
   }) =>
       NovelJobConfig(
         filePath: filePath,
@@ -244,6 +255,8 @@ class NovelJobConfig {
         modelOverride: modelOverride ?? this.modelOverride,
         avatarPaths: avatarPaths ?? this.avatarPaths,
         extraInstruction: extraInstruction ?? this.extraInstruction,
+        tokenBudget: tokenBudget ?? this.tokenBudget,
+        encodingOverride: encodingOverride ?? this.encodingOverride,
       );
 
   Map<String, dynamic> toJson() => {
@@ -260,6 +273,8 @@ class NovelJobConfig {
         'modelOverride': modelOverride,
         'avatarPaths': avatarPaths,
         'extraInstruction': extraInstruction,
+        'tokenBudget': tokenBudget,
+        'encodingOverride': encodingOverride,
       };
 
   factory NovelJobConfig.fromJson(Map<String, dynamic> j) => NovelJobConfig(
@@ -282,6 +297,8 @@ class NovelJobConfig {
                 .toList() ??
             const [],
         extraInstruction: (j['extraInstruction'] ?? '').toString(),
+        tokenBudget: (j['tokenBudget'] as num?)?.toInt() ?? 0,
+        encodingOverride: (j['encodingOverride'] ?? '').toString(),
       );
 }
 

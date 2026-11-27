@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
+import '../core/novel/novel_controller.dart';
+import '../core/novel/novel_types.dart';
 import '../core/store.dart';
 import '../data/demo.dart';
 import '../design/glass.dart';
@@ -8,6 +10,7 @@ import '../design/scaffold.dart';
 import '../design/routes.dart';
 import '../design/theme.dart';
 import 'chat.dart';
+import 'novel_import.dart';
 import 'search.dart';
 
 /// Home dashboard: a "continue" card plus a small, curated preview of two
@@ -326,6 +329,8 @@ class _CharacterLibraryPageState extends State<CharacterLibraryPage> {
                     onTap: () => Navigator.maybePop(context),
                   ),
                   const Spacer(),
+                  _NovelGenCapsule(),
+                  const SizedBox(width: 8),
                   GlassCircleButton(
                     icon: Icons.add_rounded,
                     size: 40,
@@ -679,4 +684,70 @@ String _sessionTime(int millis) {
     return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
   return '${d.month}/${d.day}';
+}
+
+/// 角色库顶部的「生成中」胶囊：小说生成任务跑在后台 isolate 里，
+/// 用户离开向导后靠它回到进度页（否则任务还在跑却找不到入口）。
+class _NovelGenCapsule extends StatefulWidget {
+  @override
+  State<_NovelGenCapsule> createState() => _NovelGenCapsuleState();
+}
+
+class _NovelGenCapsuleState extends State<_NovelGenCapsule> {
+  final _gen = NovelGenController.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _gen.addListener(_onChange);
+  }
+
+  @override
+  void dispose() {
+    _gen.removeListener(_onChange);
+    super.dispose();
+  }
+
+  void _onChange() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_gen.busy) return const SizedBox.shrink();
+    final p = AppPalette.of(context);
+    final pr = _gen.progress;
+    final paused = pr.state == GenState.paused;
+    return Pressable(
+      onTap: () => openGlassPage(context, const NovelImportPage()),
+      child: Glass(
+        radius: 14,
+        blur: 18,
+        shadow: false,
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 13,
+              height: 13,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.8,
+                value: paused ? pr.percent / 100 : null,
+                color: p.amber,
+                backgroundColor: p.textTertiary.withValues(alpha: .2),
+              ),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              paused
+                  ? '已暂停 ${pr.percent.toStringAsFixed(0)}%'
+                  : '生成中 ${pr.percent.toStringAsFixed(0)}%',
+              style: appText(10.5, FontWeight.w600, p.amber),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
