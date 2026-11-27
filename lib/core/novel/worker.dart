@@ -521,8 +521,10 @@ class _WorkerRun {
     state = GenState.done;
     currentLabel = '完成';
     emit(force: true);
-    sendPort.send({'type': 'result', 'result': result.toJson()});
+    // 先清理临时文件，再通知主 isolate：主 isolate 收到 result 会立刻
+    // kill 本 isolate，放在 send 之后可能来不及清。
     await cleanupTemp();
+    sendPort.send({'type': 'result', 'result': result.toJson()});
   }
 
   /// 清理 docx/pdf 转出的临时 txt 目录（幂等，失败不影响主流程）。
