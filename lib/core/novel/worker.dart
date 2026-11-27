@@ -250,25 +250,35 @@ class _WorkerRun {
     await waitIfPaused();
 
     // ---------------------------------------------------- 3. 选块
+    // 注意：这里只记录「块的位置」，不持正文。几百 MB 走全书精读时，
+    // 若把所有块正文攒在内存里会直接 OOM；正文在抽取时按需读取。
+    setPhase(GenPhase.extracting);
     final selected = job.selectedChapters.isNotEmpty
         ? job.selectedChapters
         : NovelSampler.selectChapters(index, stats, config);
-    final blocks = <_BlockPlan>[];
-    for (final chapterIndex in selected) {
+    final plans = <_BlockPlan>[];
+    for (var s = 0; s < selected.length; s++) {
+      await waitIfPaused();
+      final chapterIndex = selected[s];
       if (chapterIndex < 0 || chapterIndex >= index.chapters.length) continue;
       final ch = index.chapters[chapterIndex];
+      // 逐章读一遍只为数出精确的块数，读完即丢，内存恒定。
       final text = await NovelTextStream.readChapter(textPath, index, ch);
       final pieces = NovelTextStream.splitBlocks(text, config.blockChars);
       for (var p = 0; p < pieces.length; p++) {
-        blocks.add(_BlockPlan(
+        if (pieces[p].trim().isEmpty) continue;
+        plans.add(_BlockPlan(
           id: 'c$chapterIndex-p$p',
           chapterIndex: chapterIndex,
           chapterTitle: ch.title,
-          text: pieces[p],
+          pieceIndex: p,
         ));
       }
+      phaseFraction = selected.isEmpty ? 0 : (s + 1) / selected.length;
+      currentLabel = '规划抽取块 ${s + 1}/${selected.length} 章';
+      emit();
     }
-    totalBlocks = blocks.length;
+    totalBlocks = plans.length;
     job = job.copyWith(selectedChapters: selected, totalBlocks: totalBlocks);
     await store.saveJob(job);
     log('计划抽取 $totalBlocks 块（${selected.length} 章）');
@@ -276,6 +286,7 @@ class _WorkerRun {
     // ---------------------------------------------------- 4. L1 抽取
     setPhase(GenPhase.extracting);
     _extractStartMs = clock.elapsedMilliseconds;
+    phaseFraction = 0;
     final cached = await store.loadBlocks(jobId);
     final done = <String, BlockExtraction>{...cached};
     doneBlocks = cached.length;
@@ -283,9 +294,34 @@ class _WorkerRun {
     if (cached.isNotEmpty) log('断点续跑：已完成 ${cached.length} 块，跳过');
     emit(force: true);
 
-    final pending = blocks.where((b) => !done.containsKey(b.id)).toList();
-    // 章节文本缓存：只保留少量章，避免大文件把内存吃满。
-    final textCache = <String, String>{};
+    final pending = plans.where((b) => !done.containsKey(b.id)).toList();
+    // 章节正文小缓存：同一章被切成多块时不重复读盘，但只保留最近几章，
+    // 内存与文件大小无关。
+    final chapterCache = <int, List<String>>{};
+    final cacheOrder = <int>[];
+
+    Future<String> textFor(_BlockPlan plan) async {
+      final key = plan.chapterIndex;
+      final cachedPieces = chapterCache[key];
+      if (cachedPieces != null) {
+        return plan.pieceIndex < cachedPieces.length
+            ? cachedPieces[plan.pieceIndex]
+            : '';
+      }
+      final idx = index!;
+      final text = await NovelTextStream.readChapter(
+        textPath,
+        idx,
+        idx.chapters[key],
+      );
+      final pieces = NovelTextStream.splitBlocks(text, config.blockChars);
+      chapterCache[key] = pieces;
+      cacheOrder.add(key);
+      while (cacheOrder.length > 4) {
+        chapterCache.remove(cacheOrder.removeAt(0));
+      }
+      return plan.pieceIndex < pieces.length ? pieces[plan.pieceIndex] : '';
+    }
 
     await _pool(pending, config.concurrency.clamp(1, 4), (plan) async {
       await waitIfPaused();
@@ -294,11 +330,16 @@ class _WorkerRun {
           : plan.chapterTitle;
       emit(force: true);
       try {
+        final text = await textFor(plan);
+        if (text.trim().isEmpty) {
+          log('· ${plan.id} 空片，跳过');
+          return;
+        }
         final extraction = await generator.extractBlock(
           blockId: plan.id,
           chapterIndex: plan.chapterIndex,
           chapterTitle: plan.chapterTitle,
-          text: plan.text,
+          text: text,
           extraInstruction: config.extraInstruction,
           shouldStop: () => shouldStop,
         );
@@ -315,7 +356,6 @@ class _WorkerRun {
         failedIds.add(plan.id);
         log('✗ ${plan.id} 失败：$e');
       } finally {
-        textCache.remove(plan.id);
         doneBlocks = done.length;
         phaseFraction = totalBlocks == 0 ? 1 : doneBlocks / totalBlocks;
         emit(force: true);
@@ -334,7 +374,7 @@ class _WorkerRun {
     setPhase(GenPhase.merging, fraction: .2);
     currentLabel = '归并人物与设定';
     emit(force: true);
-    final ordered = blocks
+    final ordered = plans
         .map((b) => done[b.id])
         .whereType<BlockExtraction>()
         .toList();
@@ -435,11 +475,13 @@ class _BlockPlan {
     required this.id,
     required this.chapterIndex,
     required this.chapterTitle,
-    required this.text,
+    required this.pieceIndex,
   });
 
   final String id;
   final int chapterIndex;
   final String chapterTitle;
-  final String text;
+
+  /// 该块在本章 splitBlocks 结果里的下标（正文在抽取时按需读取）。
+  final int pieceIndex;
 }
