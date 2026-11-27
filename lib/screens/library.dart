@@ -714,10 +714,17 @@ class _NovelGenCapsuleState extends State<_NovelGenCapsule> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_gen.busy) return const SizedBox.shrink();
+    final busy = _gen.busy;
+    final hasResult = _gen.hasResult;
+    if (!busy && !hasResult) return const SizedBox.shrink();
     final p = AppPalette.of(context);
     final pr = _gen.progress;
     final paused = pr.state == GenState.paused;
+    final label = busy
+        ? (paused
+            ? '已暂停 ${pr.percent.toStringAsFixed(0)}%'
+            : '生成中 ${pr.percent.toStringAsFixed(0)}%')
+        : '有结果待入库';
     return Pressable(
       onTap: () => openGlassPage(context, const NovelImportPage()),
       child: Glass(
@@ -728,21 +735,22 @@ class _NovelGenCapsuleState extends State<_NovelGenCapsule> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 13,
-              height: 13,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.8,
-                value: paused ? pr.percent / 100 : null,
-                color: p.amber,
-                backgroundColor: p.textTertiary.withValues(alpha: .2),
-              ),
-            ),
+            if (busy)
+              SizedBox(
+                width: 13,
+                height: 13,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.8,
+                  value: paused ? pr.percent / 100 : null,
+                  color: p.amber,
+                  backgroundColor: p.textTertiary.withValues(alpha: .2),
+                ),
+              )
+            else
+              Icon(Icons.auto_awesome_rounded, size: 13, color: p.amber),
             const SizedBox(width: 7),
             Text(
-              paused
-                  ? '已暂停 ${pr.percent.toStringAsFixed(0)}%'
-                  : '生成中 ${pr.percent.toStringAsFixed(0)}%',
+              label,
               style: appText(10.5, FontWeight.w600, p.amber),
             ),
           ],
