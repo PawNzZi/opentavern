@@ -14,6 +14,7 @@ import '../design/scaffold.dart';
 import '../design/settings_kit.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
+import 'novel_import.dart';
 
 /// 世界书在 Prompt 构建中的生效状态，用于列表 / 详情页提示。
 ///
@@ -199,6 +200,13 @@ class _LoreScreenState extends State<LoreScreen> {
                   onTap: () => Navigator.maybePop(context),
                 ),
                 const Spacer(),
+                GlassCircleButton(
+                  icon: Icons.auto_stories_outlined,
+                  size: 40,
+                  iconSize: 17,
+                  onTap: () => openGlassPage(context, const NovelImportPage()),
+                ),
+                const SizedBox(width: 8),
                 GlassCircleButton(
                   icon: Icons.file_download_outlined,
                   size: 40,

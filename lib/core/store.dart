@@ -49,6 +49,10 @@ class AppStore extends ChangeNotifier {
 
   bool get isReady => _ready;
 
+  /// 本地存储根目录。后台 isolate 不能用 platform channel，所以由主 isolate
+  /// 取好路径再传进去（小说生成任务的 checkpoint 就落在这下面）。
+  String? get storagePath => _dir?.path;
+
   Future<void> init() async {
     if (_ready) return;
     try {
@@ -266,6 +270,32 @@ class AppStore extends ChangeNotifier {
     );
     final model = character.modelOverride.trim();
     if (model.isNotEmpty) result = result.copyWith(model: model);
+    return result;
+  }
+
+  /// 按服务商 id 取一份可用的 API 配置（档案优先，缺省用内置默认地址/模型）。
+  /// 小说生成这类「临时指定服务商」的场景用它，不影响全局设置。
+  APISettings apiForProvider(String providerId, {String model = ''}) {
+    final global = settings.api;
+    final id = providerId.trim();
+    if (id.isEmpty) {
+      final m = model.trim();
+      return m.isEmpty ? global : global.copyWith(model: m);
+    }
+    final profile = global.profiles[id];
+    final defaults = kProviderDefaults[id];
+    var result = global.copyWith(
+      provider: id,
+      baseUrl: (profile != null && profile.baseUrl.trim().isNotEmpty)
+          ? profile.baseUrl
+          : (defaults != null ? defaults.$1 : global.baseUrl),
+      apiKey: profile != null ? profile.apiKey : '',
+      model: (profile != null && profile.model.trim().isNotEmpty)
+          ? profile.model
+          : (defaults != null ? defaults.$2 : global.model),
+    );
+    final m = model.trim();
+    if (m.isNotEmpty) result = result.copyWith(model: m);
     return result;
   }
 

@@ -16,6 +16,10 @@ dependencies:
   archive: ^3.6.1
   xml: ^6.6.1
   native_liquid_glass: ^0.3.1
+  # 小说导入：GBK/GB18030 中文文本解码（dart:convert 只有 utf8/latin1）。
+  enough_convert: ^1.7.1
+  # 长时间生成期间防止 iOS 锁屏挂起（配合断点续跑）。
+  wakelock_plus: ^1.8.2
 
 dev_dependencies:
   flutter_test:

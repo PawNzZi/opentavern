@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/models.dart';
+
 // ---------------------------------------------------------------------------
 // Characters & chats (existing demo)
 // ---------------------------------------------------------------------------
@@ -139,51 +141,61 @@ class DemoCharacter {
     );
   }
 
-  Map<String, dynamic> toCardJson() => {
-        'spec': 'chara_card_v2',
-        'spec_version': '2.0',
-        'name': name,
-        'description': description,
-        'personality': personality,
-        'scenario': scenario,
-        'first_mes': greeting,
-        'mes_example': exampleDialogue,
-        'creatorcomment': tagline,
-        'avatar': 'none',
+  /// Exports a SillyTavern V2 card. When [book] is given, its entries are also
+  /// embedded as the standard `data.character_book`, so both SillyTavern and
+  /// this app (`parseCharacterBook`) can read the lorebook back from the PNG.
+  /// Calling without [book] keeps the exact previous output shape.
+  Map<String, dynamic> toCardJson({Lorebook? book}) {
+    final data = <String, dynamic>{
+      'name': name,
+      'description': description,
+      'personality': personality,
+      'scenario': scenario,
+      'first_mes': greeting,
+      'mes_example': exampleDialogue,
+      'creator_notes': title,
+      'system_prompt': systemPrompt,
+      'post_history_instructions': postHistoryInstructions,
+      'alternate_greetings': alternateGreetings,
+      'tags': tags,
+      'creator': creator,
+      'character_version': version,
+      'nickname': name,
+      'creator_notes_multilingual': const <String, dynamic>{},
+      'source': const <String>[],
+      'group_only_greetings': const <String>[],
+      'assets': const <Map<String, dynamic>>[],
+      'creation_date': DateTime.now().millisecondsSinceEpoch,
+      'modification_date': DateTime.now().millisecondsSinceEpoch,
+      'extensions': {
         'talkativeness': 0.5,
         'fav': favorite,
-        'tags': tags,
-        'assets': const <Map<String, dynamic>>[],
-        'group_only_greetings': const <String>[],
-        'creation_date': DateTime.now().millisecondsSinceEpoch,
-        'data': {
-          'name': name,
-          'description': description,
-          'personality': personality,
-          'scenario': scenario,
-          'first_mes': greeting,
-          'mes_example': exampleDialogue,
-          'creator_notes': title,
-          'system_prompt': systemPrompt,
-          'post_history_instructions': postHistoryInstructions,
-          'alternate_greetings': alternateGreetings,
-          'tags': tags,
-          'creator': creator,
-          'character_version': version,
-          'nickname': name,
-          'creator_notes_multilingual': const <String, dynamic>{},
-          'source': const <String>[],
-          'group_only_greetings': const <String>[],
-          'assets': const <Map<String, dynamic>>[],
-          'creation_date': DateTime.now().millisecondsSinceEpoch,
-          'modification_date': DateTime.now().millisecondsSinceEpoch,
-          'extensions': {
-            'talkativeness': 0.5,
-            'fav': favorite,
-            'world': lorebook == '未绑定' ? '' : lorebook,
-          },
-        },
-      };
+        'world': lorebook == '未绑定' ? '' : lorebook,
+      },
+    };
+    if (book != null) {
+      data['character_book'] = _characterBookJson(book);
+    }
+    return {
+      'spec': 'chara_card_v2',
+      'spec_version': '2.0',
+      'name': name,
+      'description': description,
+      'personality': personality,
+      'scenario': scenario,
+      'first_mes': greeting,
+      'mes_example': exampleDialogue,
+      'creatorcomment': tagline,
+      'avatar': 'none',
+      'talkativeness': 0.5,
+      'fav': favorite,
+      'tags': tags,
+      'assets': const <Map<String, dynamic>>[],
+      'group_only_greetings': const <String>[],
+      'creation_date': DateTime.now().millisecondsSinceEpoch,
+      'data': data,
+    };
+  }
 
   Map<String, dynamic> toJson() => {
         'name': name,
@@ -310,6 +322,82 @@ class DemoCharacter {
       rawJson: json,
       createdAt: DateTime.now().millisecondsSinceEpoch,
     );
+  }
+}
+
+/// Builds the standard V2 `character_book` block. Field semantics follow
+/// `lib/core/lore_io.dart` (`loreEntryFromMap` / `lorebookToWorldJson`):
+/// position before=0 / after=1 / at_depth=4, role system=0 / user=1 /
+/// assistant=2, selectiveLogic AND_ANY=0 / AND_ALL=1 / NOT_ANY=2 / NOT_ALL=3.
+Map<String, dynamic> _characterBookJson(Lorebook book) => {
+      'name': book.name,
+      'description': '',
+      'scan_depth': 50,
+      'token_budget': 2048,
+      'recursive_scanning': false,
+      'extensions': <String, dynamic>{},
+      'entries': [
+        for (var i = 0; i < book.entries.length; i++)
+          _characterBookEntryJson(book.entries[i], i),
+      ],
+    };
+
+Map<String, dynamic> _characterBookEntryJson(LoreEntry e, int index) {
+  final position = e.position == 'at_depth'
+      ? 4
+      : e.position == 'after'
+          ? 1
+          : 0;
+  final role = e.role == 'user'
+      ? 1
+      : e.role == 'assistant'
+          ? 2
+          : 0;
+  return {
+    'keys': e.keys,
+    'secondary_keys': e.secondaryKeys,
+    'content': e.content,
+    'comment': e.name.isNotEmpty ? e.name : e.comment,
+    'name': e.name,
+    'constant': e.constant,
+    'selective': e.selective,
+    'insertion_order': e.order,
+    'enabled': e.enabled,
+    'position': position,
+    'extensions': {
+      'position': position,
+      'depth': e.depth,
+      'role': role,
+      'probability': e.probability,
+      'group': e.group,
+      'group_weight': e.groupWeight,
+      'sticky': e.sticky,
+      'cooldown': e.cooldown,
+      'delay': e.delay,
+      'case_sensitive': e.caseSensitive,
+      'match_whole_words': e.matchWholeWords,
+      'selective_logic': _selectiveLogicIndex(e.selectiveLogic),
+      'exclude_recursion': e.excludeRecursion,
+      'prevent_recursion': e.preventRecursion,
+    },
+    // `loreEntryFromMap` reads selective logic from the entry root (same as
+    // `lorebookToWorldJson`), so keep a root copy for lossless round-trips.
+    'selectiveLogic': e.selectiveLogic,
+    'id': index,
+    'case_sensitive': e.caseSensitive,
+  };
+}
+
+int _selectiveLogicIndex(String logic) {
+  switch (logic) {
+    case 'AND_ALL':
+      return 1;
+    case 'NOT_ANY':
+      return 2;
+    case 'NOT_ALL':
+      return 3;
+    default:
+      return 0;
   }
 }
 

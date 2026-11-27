@@ -5,12 +5,19 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../data/demo.dart';
+import 'models.dart';
 import 'png_card_export.dart';
 
 /// Builds a PNG character card, embedding V2/V3 metadata.
-Future<Uint8List> buildCharacterCardPng(DemoCharacter character) async {
+///
+/// When [book] is given, the lorebook is embedded as `data.character_book`
+/// inside the same PNG, so one image carries both the card and its world info.
+Future<Uint8List> buildCharacterCardPng(
+  DemoCharacter character, {
+  Lorebook? book,
+}) async {
   final png = await _characterImage(character);
-  return embedCardInPng(png, character.toCardJson());
+  return embedCardInPng(png, character.toCardJson(book: book));
 }
 
 Future<Uint8List> _characterImage(DemoCharacter character) async {

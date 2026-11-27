@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import '../core/models.dart';
 import '../core/store.dart';
 import '../design/glass.dart';
+import '../design/routes.dart';
 import '../design/scaffold.dart';
 import '../design/theme.dart';
 import '../design/toast.dart';
+import 'novel_import.dart';
 
 class ConnectSheetScreen extends StatefulWidget {
   const ConnectSheetScreen({super.key});
@@ -363,6 +365,24 @@ class ImportSheetScreen extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          const SizedBox(height: 14),
+          GlassPill(
+            label: '从小说 / 文档生成角色卡',
+            icon: Icons.auto_stories_outlined,
+            height: 44,
+            onTap: () {
+              // 先收起导入面板，再进生成向导（同一个 Navigator，动画衔接）。
+              final nav = Navigator.of(context);
+              nav.maybePop();
+              openGlassPage(context, const NovelImportPage());
+            },
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '导入 txt / docx / pdf，AI 抽取人物与世界观，'
+            '可把角色卡与世界书一起写进 PNG。',
+            style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
           ),
         ],
       ),
