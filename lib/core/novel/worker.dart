@@ -79,10 +79,13 @@ Future<void> novelWorkerMain(Map<String, dynamic> message) async {
     if (e is NovelCancelledException || e is NovelStoppedException) {
       runner.state = GenState.cancelled;
       runner.emit(force: true);
+      sendPort.send({'type': 'cancelled'});
     } else {
       runner.state = GenState.error;
       runner.error = e.toString();
       runner.emit(force: true);
+      // 显式错误消息：进度里的 error 已带上，但单独一条更方便主 isolate 记录/展示。
+      sendPort.send({'type': 'error', 'message': e.toString()});
     }
   } finally {
     control.close();
