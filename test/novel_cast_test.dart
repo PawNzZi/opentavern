@@ -1,4 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tavern_app/core/card_import.dart';
+import 'package:tavern_app/core/character_png.dart';
 import 'package:tavern_app/core/llm.dart';
 import 'package:tavern_app/core/models.dart';
 import 'package:tavern_app/core/novel/generator.dart';
@@ -43,6 +48,8 @@ const _settings = AppSettings(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('castFallback（单卡定位）', () {
     test('第一人称 + 书名点名角色：char = 美母，user = 我', () {
       final cast = NovelGenerator.castFallback(
@@ -71,6 +78,71 @@ void main() {
       expect(names, isNot(contains('美母')));
       expect(names, isNot(contains('小杰')));
       expect(cast.user.description, isNotEmpty);
+    });
+
+    test('第一人称：戏份最高的是叙述者时，char 不能是他', () {
+      final cast = NovelGenerator.castFallback(
+        title: '掌中的美母.txt',
+        openingExcerpt: '我是小杰。我推开门，看见她坐在窗边。我愣在原地。'
+            '我没有说话，她也只是看着我。',
+        candidates: const [
+          CastCandidate(
+            name: '小杰',
+            aliases: ['儿子'],
+            role: '主角（叙述者）',
+            gender: '男',
+            mentions: 100,
+          ),
+          CastCandidate(
+            name: '母亲',
+            aliases: ['妈妈'],
+            role: '女主',
+            gender: '女',
+            mentions: 60,
+            relationship: '小杰的母亲',
+          ),
+          CastCandidate(
+            name: '小姨',
+            role: '配角',
+            gender: '女',
+            mentions: 10,
+            relationship: '小杰的小姨',
+          ),
+        ],
+      );
+      expect(cast.character.name, '母亲');
+      expect(cast.user.name, '我');
+      expect(cast.user.aliases, contains('小杰'));
+      final names = cast.supporting.map((e) => e.name).toList();
+      expect(names, contains('小姨'));
+      expect(names, isNot(contains('母亲')));
+      expect(names, isNot(contains('小杰')));
+    });
+
+    test('第一人称没有书名线索时，也不能把叙述者做成角色卡', () {
+      final cast = NovelGenerator.castFallback(
+        title: '测试书名.txt',
+        openingExcerpt: '我是小杰。我推开门，看见她坐在窗边。我愣在原地。'
+            '我没有说话，她也只是看着我。我想开口，却不知道说什么。',
+        candidates: const [
+          CastCandidate(
+            name: '小杰',
+            role: '主角（叙述者）',
+            gender: '男',
+            mentions: 100,
+          ),
+          CastCandidate(
+            name: '苏晚',
+            role: '女主',
+            gender: '女',
+            mentions: 40,
+            relationship: '小杰的恋人',
+          ),
+        ],
+      );
+      expect(cast.character.name, '苏晚');
+      expect(cast.user.name, '我');
+      expect(cast.supporting.map((e) => e.name), isNot(contains('小杰')));
     });
 
     test('第三人称：男主给 user、女主给 char', () {
@@ -246,7 +318,10 @@ void main() {
 
     test('composeCard 把 user 人格与说话方式写进草稿', () async {
       final client = _FakeClient([
-        '{"name":"美母","description":"d","first_mes":"你回来了？",'
+        '{"name":"美母","description":"她是这个家的女主人，也是小杰的母亲。'
+            '她总是把情绪藏在温和的语气里，只有在深夜才会露出疲惫。'
+            '她与{{user}}之间既有母子间的亲密，也有无法说出口的距离。",'
+            '"first_mes":"你回来了？先把湿衣服换了。",'
             '"speech_style":"语气温柔，句尾常带「呢」，叫{{user}}「小杰」。",'
             '"speech_examples":["回来了？饭在锅里呢。","别站着了，过来坐。"]}',
       ]);
@@ -263,6 +338,27 @@ void main() {
       final systemPrompt = client.calls.single.first['content'].toString();
       expect(systemPrompt, contains('{{user}} = 小杰'));
       expect(systemPrompt, contains('speech_examples'));
+    });
+
+    test('模型返回 user 名字/空内容时，仍以 char 为准并兜底正文', () async {
+      final client = _FakeClient([
+        '{"name":"小杰","description":"","first_mes":""}',
+      ]);
+      final gen = NovelGenerator(settings: _settings, client: client);
+      final card = await gen.composeCard(
+        character: MergedCharacter(
+          name: '美母',
+          personality: ['温柔'],
+          relationship: ['小杰的母亲'],
+          quotes: ['回来了？'],
+        ),
+        user: const CastUser(name: '小杰', description: '你是她的儿子'),
+        worldSummary: '',
+      );
+      expect(card.name, '美母');
+      expect(card.description, isNotEmpty);
+      expect(card.description, contains('美母'));
+      expect(card.userName, '小杰');
     });
 
     test('draftToCharacter 把说话方式并入角色卡 description', () async {
@@ -313,6 +409,77 @@ void main() {
       expect(entries.single.content, contains('红衣'));
       expect(entries.single.keys, contains('阿姨'));
     });
+    test('导出的 PNG 卡字段完整：名称/正文/性格/开场白/说话方式', () async {
+      const draft = DraftCard(
+        name: '美母',
+        description: '她是这个家的女主人，也是小杰的母亲。',
+        personality: '温柔、克制',
+        scenario: '雨夜，家中客厅',
+        firstMes: '“回来了？先把湿衣服换了。”',
+        mesExample: '<START>\n{{user}}: 我回来了。\n{{char}}: 饭在锅里。',
+        alternateGreetings: ['“站在门口做什么？进来。”'],
+        speechStyle: '语气温柔，句尾常带「呢」。',
+        speechExamples: ['饭在锅里呢。', '别站着了。'],
+        tags: ['小说生成', '家庭'],
+      );
+      final character = await draftToCharacter(draft);
+      final png = await buildCharacterCardPng(character);
+      final parsed = parseCharacterCard(png, 'card.png');
+      expect(parsed, isNotNull);
+      expect(parsed!.name, '美母');
+      expect(parsed.description, contains('她是这个家的女主人'));
+      expect(parsed.description, contains('【习惯的说话方式】'));
+      expect(parsed.description, contains('【说话示例】'));
+      expect(parsed.personality, '温柔、克制');
+      expect(parsed.scenario, '雨夜，家中客厅');
+      expect(parsed.greeting, '“回来了？先把湿衣服换了。”');
+      expect(parsed.exampleDialogue, contains('饭在锅里'));
+      expect(parsed.alternateGreetings, ['“站在门口做什么？进来。”']);
+      expect(parsed.tags, contains('小说生成'));
+    });
+
+    test('详细模式下世界书条目要求 1000 字以上', () async {
+      final client = _FakeClient(['{"entries":[]}']);
+      final gen = NovelGenerator(settings: _settings, client: client);
+      await gen.composeLore(
+        lore: [
+          MergedLore(topic: '旧城', keys: {'旧城'}, contents: ['城墙很高。']),
+        ],
+        maxEntries: 1,
+        worldSummary: '旧城',
+        detail: NovelDetail.detailed,
+      );
+      final system = client.calls.single.first['content'].toString();
+      expect(system, contains('1000~1300'));
+      expect(system, contains('不得低于 1000 字'));
+
+      final client2 = _FakeClient(['{"entries":[]}']);
+      final gen2 = NovelGenerator(settings: _settings, client: client2);
+      await gen2.composeCastLore(
+        supporting: const [SupportingCast(name: '小姨', importance: 4)],
+        evidence: const {},
+        charName: '美母',
+        userName: '我',
+        title: 't',
+        plotSummary: '',
+        worldSummary: '',
+        detail: NovelDetail.detailed,
+      );
+      final system2 = client2.calls.single.first['content'].toString();
+      expect(system2, contains('1000~1500'));
+      expect(system2, contains('不得低于 1000 字'));
+    });
+
+    test('世界书 JSON 不会被误当成角色卡导入', () {
+      final bytes = Uint8List.fromList(utf8.encode(jsonEncode({
+        'name': '旧城世界书',
+        'entries': {
+          '0': {'key': ['旧城'], 'content': '城墙很高。'},
+        },
+      })));
+      expect(parseCharacterCard(bytes, '世界书-旧城.json'), isNull);
+    });
+
     test('L1 摘录的原话进入归并档案，供说话方式参考', () {
       final blocks = [
         const BlockExtraction(

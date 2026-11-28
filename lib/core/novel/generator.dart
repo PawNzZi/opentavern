@@ -16,6 +16,7 @@ class MergedCharacter {
     List<String>? relationship,
     List<String>? speechStyle,
     this.role = '',
+    this.gender = '',
     Set<String>? blockIds,
     List<String>? quotes,
   })  : aliases = aliases ?? <String>{},
@@ -36,6 +37,9 @@ class MergedCharacter {
   final List<String> relationship;
   final List<String> speechStyle;
   String role;
+
+  /// 男 / 女 / 未知。
+  String gender;
 
   /// 出现过该人物的块 id，成稿时用来回读原文做「证据包」。
   final Set<String> blockIds;
@@ -163,8 +167,9 @@ class NovelGenerator {
       ..writeln('你是小说设定分析器。只输出 JSON，不要任何解释或 Markdown 以外的文字。')
       ..writeln('从下面的小说片段中抽取客观存在的设定：')
       ..writeln('1) characters：出场人物，最多 8 个。字段 name, aliases(数组), '
-          'appearance, personality, relationship, speechStyle, '
-          'role(主角/配角/反派等), quotes(数组：该人物在本片段中的原话，'
+          'appearance, personality, relationship, speechStyle, gender(男/女/未知), '
+          'role(主角/女主/男主/配角/反派；第一人称叙述者标为「主角（叙述者）」), '
+          'quotes(数组：该人物在本片段中的原话，'
           '直接摘录引号里的对话，最多 3 句，不要改写或概括)。')
       ..writeln('2) lore：世界设定，最多 6 条。字段 topic, keys(触发关键词数组), '
           'content, category(地点/组织/物品/规则/时间线), constant(是否世界观常驻,布尔)。')
@@ -254,6 +259,9 @@ class NovelGenerator {
         }
         if (target.role.isEmpty && c.role.trim().isNotEmpty) {
           target.role = c.role.trim();
+        }
+        if (target.gender.isEmpty && c.gender.trim().isNotEmpty) {
+          target.gender = c.gender.trim();
         }
       }
     }
@@ -367,6 +375,7 @@ class NovelGenerator {
           relationship: [...canonical.relationship],
           speechStyle: [...canonical.speechStyle],
           role: canonical.role,
+          gender: canonical.gender,
           blockIds: {...canonical.blockIds},
           quotes: [...canonical.quotes],
         );
@@ -374,6 +383,7 @@ class NovelGenerator {
           out.aliases.addAll(m.aliases);
           if (!out.aliases.contains(m.name)) out.aliases.add(m.name);
           out.blockIds.addAll(m.blockIds);
+          if (out.gender.isEmpty) out.gender = m.gender;
           for (final q in m.quotes) {
             if (!out.quotes.contains(q)) out.quotes.add(q);
           }
@@ -435,6 +445,7 @@ class NovelGenerator {
       listing.writeln('$i. ${c.name}'
           '${c.aliases.isEmpty ? '' : '（称谓：${c.aliases.take(8).join('、')}）'}'
           '${c.role.isEmpty ? '' : '｜定位：${c.role}'}'
+          '${c.gender.isEmpty ? '' : '｜性别：${c.gender}'}'
           '｜出场 ${c.mentions} 块'
           '${c.relationship.isEmpty ? '' : '\n   关系：${_clip(c.relationship, 160)}'}');
     }
@@ -447,13 +458,21 @@ class NovelGenerator {
           '对手戏最多、情感或剧情张力最强的人；')
       ..writeln('2) user：玩家扮演的人。优先选叙述视角/第一人称「我」/读者代入对象。')
       ..writeln('判断规则：')
-      ..writeln('- char 与 user 不能是同一个人；两人都必须来自候选清单（名字或称谓）。')
-      ..writeln('- 第一人称小说：user = 「我」；char = 与「我」关系最核心的人，'
-          '不能把「我」本人做成角色卡。')
+      ..writeln('- char 是玩家要互动的对象（角色卡里那个人）；user 是玩家本人；'
+          'char 与 user 不能是同一个人，两人都必须来自候选清单（名字或称谓）。')
+      ..writeln('- 第一人称小说：user = 「我」；char = 与「我」关系最核心的人。'
+          '如果候选里戏份最高的是叙述者本人（例如「小杰」「主角（叙述者）」），'
+          '绝不能把他选成 char，要选与他关系最核心的另一人。')
+      ..writeln('- 判断「叙述者的名字」：第一人称里别人对「我」的称呼、'
+          '主角（叙述者）标记、以及开篇里与「我」对应的名字，都属于 user；'
+          '把这些名字放进 user.aliases，并从 char/supporting 中排除。')
+      ..writeln('- char 的描述只写 char 本人，不要写 user 的设定；user 的设定只放在 '
+          'user.description。')
       ..writeln('- 第三人称双主角：把读者代入的一方给 user，另一方给 char；'
           '不按男女频硬编码性别，根据称谓、心理描写和剧情重心判断。')
       ..writeln('- 书名包含明确关系词（如「美母」「姐姐」「师尊」）且候选里有对应人物时，'
-          '该人物优先做 char。')
+          '该人物优先做 char；书名候选不在清单时，用关系词（母/母亲/姐/姨等）'
+          '匹配候选的 relationship/称谓。')
       ..writeln('- 其余角色全部放进 supporting，不要遗漏主要配角；'
           '已故/纯背景/群体角色可以重要性低，但不要塞进 char/user。')
       ..writeln('- 第一人称叙述者如果有名字或别人对他的称呼（如「小杰」「儿子」），'
@@ -529,6 +548,41 @@ class NovelGenerator {
         throw StateError('角色卡角色与用户角色是同一人');
       }
 
+      final charCandidate = _matchCandidate(charName, candidates);
+      final userAliases = _mergeAliases(
+        _stringList(userRaw['aliases']),
+        userMatch?.aliases ?? const [],
+      );
+      final userKeys = <String>{
+        _norm(userName),
+        ...userAliases.map(_norm),
+        if (userMatch != null) _norm(userMatch.name),
+      };
+      if (charCandidate == null && charOverride.trim().isEmpty) {
+        throw StateError('角色卡角色不在候选清单里');
+      }
+      if (userKeys.contains(_norm(charName))) {
+        throw StateError('角色卡角色命中了 {{user}} 的名字/别名');
+      }
+      if (userMatch != null &&
+          charCandidate != null &&
+          _sameCandidate(userMatch, charCandidate)) {
+        throw StateError('角色卡角色与用户角色是同一人');
+      }
+      if (_looksFirstPerson(openingExcerpt) && charCandidate != null) {
+        if (charCandidate.role.contains('叙述者')) {
+          throw StateError('第一人称把叙述者选成了角色卡');
+        }
+        final top = candidates.reduce(
+          (a, b) => b.mentions > a.mentions ? b : a,
+        );
+        if (_sameCandidate(charCandidate, top) &&
+            !_titleMatchesCandidate(title, charCandidate) &&
+            (userMatch == null || _sameCandidate(userMatch, top))) {
+          throw StateError('第一人称把戏份最高的叙述者选成了角色卡');
+        }
+      }
+
       var userDescription =
           (userRaw['description'] ?? '').toString().trim();
       if (userDescriptionOverride.trim().isNotEmpty) {
@@ -574,7 +628,7 @@ class NovelGenerator {
         ));
       }
 
-      final charMatch2 = _matchCandidate(charName, candidates);
+      final charMatch2 = charCandidate;
       return CastResolution(
         character: CastCharacter(
           name: charMatch2?.name ?? charName,
@@ -583,10 +637,9 @@ class NovelGenerator {
         ),
         user: CastUser(
           name: userName,
-          aliases: _mergeAliases(
-            _stringList(userRaw['aliases']),
-            userMatch?.aliases ?? const [],
-          ).where((a) => _norm(a) != _norm(userName)).toList(),
+          aliases: userAliases
+              .where((a) => _norm(a) != _norm(userName))
+              .toList(),
           description: userDescription,
           reason: (userRaw['reason'] ?? '').toString(),
         ),
@@ -640,44 +693,68 @@ class NovelGenerator {
           }
         }
       }
-      return best;
+      if (best != null) return best;
+      // 书名用关系词（美母/姐姐/师尊…）而不是人物本名时，按关系匹配候选。
+      final term = _titleRelationTerm(title);
+      if (term != null) {
+        final synonyms = _relationSynonyms(term);
+        for (final c in sorted) {
+          final hay = '${c.name} ${c.aliases.join(' ')} ${c.role} ${c.relationship}';
+          if (synonyms.any(hay.contains)) return c;
+        }
+      }
+      return null;
     }
 
     CastCandidate? userPick = fixedUser.isEmpty ? null : match(fixedUser);
     CastCandidate? charPick = fixedChar.isEmpty ? null : match(fixedChar);
 
-    if (fixedChar.isEmpty) {
-      charPick ??= byTitle();
-      if (charPick == null) {
-        if (firstPerson) {
-          charPick = _first(sorted.where((c) => _norm(c.name) != '我'));
-        } else {
-          charPick = _first(sorted.where((c) =>
+    if (firstPerson) {
+      // 第一人称：先把叙述者（主角/男主）找出来做 user，char 必须排除他。
+      userPick ??= _pickNarrator(sorted);
+      final titleChar = byTitle();
+      if (charPick == null &&
+          titleChar != null &&
+          !_sameCandidate(titleChar, userPick)) {
+        charPick = titleChar;
+      }
+      charPick ??= _first(sorted.where((c) =>
+          !_sameCandidate(c, userPick) &&
+          !c.role.contains('叙述者') &&
+          (c.role.contains('女主') ||
+              c.relationship.contains('母') ||
+              c.relationship.contains('妻') ||
+              c.relationship.contains('姐'))));
+      charPick ??= _first(sorted.where((c) =>
+          !_sameCandidate(c, userPick) && !c.role.contains('叙述者')));
+      charPick ??= _first(sorted.where((c) => !_sameCandidate(c, userPick)));
+      userPick ??= _first(sorted.where(
+        (c) => !_sameCandidate(c, charPick) && c.gender == '男',
+      ));
+      // 书名已经点名了 char 时，第一人称里戏份最高的另一位通常就是叙述者，
+      // 用来补全 user 的别名/人格，避免把「我」本人写成配角。
+      if (userPick == null &&
+          charPick != null &&
+          _titleMatchesCandidate(title, charPick)) {
+        userPick = _first(sorted.where(
+              (c) => !_sameCandidate(c, charPick) && c.gender == '男',
+            )) ??
+            _first(sorted.where((c) => !_sameCandidate(c, charPick)));
+      }
+    } else {
+      charPick ??= byTitle() ??
+          _first(sorted.where((c) =>
               _norm(c.name) != _norm(userPick?.name ?? '') &&
               (c.role.contains('女主') || c.role.contains('主角'))));
-        }
-      }
-      charPick ??= _first(
-        sorted.where((c) => _norm(c.name) != _norm(userPick?.name ?? '')),
-      );
-    }
-
-    if (fixedUser.isEmpty && !firstPerson) {
-      // 第三人称：先找男主/主角做 user。
       userPick ??= _first(sorted.where((c) =>
-          _norm(c.name) != _norm(charPick?.name ?? '') &&
+          !_sameCandidate(c, charPick) &&
           (c.role.contains('男主') || c.role.contains('主角'))));
-      userPick ??= _first(sorted.where(
-        (c) => _norm(c.name) != _norm(charPick?.name ?? ''),
-      ));
-    }
-
-    if (fixedUser.isEmpty && firstPerson) {
-      // 第一人称：如果叙述者有自己的名字/称谓，用它补全 user 的别名，
-      // 避免把「我」本人再当成配角写进世界书。
-      userPick ??= _first(sorted.where((c) =>
-          _norm(c.name) != _norm(charPick?.name ?? '') &&
-          (c.role.contains('主角') || c.role.contains('男主'))));
+      userPick ??= _first(
+        sorted.where((c) => !_sameCandidate(c, charPick)),
+      );
+      charPick ??= _first(
+        sorted.where((c) => !_sameCandidate(c, userPick)),
+      );
     }
 
     final charName = charPick?.name ?? fixedChar;
@@ -700,6 +777,7 @@ class NovelGenerator {
 
     final excluded = <String>{
       _norm(charName),
+      if (charPick != null) ...charPick.aliases.map(_norm),
       _norm(userName),
       if (userPick != null) _norm(userPick.name),
       if (userPick != null) ...userPick.aliases.map(_norm),
@@ -886,7 +964,8 @@ class NovelGenerator {
           'alternate_greetings(数组,2 条不同情境的开场白), '
           'system_prompt(可留空), tags(数组,3-5 个中文标签)。')
       ..writeln('要求：忠于原设定，不要新增无依据的设定；用 {{user}} 指代玩家、'
-          '{{char}} 指代角色；不要把其他配角写成主角；'
+          '{{char}} 指代角色；description 只写 {{char}} 本人（身份/外貌/性格/'
+          '与{{user}}的关系），不要写 {{user}} 的设定；不要把其他配角写成主角；'
           '开场白用第二人称视角把 {{user}} 带入场景；'
           '剧情梗概只用来把握人物经历与语气，不要把整段剧情复述进卡片；'
           '说话方式与示例必须能从书中原话/人物档案找到依据，不要凭空发明；'
@@ -912,13 +991,19 @@ class NovelGenerator {
 
     try {
       final json = await _callJson(messages, shouldStop: shouldStop);
-      final name = (json['name'] ?? '').toString().trim();
+      final description = (json['description'] ?? '').toString().trim();
+      final firstMes = (json['first_mes'] ?? '').toString().trim();
+      // 字段缺失/模型返回空壳时不要生成一张空卡：直接走本地档案兜底。
+      if (description.length < 40 || firstMes.isEmpty) {
+        throw StateError('角色卡字段缺失');
+      }
       return DraftCard(
-        name: name.isEmpty ? character.name : name,
-        description: (json['description'] ?? '').toString(),
+        // 角色卡的名字必须是 {{char}}，不能用模型返回的 user 名字。
+        name: character.name,
+        description: description,
         personality: (json['personality'] ?? '').toString(),
         scenario: (json['scenario'] ?? '').toString(),
-        firstMes: (json['first_mes'] ?? '').toString(),
+        firstMes: firstMes,
         mesExample: (json['mes_example'] ?? '').toString(),
         alternateGreetings: (json['alternate_greetings'] as List? ?? const [])
             .map((e) => e.toString())
@@ -978,9 +1063,10 @@ class NovelGenerator {
     bool Function()? shouldStop,
   }) async {
     if (supporting.isEmpty) return const [];
-    const batchSize = 4;
     final detailed = detail == NovelDetail.detailed;
-    final target = detailed ? '400~700 字' : '200~350 字';
+    final batchSize = 2;
+    final target = detailed ? '1000~1500 字' : '1000~1200 字';
+    final minChars = 1000;
     final results = <String, DraftLoreEntry>{};
 
     for (var start = 0; start < supporting.length; start += batchSize) {
@@ -1033,7 +1119,7 @@ class NovelGenerator {
         ..writeln('正文目标长度：$target（重要角色取长）。'
             '必须使用 {{char}} 指角色卡角色、{{user}} 指玩家，不要写死名字。')
         ..writeln('忠于原文依据，不要编造原文没有的设定；信息不足的栏目可省略，'
-            '但正文不得低于 ${detailed ? 300 : 150} 字。')
+            '但正文不得低于 $minChars 字，不要用空话凑字数。')
         ..writeln('keys 触发关键词必须包含姓名、称谓、别名与关系词。')
         ..writeln('输出格式：{"entries":[{"name":"","keys":[],'
             '"secondary_keys":[],"content":""}]}');
@@ -1083,13 +1169,13 @@ class NovelGenerator {
         }
         // 质量闸门：过短的条目再扩写一次，避免模型只写两三句。
         final short = batchEntries.values
-            .where((e) => e.content.length < (detailed ? 300 : 150))
+            .where((e) => e.content.length < minChars)
             .toList();
         if (short.isNotEmpty) {
           final expanded = await _expandLoreEntries(
             entries: short,
             context: source.toString(),
-            minChars: detailed ? 300 : 150,
+            minChars: minChars,
             target: target,
             shouldStop: shouldStop,
           );
@@ -1218,10 +1304,10 @@ class NovelGenerator {
     final picked = lore.take(maxEntries).toList();
     if (picked.isEmpty) return const [];
     final detailed = detail == NovelDetail.detailed;
-    final target = detailed ? '250~500 字' : '120~250 字';
-    // 按批成稿：一次让模型写 40 条 × 400 字会超出输出上限，JSON 被截断
-    // 后整批都会退回短兜底，所以这里 4~6 条一批。
-    final batchSize = detailed ? 4 : 6;
+    final target = detailed ? '1000~1300 字' : '1000~1200 字';
+    final minChars = 1000;
+    // 按批成稿：一次让模型写几十条 × 1000 字会超出输出上限，JSON 被截断。
+    final batchSize = 2;
     final out = <DraftLoreEntry>[];
 
     DraftLoreEntry fallbackFor(MergedLore l, int index) => DraftLoreEntry(
@@ -1258,6 +1344,8 @@ class NovelGenerator {
             '规则、历史、与{{char}}/{{user}}的关系或影响。')
         ..writeln('正文目标长度：$target（重要设定取长）。'
             '可用 {{char}} 指角色卡角色、{{user}} 指玩家。')
+        ..writeln('正文不得低于 $minChars 字；信息不足时结合原文依据补充细节，'
+            '不要用空话凑字数。')
         ..writeln('字段：name, keys(触发关键词数组,含别名/简称), secondary_keys(数组,可空), '
             'content, constant(布尔), order(整数,常驻用10,其余100起)。')
         ..writeln('输出格式：{"entries":[{"name":"","keys":[],'
@@ -1311,13 +1399,13 @@ class NovelGenerator {
           continue;
         }
         final short = entries
-            .where((e) => e.content.length < (detailed ? 200 : 100))
+            .where((e) => e.content.length < minChars)
             .toList();
         if (short.isNotEmpty) {
           final expanded = await _expandLoreEntries(
             entries: short,
             context: source,
-            minChars: detailed ? 200 : 100,
+            minChars: minChars,
             target: target,
             shouldStop: shouldStop,
           );
@@ -1413,6 +1501,69 @@ String _norm(String s) => s
     .toLowerCase();
 
 T? _first<T>(Iterable<T> items) => items.isEmpty ? null : items.first;
+
+bool _sameCandidate(CastCandidate? a, CastCandidate? b) {
+  if (a == null || b == null) return false;
+  final aKeys = <String>{_norm(a.name), ...a.aliases.map(_norm)};
+  final bKeys = <String>{_norm(b.name), ...b.aliases.map(_norm)};
+  return aKeys.any(bKeys.contains);
+}
+
+/// 第一人称下找叙述者：优先「主角（叙述者）」，其次主角/男主，最后男性候选。
+CastCandidate? _pickNarrator(List<CastCandidate> sorted) {
+  for (final c in sorted) {
+    if (c.role.contains('叙述者')) return c;
+  }
+  for (final c in sorted) {
+    if (c.role.contains('主角') || c.role.contains('男主')) return c;
+  }
+  return _first(sorted.where((c) => c.gender == '男'));
+}
+
+/// 书名里的关系词（从长到短）。
+const List<String> _titleRelationTerms = [
+  '美母', '母亲', '妈妈', '姐姐', '小姨', '阿姨', '妻子', '老婆', '媳妇',
+  '师尊', '师父', '老师', '女儿', '妹妹', '嫂子', '婶婶', '婆婆', '娘',
+];
+
+String? _titleRelationTerm(String title) {
+  for (final term in _titleRelationTerms) {
+    if (title.contains(term)) return term;
+  }
+  return null;
+}
+
+bool _titleMatchesCandidate(String title, CastCandidate c) {
+  for (final alias in [c.name, ...c.aliases]) {
+    final a = alias.trim();
+    if (a.length >= 2 && title.contains(a)) return true;
+  }
+  final term = _titleRelationTerm(title);
+  if (term == null) return false;
+  final synonyms = _relationSynonyms(term);
+  final hay = '${c.name} ${c.aliases.join(' ')} ${c.role} ${c.relationship}';
+  return synonyms.any(hay.contains);
+}
+
+List<String> _relationSynonyms(String term) {
+  if (term.contains('母') || term == '娘' || term.contains('妈')) {
+    return const ['母亲', '妈妈', '妈', '娘', '母'];
+  }
+  if (term.contains('姐')) return const ['姐姐', '姐'];
+  if (term.contains('姨')) return const ['小姨', '姨', '阿姨'];
+  if (term.contains('妻') || term.contains('老婆') || term.contains('媳妇')) {
+    return const ['妻子', '老婆', '媳妇', '妻'];
+  }
+  if (term.contains('师尊') || term.contains('师父')) {
+    return const ['师尊', '师父', '师傅'];
+  }
+  if (term.contains('老师')) return const ['老师', '教师'];
+  if (term.contains('女儿')) return const ['女儿', '女'];
+  if (term.contains('妹妹')) return const ['妹妹', '妹'];
+  if (term.contains('嫂子')) return const ['嫂子', '嫂'];
+  if (term.contains('婆婆')) return const ['婆婆', '婆'];
+  return [term];
+}
 
 String _clip(String s, int max) {
   final text = s.trim();

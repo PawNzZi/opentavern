@@ -71,6 +71,11 @@ class _NovelImportPageState extends State<NovelImportPage> {
   List<String> _castCandidates = const [];
   bool _casting = false;
 
+  /// 只有用户手动改选才作为强约束传给 worker；预检结果只是建议，
+  /// 避免预检判断错误时把错误角色锁死。
+  bool _castCharManual = false;
+  bool _castUserManual = false;
+
   List<NovelJobSummary> _jobs = const [];
   bool _saving = false;
 
@@ -147,6 +152,8 @@ class _NovelImportPageState extends State<NovelImportPage> {
       _castChar = '';
       _castUser = '';
       _castUserDescription = '';
+      _castCharManual = false;
+      _castUserManual = false;
     });
   }
 
@@ -198,8 +205,15 @@ class _NovelImportPageState extends State<NovelImportPage> {
 
   // ------------------------------------------------------------ 角色定位
 
-  String get _castCharLabel => _castChar.trim().isEmpty ? '自动判断' : _castChar;
-  String get _castUserLabel => _castUser.trim().isEmpty ? '自动判断' : _castUser;
+  String get _castCharLabel {
+    if (_castChar.trim().isEmpty) return '自动判断';
+    return _castCharManual ? _castChar : '建议：$_castChar';
+  }
+
+  String get _castUserLabel {
+    if (_castUser.trim().isEmpty) return '自动判断';
+    return _castUserManual ? _castUser : '建议：$_castUser';
+  }
 
   /// 预检：只读文件开头 + 本地人名候选，调一次 AI 定位。
   ///
@@ -234,9 +248,10 @@ class _NovelImportPageState extends State<NovelImportPage> {
           for (final entry in counts.entries)
             CastCandidate(name: entry.key, mentions: entry.value),
         ],
-        charOverride: _castChar,
-        userOverride: _castUser,
-        userDescriptionOverride: _castUserDescription,
+        charOverride: _castCharManual ? _castChar : '',
+        userOverride: _castUserManual ? _castUser : '',
+        userDescriptionOverride:
+            _castUserManual ? _castUserDescription : '',
       );
       if (!mounted) return;
       setState(() {
@@ -274,7 +289,10 @@ class _NovelImportPageState extends State<NovelImportPage> {
       current: _castChar,
     );
     if (picked == null || !mounted) return;
-    setState(() => _castChar = picked);
+    setState(() {
+      _castChar = picked;
+      _castCharManual = picked.trim().isNotEmpty;
+    });
   }
 
   Future<void> _pickCastUser() async {
@@ -295,6 +313,7 @@ class _NovelImportPageState extends State<NovelImportPage> {
     }
     setState(() {
       _castUser = picked;
+      _castUserManual = picked.trim().isNotEmpty;
       _castUserDescription = _castPreview?.user.name == picked && picked.isNotEmpty
           ? _castPreview!.user.description
           : '';
@@ -332,6 +351,7 @@ class _NovelImportPageState extends State<NovelImportPage> {
     if (value == null || value.isEmpty || !mounted) return;
     setState(() {
       _castUser = value;
+      _castUserManual = true;
       _castUserDescription = _castPreview?.user.name == value
           ? _castPreview!.user.description
           : '';
@@ -422,9 +442,9 @@ class _NovelImportPageState extends State<NovelImportPage> {
         extraInstruction: _extra.text.trim(),
         tokenBudget: _tokenBudget,
         encodingOverride: _encodingOverride,
-        cardCharacter: _castChar,
-        cardUser: _castUser,
-        cardUserDescription: _castUserDescription,
+        cardCharacter: _castCharManual ? _castChar : '',
+        cardUser: _castUserManual ? _castUser : '',
+        cardUserDescription: _castUserManual ? _castUserDescription : '',
         detail: _detail,
         supportingLimit: _supportingLimit,
       );
@@ -597,14 +617,14 @@ class _NovelImportPageState extends State<NovelImportPage> {
       final character = await draftToCharacter(draft, bookName: book.name);
       final bytes = await buildCardPng(character, book: book);
       final safe = character.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      archive.addFile(ArchiveFile('$safe.png', bytes.length, bytes));
+      archive.addFile(ArchiveFile('角色卡-$safe.png', bytes.length, bytes));
     }
     // 顺手把世界书 JSON 一起放进去，方便单独导入到别的工具。
     final json = utf8.encode(
       const JsonEncoder.withIndent('  ').convert(lorebookToWorldJson(book)),
     );
     final safeBook = book.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    archive.addFile(ArchiveFile('$safeBook.json', json.length, json));
+    archive.addFile(ArchiveFile('世界书-$safeBook.json', json.length, json));
 
     final zipped = ZipEncoder().encode(archive);
     if (zipped == null) {
@@ -819,8 +839,8 @@ class _NovelImportPageState extends State<NovelImportPage> {
       const SizedBox(height: 14),
       SettingsGroup(
         title: '生成',
-        footnote: '「详尽」会让每条人物/世界设定写 250~700 字，token 消耗更高；'
-            '人物条目超出上限时按重要度截断。',
+        footnote: '标准/详尽的世界书条目都在 1000 字以上；详尽可到 1500 字，'
+            'token 消耗更高。人物条目超出上限时按重要度截断。',
         children: [
           SegmentLine(
             title: '扫描模式',

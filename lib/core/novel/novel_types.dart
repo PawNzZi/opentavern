@@ -366,6 +366,7 @@ class ExtractedCharacter {
     this.relationship = '',
     this.speechStyle = '',
     this.role = '',
+    this.gender = '',
     this.quotes = const [],
   });
 
@@ -376,8 +377,11 @@ class ExtractedCharacter {
   final String relationship;
   final String speechStyle;
 
-  /// 主角/配角/反派等。
+  /// 主角/配角/反派等；L1 提示词会把第一人称叙述者标成「主角（叙述者）」。
   final String role;
+
+  /// 男 / 女 / 未知。
+  final String gender;
 
   /// 本片段中该人物的原话（直接摘录，用于学习/示例说话方式）。
   final List<String> quotes;
@@ -390,6 +394,7 @@ class ExtractedCharacter {
         'relationship': relationship,
         'speechStyle': speechStyle,
         'role': role,
+        'gender': gender,
         'quotes': quotes,
       };
 
@@ -402,6 +407,7 @@ class ExtractedCharacter {
         relationship: (j['relationship'] ?? '').toString(),
         speechStyle: (j['speechStyle'] ?? '').toString(),
         role: (j['role'] ?? '').toString(),
+        gender: (j['gender'] ?? '').toString(),
         quotes: _strList(j['quotes']),
       );
 }
@@ -502,6 +508,7 @@ class CastCandidate {
     this.role = '',
     this.mentions = 0,
     this.relationship = '',
+    this.gender = '',
   });
 
   final String name;
@@ -512,12 +519,16 @@ class CastCandidate {
   /// 归并后的关系片段（用于定位器判断人物关系）。
   final String relationship;
 
+  /// 男 / 女 / 未知（第一人称兜底时区分叙述者与核心角色）。
+  final String gender;
+
   Map<String, dynamic> toJson() => {
         'name': name,
         'aliases': aliases,
         'role': role,
         'mentions': mentions,
         'relationship': relationship,
+        'gender': gender,
       };
 
   factory CastCandidate.fromJson(Map<String, dynamic> j) => CastCandidate(
@@ -526,6 +537,7 @@ class CastCandidate {
         role: (j['role'] ?? '').toString(),
         mentions: (j['mentions'] as num?)?.toInt() ?? 0,
         relationship: (j['relationship'] ?? '').toString(),
+        gender: (j['gender'] ?? '').toString(),
       );
 }
 

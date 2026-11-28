@@ -28,6 +28,16 @@ DemoCharacter? parseCharacterCard(Uint8List bytes, String fileName) {
     }
 
     if (json == null) return null;
+    // 世界书 JSON 顶层也有 name + entries：它不能当角色卡导入，
+    // 否则会出现「名称是世界书名、内容全空」的假角色卡。
+    if (json['data'] is! Map &&
+        json.containsKey('entries') &&
+        !json.containsKey('description') &&
+        !json.containsKey('first_mes') &&
+        !json.containsKey('personality') &&
+        !json.containsKey('scenario')) {
+      return null;
+    }
     return DemoCharacter.fromCardJson(json, avatarBase64: avatar);
   } catch (_) {
     return null;

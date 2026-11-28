@@ -496,6 +496,7 @@ class _WorkerRun {
           role: c.role,
           mentions: c.mentions,
           relationship: c.relationship.take(3).join('；'),
+          gender: c.gender,
         ),
     ];
 
@@ -576,21 +577,21 @@ class _WorkerRun {
     log('角色定位：{{char}} = ${charProfile.name} · '
         '{{user}} = ${cast.user.name} · 配角 ${supporting.length} 人');
 
-    // 配角证据包：按块回读原文，抓与该角色相关的上下文，避免成稿只有
-    // 几句归并摘要。只读每人的前 2 个块，章节缓存复用，内存恒定。
-    Future<String> evidenceFor(MergedCharacter c) async {
+    // 证据包：按块回读原文，抓与角色/设定相关的上下文，避免成稿只有
+    // 几句归并摘要。只读前 2 个块，章节缓存复用，内存恒定。
+    Future<String> evidenceForBlocks(
+      Iterable<String> ids,
+      List<String> names,
+    ) async {
       final buffer = StringBuffer();
       var used = 0;
-      for (final id in c.blockIds) {
+      for (final id in ids) {
         if (used >= 2) break;
         final plan = planById[id];
         if (plan == null) continue;
         try {
           final text = await textFor(plan);
-          final snippets = _mentionSnippets(
-            text,
-            [c.name, ...c.aliases],
-          );
+          final snippets = _mentionSnippets(text, names);
           if (snippets.isEmpty) continue;
           buffer.writeln(snippets);
           used++;
@@ -599,6 +600,9 @@ class _WorkerRun {
       final out = buffer.toString().trim();
       return out.length > 1600 ? out.substring(0, 1600) : out;
     }
+
+    Future<String> evidenceFor(MergedCharacter c) =>
+        evidenceForBlocks(c.blockIds, [c.name, ...c.aliases]);
 
     await waitIfPaused();
     currentLabel = '生成角色卡：${charProfile.name}';
@@ -623,6 +627,17 @@ class _WorkerRun {
       if (profile == null) continue;
       final text = await evidenceFor(profile);
       if (text.trim().isNotEmpty) evidence[s.name] = text;
+    }
+
+    // 世界设定也需要原文依据，否则只能把归并摘要写成 1000+ 字空话。
+    final loreEvidence = <String, String>{};
+    for (final l in lore.take(config.maxLoreEntries)) {
+      await waitIfPaused();
+      final text = await evidenceForBlocks(
+        l.blockIds,
+        [l.topic, ...l.keys],
+      );
+      if (text.trim().isNotEmpty) loreEvidence[l.topic] = text;
     }
 
     await waitIfPaused();
@@ -655,6 +670,7 @@ class _WorkerRun {
       plotSummary: plotSummary,
       charName: charProfile.name,
       userName: cast.user.name,
+      evidence: loreEvidence,
       extraInstruction: config.extraInstruction,
       shouldStop: () => shouldStop,
     );
