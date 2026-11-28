@@ -101,7 +101,6 @@ class NovelGenController extends ChangeNotifier {
         headChapters: old.headChapters,
         blockChars: old.blockChars,
         // 运行时参数取新表单
-        maxCards: overrides.maxCards,
         maxLoreEntries: overrides.maxLoreEntries,
         concurrency: overrides.concurrency,
         providerOverride: overrides.providerOverride,
@@ -110,6 +109,11 @@ class NovelGenController extends ChangeNotifier {
         extraInstruction: overrides.extraInstruction,
         tokenBudget: overrides.tokenBudget,
         encodingOverride: overrides.encodingOverride,
+        cardCharacter: overrides.cardCharacter,
+        cardUser: overrides.cardUser,
+        cardUserDescription: overrides.cardUserDescription,
+        detail: overrides.detail,
+        supportingLimit: overrides.supportingLimit,
       );
       final encodingChanged =
           merged.encodingOverride != old.encodingOverride;

@@ -85,6 +85,28 @@ class NovelTextStream {
     }
   }
 
+  /// 只读文件开头一段文本，不建立全书索引。
+  ///
+  /// 角色预检（判断谁是角色卡、谁是 {{user}}）只需要开头几千字；这本书可能
+  /// 有几百 MB，不能为了预检扫全书。截断处的多字节字符由容错解码处理。
+  static Future<String> readPrefix(
+    String path, {
+    int maxBytes = 96 * 1024,
+  }) async {
+    final enc = await detectEncoding(path);
+    final raf = await File(path).open();
+    try {
+      final size = await raf.length();
+      var bytes = await raf.read(min(maxBytes, size));
+      if (enc.isWide && bytes.length.isOdd) {
+        bytes = bytes.sublist(0, bytes.length - 1);
+      }
+      return _decodeBytes(bytes, enc);
+    } finally {
+      await raf.close();
+    }
+  }
+
   static NovelEncoding _detectFromSample(Uint8List sample,
       {bool wholeFile = false}) {
     if (sample.length >= 3 &&

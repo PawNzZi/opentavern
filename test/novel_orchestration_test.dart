@@ -218,6 +218,7 @@ void main() {
           personality: ['冷静'],
           mentions: 3,
         ),
+        user: const CastUser(name: '我', description: '第一人称叙述者'),
         worldSummary: '边陲小城',
       );
       expect(draft.name, '林清');
@@ -240,6 +241,7 @@ void main() {
           ),
         ],
         maxEntries: 10,
+        worldSummary: '边陲小城',
       );
       expect(entries.single.name, '青云城');
       expect(entries.single.constant, true);
@@ -289,6 +291,7 @@ void main() {
       final gen = NovelGenerator(settings: _settings, client: client);
       await gen.composeCard(
         character: MergedCharacter(name: '林清'),
+        user: const CastUser(name: '我', description: '第一人称叙述者'),
         worldSummary: '边陲小城',
         plotSummary: '林清逃出家门，来到青云城。',
       );

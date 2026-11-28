@@ -171,6 +171,11 @@ class DemoCharacter {
         'talkativeness': 0.5,
         'fav': favorite,
         'world': lorebook == '未绑定' ? '' : lorebook,
+        // 单卡改编写入的角色级 {{user}} 人格；重新导入时还原。
+        if (personaNameOverride.trim().isNotEmpty)
+          'novel_user_name': personaNameOverride,
+        if (personaDescriptionOverride.trim().isNotEmpty)
+          'novel_user_description': personaDescriptionOverride,
       },
     };
     if (book != null) {
@@ -321,6 +326,9 @@ class DemoCharacter {
       avatarBase64: avatarBase64,
       rawJson: json,
       createdAt: DateTime.now().millisecondsSinceEpoch,
+      personaNameOverride: (ext['novel_user_name'] ?? '').toString(),
+      personaDescriptionOverride:
+          (ext['novel_user_description'] ?? '').toString(),
     );
   }
 }

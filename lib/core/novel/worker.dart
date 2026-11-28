@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math';
 
 import '../models.dart';
 import 'generator.dart';
@@ -469,49 +470,211 @@ class _WorkerRun {
     await waitIfPaused();
 
     // ---------------------------------------------------- 6. L3 成稿
+    // 单卡：先定位「角色卡对象 / {{user}} / 配角表」，再成稿一张卡，
+    // 其余人物全部写进世界书。
     setPhase(GenPhase.composing);
-    final cardCount = config.maxCards.clamp(1, 10);
-    final targets = characters.take(cardCount).toList();
-    final cards = <DraftCard>[];
-    for (var i = 0; i < targets.length; i++) {
-      await waitIfPaused();
-      currentLabel = '生成角色卡：${targets[i].name}';
-      phaseFraction = targets.isEmpty ? 1 : i / (targets.length + 1);
-      emit(force: true);
-      final avatar = i < config.avatarPaths.length ? config.avatarPaths[i] : '';
-      final card = await generator.composeCard(
-        character: targets[i],
+    final planById = {for (final p in plans) p.id: p};
+
+    String openingExcerpt = '';
+    final idx = index;
+    if (idx.chapters.isNotEmpty) {
+      try {
+        final first = await NovelTextStream.readChapter(
+          textPath,
+          idx,
+          idx.chapters.first,
+        );
+        openingExcerpt = first.length > 3000 ? first.substring(0, 3000) : first;
+      } catch (_) {}
+    }
+
+    final candidates = <CastCandidate>[
+      for (final c in characters.take(24))
+        CastCandidate(
+          name: c.name,
+          aliases: c.aliases.toList(),
+          role: c.role,
+          mentions: c.mentions,
+          relationship: c.relationship.take(3).join('；'),
+        ),
+    ];
+
+    await waitIfPaused();
+    currentLabel = '识别角色卡与 {{user}}';
+    phaseFraction = .05;
+    emit(force: true);
+    CastResolution cast;
+    try {
+      cast = await generator.resolveCast(
+        title: config.fileName,
+        openingExcerpt: openingExcerpt,
+        candidates: candidates,
         worldSummary: worldSummary,
         plotSummary: plotSummary,
+        charOverride: config.cardCharacter,
+        userOverride: config.cardUser,
+        userDescriptionOverride: config.cardUserDescription,
         extraInstruction: config.extraInstruction,
-        avatarPath: avatar,
         shouldStop: () => shouldStop,
       );
-      cards.add(card);
-      log('✓ 角色卡「${card.name}」');
+    } on NovelStoppedException {
+      rethrow;
+    } catch (e) {
+      log('· 角色定位失败，改用本地规则：$e');
+      cast = NovelGenerator.castFallback(
+        title: config.fileName,
+        openingExcerpt: openingExcerpt,
+        candidates: candidates,
+        charOverride: config.cardCharacter,
+        userOverride: config.cardUser,
+        userDescriptionOverride: config.cardUserDescription,
+      );
+    }
+
+    var charProfile = _findMerged(cast.character.name, characters);
+    if (charProfile == null) {
+      // 定位结果不在归并人物里（模型编名字/别名未命中）：用本地兜底重选。
+      final fallback = NovelGenerator.castFallback(
+        title: config.fileName,
+        openingExcerpt: openingExcerpt,
+        candidates: candidates,
+        charOverride: config.cardCharacter,
+        userOverride: config.cardUser,
+        userDescriptionOverride: config.cardUserDescription,
+      );
+      final fallbackProfile = _findMerged(fallback.character.name, characters);
+      if (fallbackProfile != null) {
+        cast = fallback.copyWith(
+          character: CastCharacter(
+            name: fallbackProfile.name,
+            aliases: fallbackProfile.aliases.toList(),
+            reason: fallback.character.reason,
+          ),
+        );
+        charProfile = fallbackProfile;
+      } else if (characters.isNotEmpty) {
+        charProfile = characters.first;
+        cast = cast.copyWith(
+          character: CastCharacter(
+            name: charProfile.name,
+            aliases: charProfile.aliases.toList(),
+            reason: '兜底：使用戏份最高的人物',
+          ),
+        );
+      }
+    }
+    if (charProfile == null) {
+      throw Exception('没有可用的角色档案，无法生成角色卡');
+    }
+
+    final supporting = NovelGenerator.completeSupporting(
+      cast: cast,
+      merged: characters,
+      limit: config.supportingLimit,
+    );
+    cast = cast.copyWith(supporting: supporting);
+    log('角色定位：{{char}} = ${charProfile.name} · '
+        '{{user}} = ${cast.user.name} · 配角 ${supporting.length} 人');
+
+    // 配角证据包：按块回读原文，抓与该角色相关的上下文，避免成稿只有
+    // 几句归并摘要。只读每人的前 2 个块，章节缓存复用，内存恒定。
+    Future<String> evidenceFor(MergedCharacter c) async {
+      final buffer = StringBuffer();
+      var used = 0;
+      for (final id in c.blockIds) {
+        if (used >= 2) break;
+        final plan = planById[id];
+        if (plan == null) continue;
+        try {
+          final text = await textFor(plan);
+          final snippets = _mentionSnippets(
+            text,
+            [c.name, ...c.aliases],
+          );
+          if (snippets.isEmpty) continue;
+          buffer.writeln(snippets);
+          used++;
+        } catch (_) {}
+      }
+      final out = buffer.toString().trim();
+      return out.length > 1600 ? out.substring(0, 1600) : out;
     }
 
     await waitIfPaused();
-    currentLabel = '生成世界书条目';
-    phaseFraction = targets.isEmpty ? .9 : targets.length / (targets.length + 1);
+    currentLabel = '生成角色卡：${charProfile.name}';
+    phaseFraction = .12;
     emit(force: true);
-    final entries = await generator.composeLore(
-      lore: lore,
-      maxEntries: config.maxLoreEntries,
+    final card = await generator.composeCard(
+      character: charProfile,
+      user: cast.user,
+      worldSummary: worldSummary,
+      plotSummary: plotSummary,
+      extraInstruction: config.extraInstruction,
+      avatarPath:
+          config.avatarPaths.isEmpty ? '' : config.avatarPaths.first,
+      shouldStop: () => shouldStop,
+    );
+    log('✓ 角色卡「${card.name}」（{{user}} = ${cast.user.name}）');
+
+    final evidence = <String, String>{};
+    for (final s in supporting) {
+      await waitIfPaused();
+      final profile = _findMerged(s.name, characters);
+      if (profile == null) continue;
+      final text = await evidenceFor(profile);
+      if (text.trim().isNotEmpty) evidence[s.name] = text;
+    }
+
+    await waitIfPaused();
+    currentLabel = '生成配角世界书（${supporting.length} 人）';
+    phaseFraction = .45;
+    emit(force: true);
+    final castEntries = await generator.composeCastLore(
+      supporting: supporting,
+      evidence: evidence,
+      charName: charProfile.name,
+      userName: cast.user.name,
+      title: config.fileName,
+      plotSummary: plotSummary,
+      worldSummary: worldSummary,
+      detail: config.detail,
       extraInstruction: config.extraInstruction,
       shouldStop: () => shouldStop,
     );
+    log('✓ 人物世界书 ${castEntries.length} 条');
+
+    await waitIfPaused();
+    currentLabel = '生成世界设定条目';
+    phaseFraction = .8;
+    emit(force: true);
+    final worldEntries = await generator.composeLore(
+      lore: lore,
+      maxEntries: config.maxLoreEntries,
+      worldSummary: worldSummary,
+      detail: config.detail,
+      plotSummary: plotSummary,
+      charName: charProfile.name,
+      userName: cast.user.name,
+      extraInstruction: config.extraInstruction,
+      shouldStop: () => shouldStop,
+    );
+    final overview = NovelGenerator.relationshipOverview(
+      cast: cast,
+      merged: characters,
+    );
+    final entries = <DraftLoreEntry>[overview, ...castEntries, ...worldEntries];
     log('✓ 世界书 ${entries.length} 条');
 
     final bookName = _bookName(config.fileName);
     final result = GenResult(
       bookName: bookName,
-      cards: cards,
+      cards: [card],
       lore: entries,
       tokensUsed: usedTokens,
       failedBlocks: failedIds,
       scannedBlocks: done.length,
       totalBlocks: totalBlocks,
+      cast: cast,
     );
     await store.saveResult(jobId, result);
     await store.saveJob(job.copyWith(finished: true));
@@ -600,4 +763,57 @@ class _BlockPlan {
 
   /// 该块在本章 splitBlocks 结果里的下标（正文在抽取时按需读取）。
   final int pieceIndex;
+}
+
+String _normName(String s) => s
+    .replaceAll(RegExp(r'''[「」『』“”"'\s·・]'''), '')
+    .trim()
+    .toLowerCase();
+
+MergedCharacter? _findMerged(
+  String name,
+  List<MergedCharacter> list,
+) {
+  final key = _normName(name);
+  if (key.isEmpty) return null;
+  for (final c in list) {
+    if (_normName(c.name) == key) return c;
+    for (final alias in c.aliases) {
+      if (_normName(alias) == key) return c;
+    }
+  }
+  for (final c in list) {
+    final n = _normName(c.name);
+    if (n.length >= 2 && (n.contains(key) || key.contains(n))) return c;
+  }
+  return null;
+}
+
+/// 从块正文里抓取提到某个人物的上下文窗口（每块最多 2 段）。
+String _mentionSnippets(
+  String text,
+  List<String> names, {
+  int radius = 180,
+  int maxSnippets = 2,
+}) {
+  final needles = names
+      .map((e) => e.trim())
+      .where((e) => e.length >= 2)
+      .toSet()
+      .toList()
+    ..sort((a, b) => b.length.compareTo(a.length));
+  final out = <String>[];
+  for (final name in needles) {
+    var from = 0;
+    while (out.length < maxSnippets) {
+      final at = text.indexOf(name, from);
+      if (at < 0) break;
+      final start = max(0, at - radius);
+      final end = min(text.length, at + name.length + radius);
+      out.add(text.substring(start, end).trim());
+      from = at + name.length;
+    }
+    if (out.length >= maxSnippets) break;
+  }
+  return out.join('\n…\n');
 }

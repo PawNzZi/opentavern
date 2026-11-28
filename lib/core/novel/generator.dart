@@ -16,11 +16,15 @@ class MergedCharacter {
     List<String>? relationship,
     List<String>? speechStyle,
     this.role = '',
+    Set<String>? blockIds,
+    List<String>? quotes,
   })  : aliases = aliases ?? <String>{},
         appearance = appearance ?? [],
         personality = personality ?? [],
         relationship = relationship ?? [],
-        speechStyle = speechStyle ?? [];
+        speechStyle = speechStyle ?? [],
+        blockIds = blockIds ?? <String>{},
+        quotes = quotes ?? [];
 
   final String name;
   final Set<String> aliases;
@@ -33,8 +37,14 @@ class MergedCharacter {
   final List<String> speechStyle;
   String role;
 
+  /// 出现过该人物的块 id，成稿时用来回读原文做「证据包」。
+  final Set<String> blockIds;
+
+  /// 从原文摘录的原话，用来总结说话方式与示例。
+  final List<String> quotes;
+
   String get profileText {
-    String join(List<String> parts) {
+    String join(List<String> parts, {int max = 1500}) {
       final seen = <String>{};
       final out = <String>[];
       for (final p in parts) {
@@ -42,19 +52,26 @@ class MergedCharacter {
         if (t.isEmpty || seen.contains(t)) continue;
         seen.add(t);
         out.add(t);
-        if (out.join('；').length > 400) break;
+        if (out.join('；').length > max) break;
       }
       return out.join('；');
     }
 
+    final sample = quotes
+        .map((q) => q.trim())
+        .where((q) => q.isNotEmpty)
+        .take(5)
+        .toList();
     return [
       '姓名：$name',
-      if (aliases.isNotEmpty) '别名/称谓：${aliases.take(8).join('、')}',
+      if (aliases.isNotEmpty) '别名/称谓：${aliases.take(10).join('、')}',
       if (role.isNotEmpty) '定位：$role',
       if (appearance.isNotEmpty) '外貌：${join(appearance)}',
       if (personality.isNotEmpty) '性格：${join(personality)}',
       if (relationship.isNotEmpty) '关系：${join(relationship)}',
       if (speechStyle.isNotEmpty) '说话风格：${join(speechStyle)}',
+      if (sample.isNotEmpty)
+        '原话示例：${sample.map((q) => '「$q」').join(' / ')}',
       '出场块数：$mentions',
     ].join('\n');
   }
@@ -69,8 +86,10 @@ class MergedLore {
     this.category = '',
     this.constant = false,
     this.mentions = 0,
+    Set<String>? blockIds,
   })  : keys = keys ?? <String>{},
-        contents = contents ?? [];
+        contents = contents ?? [],
+        blockIds = blockIds ?? <String>{};
 
   final String topic;
   final Set<String> keys;
@@ -79,6 +98,10 @@ class MergedLore {
   bool constant;
   int mentions;
 
+  /// 出现过该设定的块 id，供成稿时回读原文补充细节。
+  final Set<String> blockIds;
+
+  /// 归并后的全部素材（不再在 600 字处截断，详细成稿需要完整依据）。
   String get content {
     final seen = <String>{};
     final out = <String>[];
@@ -87,7 +110,7 @@ class MergedLore {
       if (t.isEmpty || seen.contains(t)) continue;
       seen.add(t);
       out.add(t);
-      if (out.join('\n').length > 600) break;
+      if (out.join('\n').length > 4000) break;
     }
     return out.join('\n');
   }
@@ -140,7 +163,9 @@ class NovelGenerator {
       ..writeln('你是小说设定分析器。只输出 JSON，不要任何解释或 Markdown 以外的文字。')
       ..writeln('从下面的小说片段中抽取客观存在的设定：')
       ..writeln('1) characters：出场人物，最多 8 个。字段 name, aliases(数组), '
-          'appearance, personality, relationship, speechStyle, role(主角/配角/反派等)。')
+          'appearance, personality, relationship, speechStyle, '
+          'role(主角/配角/反派等), quotes(数组：该人物在本片段中的原话，'
+          '直接摘录引号里的对话，最多 3 句，不要改写或概括)。')
       ..writeln('2) lore：世界设定，最多 6 条。字段 topic, keys(触发关键词数组), '
           'content, category(地点/组织/物品/规则/时间线), constant(是否世界观常驻,布尔)。')
       ..writeln('3) summary：本片段剧情，80 字以内。')
@@ -210,6 +235,7 @@ class NovelGenerator {
         }
         target ??= byKey[key] = MergedCharacter(name: c.name.trim());
         target.mentions++;
+        target.blockIds.add(block.blockId);
         for (final a in c.aliases) {
           final n = norm(a);
           if (n.isNotEmpty && n != key) target.aliases.add(a.trim());
@@ -220,6 +246,12 @@ class NovelGenerator {
           target.relationship.add(c.relationship);
         }
         if (c.speechStyle.trim().isNotEmpty) target.speechStyle.add(c.speechStyle);
+        for (final quote in c.quotes) {
+          final q = quote.trim();
+          if (q.isEmpty || target.quotes.contains(q)) continue;
+          target.quotes.add(q);
+          if (target.quotes.length >= 12) break;
+        }
         if (target.role.isEmpty && c.role.trim().isNotEmpty) {
           target.role = c.role.trim();
         }
@@ -244,6 +276,7 @@ class NovelGenerator {
         if (key.isEmpty) continue;
         final target = byKey[key] ??= MergedLore(topic: l.topic.trim());
         target.mentions++;
+        target.blockIds.add(block.blockId);
         target.keys.addAll(l.keys.where((k) => k.trim().isNotEmpty));
         target.keys.add(l.topic.trim());
         if (l.content.trim().isNotEmpty) target.contents.add(l.content);
@@ -334,10 +367,16 @@ class NovelGenerator {
           relationship: [...canonical.relationship],
           speechStyle: [...canonical.speechStyle],
           role: canonical.role,
+          blockIds: {...canonical.blockIds},
+          quotes: [...canonical.quotes],
         );
         for (final m in ordered.skip(1)) {
           out.aliases.addAll(m.aliases);
           if (!out.aliases.contains(m.name)) out.aliases.add(m.name);
+          out.blockIds.addAll(m.blockIds);
+          for (final q in m.quotes) {
+            if (!out.quotes.contains(q)) out.quotes.add(q);
+          }
           out.appearance.addAll(m.appearance);
           out.personality.addAll(m.personality);
           out.relationship.addAll(m.relationship);
@@ -360,11 +399,471 @@ class NovelGenerator {
     }
   }
 
+  // ---------------------------------------------------------------- L2.6
+
+  /// 角色定位：从候选人物里判断「角色卡角色（{{char}}）」与
+  /// 「玩家角色（{{user}}）」，其余人物作为配角写进世界书。
+  ///
+  /// 规则优先于模型的自由发挥：只能选 1 个 char / 1 个 user，且 char ≠ user。
+  /// 失败时退回 [castFallback]，保证永远能给出可用的定位。
+  Future<CastResolution> resolveCast({
+    required String title,
+    required String openingExcerpt,
+    required List<CastCandidate> candidates,
+    String worldSummary = '',
+    String plotSummary = '',
+    String charOverride = '',
+    String userOverride = '',
+    String userDescriptionOverride = '',
+    String extraInstruction = '',
+    bool Function()? shouldStop,
+  }) async {
+    if (candidates.isEmpty) {
+      return castFallback(
+        title: title,
+        openingExcerpt: openingExcerpt,
+        candidates: candidates,
+        charOverride: charOverride,
+        userOverride: userOverride,
+        userDescriptionOverride: userDescriptionOverride,
+      );
+    }
+
+    final listing = StringBuffer();
+    for (var i = 0; i < candidates.length; i++) {
+      final c = candidates[i];
+      listing.writeln('$i. ${c.name}'
+          '${c.aliases.isEmpty ? '' : '（称谓：${c.aliases.take(8).join('、')}）'}'
+          '${c.role.isEmpty ? '' : '｜定位：${c.role}'}'
+          '｜出场 ${c.mentions} 块'
+          '${c.relationship.isEmpty ? '' : '\n   关系：${_clip(c.relationship, 160)}'}');
+    }
+
+    final prompt = StringBuffer()
+      ..writeln('你是小说改编 SillyTavern 角色卡的角色定位器。只输出 JSON，不要解释。')
+      ..writeln('这是一次「单卡」改编：玩家会扮演 {{user}}，与角色卡 {{char}} 互动。')
+      ..writeln('从候选人物里选出：')
+      ..writeln('1) char：角色卡角色。优先选书名/标题点名的核心人物、与 {{user}} '
+          '对手戏最多、情感或剧情张力最强的人；')
+      ..writeln('2) user：玩家扮演的人。优先选叙述视角/第一人称「我」/读者代入对象。')
+      ..writeln('判断规则：')
+      ..writeln('- char 与 user 不能是同一个人；两人都必须来自候选清单（名字或称谓）。')
+      ..writeln('- 第一人称小说：user = 「我」；char = 与「我」关系最核心的人，'
+          '不能把「我」本人做成角色卡。')
+      ..writeln('- 第三人称双主角：把读者代入的一方给 user，另一方给 char；'
+          '不按男女频硬编码性别，根据称谓、心理描写和剧情重心判断。')
+      ..writeln('- 书名包含明确关系词（如「美母」「姐姐」「师尊」）且候选里有对应人物时，'
+          '该人物优先做 char。')
+      ..writeln('- 其余角色全部放进 supporting，不要遗漏主要配角；'
+          '已故/纯背景/群体角色可以重要性低，但不要塞进 char/user。')
+      ..writeln('- 第一人称叙述者如果有名字或别人对他的称呼（如「小杰」「儿子」），'
+          '放进 user.aliases；绝不能把 user 本人再放进 supporting。')
+      ..writeln('- 每个 supporting 的 speech_style 概括其习惯说话方式（语气、用词、'
+          '口头禅、称呼），speech_examples 尽量摘录原文原话（1~3 句）。')
+      ..writeln('- user.description：给 {{user}} 用的角色级人格（150~400 字），'
+          '写清身份、与 char 的关系、动机、说话/行为方式；第一人称且全书没出现真名时 '
+          'user.name 用「我」。')
+      ..writeln('候选清单：\n$listing');
+    if (worldSummary.trim().isNotEmpty) {
+      prompt.writeln('世界观摘要：${_clip(worldSummary, 1200)}');
+    }
+    if (plotSummary.trim().isNotEmpty) {
+      prompt.writeln('剧情梗概：${_clip(plotSummary, 1600)}');
+    }
+    if (charOverride.trim().isNotEmpty) {
+      prompt.writeln('用户指定角色卡对象：$charOverride（若在候选里必须遵守）');
+    }
+    if (userOverride.trim().isNotEmpty) {
+      prompt.writeln('用户指定 {{user}}：$userOverride（若在候选里必须遵守）');
+    }
+    if (extraInstruction.trim().isNotEmpty) {
+      prompt.writeln('附加要求：${extraInstruction.trim()}');
+    }
+    prompt.writeln('输出格式：{"pov":"first|third","confidence":0.0,'
+        '"char":{"name":"","aliases":[],"reason":""},'
+        '"user":{"name":"","aliases":[],"description":"","reason":""},'
+        '"supporting":[{"name":"","aliases":[],"importance":1,'
+        '"relation_to_char":"","relation_to_user":"","motivation":"",'
+        '"secrets":"","speech_style":"","speech_examples":[""],'
+        '"appearance":"","personality":""}],'
+        '"reason":""}');
+
+    try {
+      final json = await _callJson([
+        {'role': 'system', 'content': prompt.toString()},
+        {
+          'role': 'user',
+          'content': '书名：$title\n\n开篇原文：\n${_clip(openingExcerpt, 3000)}',
+        },
+      ], shouldStop: shouldStop);
+
+      final charRaw = json['char'] is Map
+          ? Map<String, dynamic>.from(json['char'] as Map)
+          : const <String, dynamic>{};
+      final userRaw = json['user'] is Map
+          ? Map<String, dynamic>.from(json['user'] as Map)
+          : const <String, dynamic>{};
+
+      var charName = (charRaw['name'] ?? '').toString().trim();
+      final charMatch = _matchCandidate(charName, candidates);
+      if (charMatch != null) charName = charMatch.name;
+      if (charOverride.trim().isNotEmpty) {
+        final overrideMatch = _matchCandidate(charOverride, candidates);
+        charName = overrideMatch?.name ?? charOverride.trim();
+      }
+      if (charName.isEmpty) {
+        throw StateError('没有识别出角色卡角色');
+      }
+
+      var userName = (userRaw['name'] ?? '').toString().trim();
+      final userMatch = _matchCandidate(userName, candidates);
+      if (userMatch != null) userName = userMatch.name;
+      if (userOverride.trim().isNotEmpty) {
+        final overrideMatch = _matchCandidate(userOverride, candidates);
+        userName = overrideMatch?.name ?? userOverride.trim();
+      }
+      if (userName.isEmpty) {
+        userName = _looksFirstPerson(openingExcerpt) ? '我' : '玩家';
+      }
+      if (_norm(charName) == _norm(userName)) {
+        throw StateError('角色卡角色与用户角色是同一人');
+      }
+
+      var userDescription =
+          (userRaw['description'] ?? '').toString().trim();
+      if (userDescriptionOverride.trim().isNotEmpty) {
+        userDescription = userDescriptionOverride.trim();
+      }
+      if (userDescription.isEmpty) {
+        userDescription = _fallbackUserDescription(
+          userName: userName,
+          userMatch: userMatch,
+          charName: charName,
+          firstPerson:
+              _looksFirstPerson(openingExcerpt) || userName == '我',
+        );
+      }
+
+      final supporting = <SupportingCast>[];
+      for (final raw in (json['supporting'] as List? ?? const [])) {
+        if (raw is! Map) continue;
+        final map = Map<String, dynamic>.from(raw);
+        final name = (map['name'] ?? '').toString().trim();
+        if (name.isEmpty) continue;
+        final matched = _matchCandidate(name, candidates);
+        final canonical = matched?.name ?? name;
+        if (_norm(canonical) == _norm(charName) ||
+            _norm(canonical) == _norm(userName)) {
+          continue;
+        }
+        supporting.add(SupportingCast(
+          name: canonical,
+          aliases: _mergeAliases(
+            _stringList(map['aliases']),
+            matched?.aliases ?? const [],
+          ),
+          importance: ((map['importance'] as num?)?.toInt() ?? 3).clamp(1, 5),
+          relationToChar: (map['relation_to_char'] ?? '').toString().trim(),
+          relationToUser: (map['relation_to_user'] ?? '').toString().trim(),
+          motivation: (map['motivation'] ?? '').toString().trim(),
+          secrets: (map['secrets'] ?? '').toString().trim(),
+          speechStyle: (map['speech_style'] ?? '').toString().trim(),
+          appearance: (map['appearance'] ?? '').toString().trim(),
+          personality: (map['personality'] ?? '').toString().trim(),
+          speechExamples: _stringList(map['speech_examples']).take(6).toList(),
+        ));
+      }
+
+      final charMatch2 = _matchCandidate(charName, candidates);
+      return CastResolution(
+        character: CastCharacter(
+          name: charMatch2?.name ?? charName,
+          aliases: charMatch2?.aliases ?? const [],
+          reason: (charRaw['reason'] ?? '').toString(),
+        ),
+        user: CastUser(
+          name: userName,
+          aliases: _mergeAliases(
+            _stringList(userRaw['aliases']),
+            userMatch?.aliases ?? const [],
+          ).where((a) => _norm(a) != _norm(userName)).toList(),
+          description: userDescription,
+          reason: (userRaw['reason'] ?? '').toString(),
+        ),
+        pov: (json['pov'] ?? '').toString(),
+        confidence:
+            ((json['confidence'] as num?)?.toDouble() ?? .6).clamp(0.0, 1.0),
+        reason: (json['reason'] ?? '').toString(),
+        supporting: supporting,
+        source: 'ai',
+      );
+    } catch (_) {
+      return castFallback(
+        title: title,
+        openingExcerpt: openingExcerpt,
+        candidates: candidates,
+        charOverride: charOverride,
+        userOverride: userOverride,
+        userDescriptionOverride: userDescriptionOverride,
+      );
+    }
+  }
+
+  /// 本地规则兜底：不依赖 AI，也尽量选对「单卡」。
+  static CastResolution castFallback({
+    required String title,
+    required String openingExcerpt,
+    required List<CastCandidate> candidates,
+    String charOverride = '',
+    String userOverride = '',
+    String userDescriptionOverride = '',
+  }) {
+    final sorted = [...candidates]
+      ..sort((a, b) => b.mentions.compareTo(a.mentions));
+    final fixedChar = charOverride.trim();
+    final fixedUser = userOverride.trim();
+    final firstPerson =
+        _looksFirstPerson(openingExcerpt) || fixedUser == '我';
+
+    CastCandidate? match(String raw) => _matchCandidate(raw, sorted);
+
+    CastCandidate? byTitle() {
+      CastCandidate? best;
+      var bestLen = 0;
+      for (final c in sorted) {
+        for (final alias in [c.name, ...c.aliases]) {
+          final a = alias.trim();
+          if (a.length < 2) continue;
+          if (title.contains(a) && a.length > bestLen) {
+            best = c;
+            bestLen = a.length;
+          }
+        }
+      }
+      return best;
+    }
+
+    CastCandidate? userPick = fixedUser.isEmpty ? null : match(fixedUser);
+    CastCandidate? charPick = fixedChar.isEmpty ? null : match(fixedChar);
+
+    if (fixedChar.isEmpty) {
+      charPick ??= byTitle();
+      if (charPick == null) {
+        if (firstPerson) {
+          charPick = _first(sorted.where((c) => _norm(c.name) != '我'));
+        } else {
+          charPick = _first(sorted.where((c) =>
+              _norm(c.name) != _norm(userPick?.name ?? '') &&
+              (c.role.contains('女主') || c.role.contains('主角'))));
+        }
+      }
+      charPick ??= _first(
+        sorted.where((c) => _norm(c.name) != _norm(userPick?.name ?? '')),
+      );
+    }
+
+    if (fixedUser.isEmpty && !firstPerson) {
+      // 第三人称：先找男主/主角做 user。
+      userPick ??= _first(sorted.where((c) =>
+          _norm(c.name) != _norm(charPick?.name ?? '') &&
+          (c.role.contains('男主') || c.role.contains('主角'))));
+      userPick ??= _first(sorted.where(
+        (c) => _norm(c.name) != _norm(charPick?.name ?? ''),
+      ));
+    }
+
+    if (fixedUser.isEmpty && firstPerson) {
+      // 第一人称：如果叙述者有自己的名字/称谓，用它补全 user 的别名，
+      // 避免把「我」本人再当成配角写进世界书。
+      userPick ??= _first(sorted.where((c) =>
+          _norm(c.name) != _norm(charPick?.name ?? '') &&
+          (c.role.contains('主角') || c.role.contains('男主'))));
+    }
+
+    final charName = charPick?.name ?? fixedChar;
+    var userName = fixedUser.isNotEmpty
+        ? fixedUser
+        : (firstPerson ? '我' : (userPick?.name ?? '玩家'));
+    if (userName.isEmpty) userName = firstPerson ? '我' : '玩家';
+    if (_norm(userName) == _norm(charName)) {
+      userName = firstPerson ? '我' : '玩家';
+    }
+
+    final userDesc = userDescriptionOverride.trim().isNotEmpty
+        ? userDescriptionOverride.trim()
+        : _fallbackUserDescription(
+            userName: userName,
+            userMatch: userPick,
+            charName: charName.isEmpty ? '角色卡角色' : charName,
+            firstPerson: firstPerson,
+          );
+
+    final excluded = <String>{
+      _norm(charName),
+      _norm(userName),
+      if (userPick != null) _norm(userPick.name),
+      if (userPick != null) ...userPick.aliases.map(_norm),
+    };
+    final supporting = <SupportingCast>[
+      for (final c in sorted)
+        if (!excluded.contains(_norm(c.name)))
+          SupportingCast(
+            name: c.name,
+            aliases: c.aliases.toList(),
+            importance: c.mentions >= (sorted.first.mentions * .5)
+                ? 5
+                : c.mentions >= (sorted.first.mentions * .2)
+                    ? 3
+                    : 1,
+            relationToChar: _clip(c.relationship, 300),
+            speechStyle: c.role,
+          ),
+    ];
+
+    return CastResolution(
+      character: CastCharacter(
+        name: charName.isEmpty ? '未命名角色' : charName,
+        aliases: charPick?.aliases.toList() ?? const [],
+        reason: '本地规则兜底：书名/第一人称/戏份判断',
+      ),
+      user: CastUser(
+        name: userName,
+        aliases: _mergeAliases(
+          userPick?.aliases.toList() ?? const [],
+          [if (userPick != null) userPick.name],
+        ).where((a) => _norm(a) != _norm(userName)).toList(),
+        description: userDesc,
+        reason: firstPerson ? '第一人称叙述者' : '主角/代入角色',
+      ),
+      pov: firstPerson ? 'first' : 'third',
+      confidence: .35,
+      reason: '未使用 AI 或 AI 定位失败，已按书名与戏份规则判断',
+      supporting: supporting,
+      source: 'fallback',
+    );
+  }
+
+  /// 把归并后的配角改成「世界书人物条目」所需的定位资料。
+  ///
+  /// 模型可能只返回部分配角，这里用全部归并人物补齐，保证「出现的角色都进书」。
+  static List<SupportingCast> completeSupporting({
+    required CastResolution cast,
+    required List<MergedCharacter> merged,
+    int limit = 30,
+  }) {
+    final byNorm = <String, SupportingCast>{};
+    for (final s in cast.supporting) {
+      byNorm[_norm(s.name)] = s;
+    }
+    final charKey = _norm(cast.character.name);
+    final excluded = <String>{
+      charKey,
+      _norm(cast.user.name),
+      ...cast.user.aliases.map(_norm),
+    };
+    var rank = 0;
+    for (final m in merged) {
+      final key = _norm(m.name);
+      if (excluded.contains(key)) continue;
+      rank++;
+      final existing = byNorm[key];
+      final importance = existing?.importance ??
+          (cast.supporting.isEmpty
+              ? (rank <= 3 ? 5 : rank <= 8 ? 4 : 3)
+              : 3);
+      byNorm[key] = SupportingCast(
+        name: m.name,
+        aliases: _mergeAliases(
+          existing?.aliases ?? const [],
+          m.aliases.toList(),
+        ),
+        importance: importance.clamp(1, 5),
+        relationToChar: existing?.relationToChar.isNotEmpty == true
+            ? existing!.relationToChar
+            : _clip(m.relationship.join('；'), 300),
+        relationToUser: existing?.relationToUser ?? '',
+        motivation: existing?.motivation ?? '',
+        secrets: existing?.secrets ?? '',
+        speechStyle: existing?.speechStyle.isNotEmpty == true
+            ? existing!.speechStyle
+            : _clip(m.speechStyle.join('；'), 200),
+        appearance: existing?.appearance.isNotEmpty == true
+            ? existing!.appearance
+            : _clip(m.appearance.join('；'), 300),
+        personality: existing?.personality.isNotEmpty == true
+            ? existing!.personality
+            : _clip(m.personality.join('；'), 300),
+        speechExamples: existing?.speechExamples.isNotEmpty == true
+            ? existing!.speechExamples
+            : _mergeAliases(m.quotes, const []).take(6).toList(),
+      );
+    }
+    final out = byNorm.values.toList()
+      ..sort((a, b) {
+        final c = b.importance.compareTo(a.importance);
+        if (c != 0) return c;
+        return a.name.compareTo(b.name);
+      });
+    return out.take(limit).toList();
+  }
+
+  /// 世界书「人物关系总览」常驻条目（本地拼装，不花 token）。
+  static DraftLoreEntry relationshipOverview({
+    required CastResolution cast,
+    required List<MergedCharacter> merged,
+    int maxSupporting = 12,
+  }) {
+    final charProfile = _mergedByName(cast.character.name, merged);
+    final charDetail = charProfile == null
+        ? ''
+        : '——${_clip(charProfile.profileText.replaceAll('\n', '；'), 500)}';
+    final userDetail = cast.user.description.trim().isEmpty
+        ? ''
+        : '——${_clip(cast.user.description, 300)}';
+    final buffer = StringBuffer()
+      ..writeln('{{char}}：${cast.character.name}$charDetail')
+      ..writeln('{{user}}：${cast.user.name}$userDetail')
+      ..writeln()
+      ..writeln('人物关系：');
+    final support = [...cast.supporting]
+      ..sort((a, b) => b.importance.compareTo(a.importance));
+    for (final s in support.take(maxSupporting)) {
+      if (buffer.length > 2200) break;
+      final relation = [
+        if (s.relationToChar.trim().isNotEmpty)
+          '与{{char}}：${_clip(s.relationToChar, 150)}',
+        if (s.relationToUser.trim().isNotEmpty)
+          '与{{user}}：${_clip(s.relationToUser, 150)}',
+        if (s.motivation.trim().isNotEmpty)
+          '动机：${_clip(s.motivation, 100)}',
+      ].join('；');
+      buffer.writeln('- ${s.name}${relation.isEmpty ? '' : '：$relation'}');
+    }
+    return DraftLoreEntry(
+      name: '人物关系总览',
+      keys: [
+        '人物关系',
+        '关系图',
+        '人物',
+        '角色关系',
+        cast.character.name,
+        cast.user.name,
+        ...cast.character.aliases.take(4),
+        ...cast.user.aliases.take(4),
+      ],
+      content: buffer.toString().trim(),
+      constant: true,
+      order: 5,
+      position: 'before',
+    );
+  }
+
   // ---------------------------------------------------------------- L3
 
   /// 成稿一张角色卡。LLM 失败时用归并档案本地兜底，保证用户总能拿到结果。
   Future<DraftCard> composeCard({
     required MergedCharacter character,
+    required CastUser user,
     required String worldSummary,
     String plotSummary = '',
     String extraInstruction = '',
@@ -373,18 +872,28 @@ class NovelGenerator {
   }) async {
     final prompt = StringBuffer()
       ..writeln('你是 SillyTavern 角色卡作者。只输出 JSON，不要解释。')
-      ..writeln('根据人物档案、世界观与剧情梗概，写一张可直接用于角色扮演的中文角色卡。')
-      ..writeln('字段：name, description(角色设定,400-800字), personality(性格,150字内), '
-          'scenario(场景,100字内), first_mes(开场白,300-600字,带动作与心理描写), '
-          'mes_example(对话示例,用 <START> 分隔,2-3 组), '
+      ..writeln('这是一次「单卡」改编：{{char}} = ${character.name}，'
+          '{{user}} = ${user.name}，玩家会以 {{user}} 的身份与 {{char}} 互动。')
+      ..writeln('根据人物档案、玩家身份、世界观与剧情梗概，写一张可直接用于角色扮演的中文角色卡。')
+      ..writeln('字段：name, description(角色设定,500-800字,必须写清身份/外貌/性格/'
+          '与{{user}}的关系/秘密或心结), personality(性格,200字内), '
+          'scenario(当前场景与关系状态,150-300字), '
+          'speech_style(习惯的说话方式,120-250字:语气、句长、用词、口头禅、'
+          '对{{user}}的称呼习惯), '
+          'speech_examples(数组,3-5 句该人物原话/贴近原文的说话示例，必须体现口头禅与语气), '
+          'first_mes(开场白,350-600字,第二人称把{{user}}带入具体场景,带动作与心理描写), '
+          'mes_example(对话示例,用 <START> 分隔,2-3 组,必须体现{{user}}与{{char}}的关系), '
           'alternate_greetings(数组,2 条不同情境的开场白), '
           'system_prompt(可留空), tags(数组,3-5 个中文标签)。')
-      ..writeln('要求：忠于原设定，不要新增无依据的设定；可用 {{user}} 指代用户、'
-          '{{char}} 指代角色；开场白用第二人称视角把 {{user}} 带入场景；'
+      ..writeln('要求：忠于原设定，不要新增无依据的设定；用 {{user}} 指代玩家、'
+          '{{char}} 指代角色；不要把其他配角写成主角；'
+          '开场白用第二人称视角把 {{user}} 带入场景；'
           '剧情梗概只用来把握人物经历与语气，不要把整段剧情复述进卡片；'
+          '说话方式与示例必须能从书中原话/人物档案找到依据，不要凭空发明；'
           '不要输出状态栏/变量脚本。')
       ..writeln('输出格式：{"name":"...","description":"...","personality":"...",'
-          '"scenario":"...","first_mes":"...","mes_example":"...",'
+          '"scenario":"...","speech_style":"...","speech_examples":["..."],'
+          '"first_mes":"...","mes_example":"...",'
           '"alternate_greetings":["..."],"system_prompt":"","tags":["..."]}');
     if (extraInstruction.trim().isNotEmpty) {
       prompt.writeln('附加要求：${extraInstruction.trim()}');
@@ -394,7 +903,8 @@ class NovelGenerator {
       {'role': 'system', 'content': prompt.toString()},
       {
         'role': 'user',
-        'content': '【人物档案】\n${character.profileText}\n\n'
+        'content': '【角色档案】\n${character.profileText}\n\n'
+            '【玩家身份 {{user}}】\n${user.name}\n${user.description}\n\n'
             '【世界观摘要】\n${worldSummary.isEmpty ? '（无）' : worldSummary}'
             '${plotSummary.trim().isEmpty ? '' : '\n\n【剧情梗概】\n${plotSummary.trim()}'}',
       },
@@ -415,22 +925,27 @@ class NovelGenerator {
             .where((e) => e.trim().isNotEmpty)
             .toList(),
         systemPrompt: (json['system_prompt'] ?? '').toString(),
-        creatorNotes: '由小说自动生成',
+        creatorNotes: '由小说自动生成 · 角色卡 {{char}} = ${character.name}，'
+            '{{user}} = ${user.name}',
         tags: (json['tags'] as List? ?? const [])
             .map((e) => e.toString())
             .where((e) => e.trim().isNotEmpty)
             .take(6)
             .toList(),
         avatarPath: avatarPath,
+        userName: user.name,
+        userDescription: user.description,
+        speechStyle: (json['speech_style'] ?? '').toString(),
+        speechExamples: _stringList(json['speech_examples']).take(6).toList(),
       );
     } catch (_) {
       // 兜底：直接用归并档案拼一张可用的卡。
       return DraftCard(
         name: character.name,
         description: character.profileText,
-        personality: character.personality.take(3).join('；'),
-        scenario: worldSummary.length > 200
-            ? worldSummary.substring(0, 200)
+        personality: character.personality.take(5).join('；'),
+        scenario: worldSummary.length > 400
+            ? worldSummary.substring(0, 400)
             : worldSummary,
         firstMes: character.relationship.isNotEmpty
             ? character.relationship.first
@@ -438,7 +953,252 @@ class NovelGenerator {
         creatorNotes: '由小说自动生成（成稿失败，已用抽取档案兜底）',
         tags: const ['小说生成'],
         avatarPath: avatarPath,
+        userName: user.name,
+        userDescription: user.description,
+        speechStyle: character.speechStyle.take(8).join('；'),
+        speechExamples: character.quotes.take(5).toList(),
       );
+    }
+  }
+
+  /// 把配角写成详细的「世界书人物条目」。
+  ///
+  /// 每批 3~4 人，附带原文证据包；正文用 `{{char}}` / `{{user}}` 宏，
+  /// 入库后无论用户怎么改人格名都能正确解析。
+  Future<List<DraftLoreEntry>> composeCastLore({
+    required List<SupportingCast> supporting,
+    required Map<String, String> evidence,
+    required String charName,
+    required String userName,
+    required String title,
+    required String plotSummary,
+    required String worldSummary,
+    NovelDetail detail = NovelDetail.detailed,
+    String extraInstruction = '',
+    bool Function()? shouldStop,
+  }) async {
+    if (supporting.isEmpty) return const [];
+    const batchSize = 4;
+    final detailed = detail == NovelDetail.detailed;
+    final target = detailed ? '400~700 字' : '200~350 字';
+    final results = <String, DraftLoreEntry>{};
+
+    for (var start = 0; start < supporting.length; start += batchSize) {
+      final end = (start + batchSize) > supporting.length
+          ? supporting.length
+          : start + batchSize;
+      final batch = supporting.sublist(start, end);
+      final fallback = <String, DraftLoreEntry>{};
+      final source = StringBuffer();
+      for (final s in batch) {
+        final index = supporting.indexOf(s);
+        fallback[_norm(s.name)] = _castLoreFallback(
+          s,
+          evidence[s.name] ?? '',
+          order: 120 + index,
+        );
+        source
+          ..writeln('### ${s.name}'
+              '${s.aliases.isEmpty ? '' : '（称谓：${s.aliases.join('、')}）'}'
+              '｜重要度 ${s.importance}/5')
+          ..writeln('外貌：${_clip(s.appearance, 400)}')
+          ..writeln('性格：${_clip(s.personality, 400)}')
+          ..writeln('与角色卡角色（{{char}}）的关系：${_clip(s.relationToChar, 500)}')
+          ..writeln('与玩家（{{user}}）的关系：${_clip(s.relationToUser, 500)}')
+          ..writeln('动机：${_clip(s.motivation, 300)}')
+          ..writeln('秘密/心结：${_clip(s.secrets, 300)}')
+          ..writeln('说话方式：${_clip(s.speechStyle, 200)}')
+          ..writeln('原话示例：${s.speechExamples.map((q) => '「${_clip(q, 160)}」').join(' / ')}');
+        final ev = evidence[s.name] ?? '';
+        if (ev.trim().isNotEmpty) {
+          source.writeln('原文依据：${_clip(ev, 1200)}');
+        }
+        source.writeln();
+      }
+
+      final prompt = StringBuffer()
+        ..writeln('你是 SillyTavern 世界书编辑。只输出 JSON，不要解释。')
+        ..writeln('为下列配角写「人物条目」，供角色扮演时按关键词注入。'
+            '必须写具体、详细、可直接用于扮演的内容，禁止只写一两句概括。')
+        ..writeln('每条正文用中文小标题分行，包含：')
+        ..writeln('【身份与外貌】年龄/身份/外貌/穿着；')
+        ..writeln('【性格与习惯】行为习惯、口癖、情绪触发点；')
+        ..writeln('【与{{char}}的关系】称呼、亲疏、情感、冲突、秘密；')
+        ..writeln('【与{{user}}的关系】称呼、态度、期待或敌意、动机；')
+        ..writeln('【目标与秘密】想要什么、害怕什么、隐瞒什么；')
+        ..writeln('【习惯的说话方式】语气、用词、句长、口头禅、称呼习惯；')
+        ..writeln('【说话示例】3~5 句该人物可能会说的话，优先直接引用/贴近原文原话，'
+            '用「……」标注，体现其语气与口头禅；')
+        ..writeln('【剧情锚点】与当前主线相关的已发生/正在发生的事。')
+        ..writeln('正文目标长度：$target（重要角色取长）。'
+            '必须使用 {{char}} 指角色卡角色、{{user}} 指玩家，不要写死名字。')
+        ..writeln('忠于原文依据，不要编造原文没有的设定；信息不足的栏目可省略，'
+            '但正文不得低于 ${detailed ? 300 : 150} 字。')
+        ..writeln('keys 触发关键词必须包含姓名、称谓、别名与关系词。')
+        ..writeln('输出格式：{"entries":[{"name":"","keys":[],'
+            '"secondary_keys":[],"content":""}]}');
+      if (extraInstruction.trim().isNotEmpty) {
+        prompt.writeln('附加要求：${extraInstruction.trim()}');
+      }
+
+      final messages = [
+        {'role': 'system', 'content': prompt.toString()},
+        {
+          'role': 'user',
+          'content': '书名：$title\n角色卡：$charName｜玩家：$userName\n'
+              '${worldSummary.trim().isEmpty ? '' : '\n世界观摘要：${_clip(worldSummary, 1200)}\n'}'
+              '${plotSummary.trim().isEmpty ? '' : '\n剧情梗概：${_clip(plotSummary, 1600)}\n'}'
+              '\n$source',
+        },
+      ];
+
+      try {
+        final json = await _callJson(messages, shouldStop: shouldStop);
+        final batchEntries = <String, DraftLoreEntry>{};
+        for (final raw in (json['entries'] as List? ?? const [])) {
+          if (raw is! Map) continue;
+          final map = Map<String, dynamic>.from(raw);
+          final name = (map['name'] ?? '').toString().trim();
+          final matched = _matchSupporting(name, batch);
+          if (matched == null) continue;
+          final content = (map['content'] ?? '').toString().trim();
+          if (content.isEmpty) continue;
+          final keys = _mergeAliases(
+            _mergeAliases(
+              _stringList(map['keys']),
+              matched.aliases,
+            ),
+            [matched.name],
+          );
+          batchEntries[_norm(matched.name)] = DraftLoreEntry(
+            name: matched.name,
+            keys: keys,
+            secondaryKeys:
+                _stringList(map['secondary_keys']).take(8).toList(),
+            content: content,
+            constant: false,
+            order: 120 + supporting.indexOf(matched),
+            position: 'before',
+          );
+        }
+        // 质量闸门：过短的条目再扩写一次，避免模型只写两三句。
+        final short = batchEntries.values
+            .where((e) => e.content.length < (detailed ? 300 : 150))
+            .toList();
+        if (short.isNotEmpty) {
+          final expanded = await _expandLoreEntries(
+            entries: short,
+            context: source.toString(),
+            minChars: detailed ? 300 : 150,
+            target: target,
+            shouldStop: shouldStop,
+          );
+          for (final e in expanded) {
+            batchEntries[_norm(e.name)] = e;
+          }
+        }
+        results.addAll(batchEntries);
+      } catch (_) {
+        // 该批失败：下面用本地模板补齐，不影响其他批次。
+      }
+      for (final entry in fallback.entries) {
+        final existing = results[entry.key];
+        final minChars = detailed ? 300 : 150;
+        if (existing == null || existing.content.length < minChars) {
+          results[entry.key] = entry.value;
+        }
+      }
+    }
+
+    final out = <DraftLoreEntry>[];
+    for (final s in supporting) {
+      final entry = results[_norm(s.name)];
+      if (entry != null) out.add(entry);
+    }
+    return out;
+  }
+
+  static DraftLoreEntry _castLoreFallback(
+    SupportingCast s,
+    String evidence, {
+    required int order,
+  }) {
+    final parts = <String>[
+      if (s.appearance.trim().isNotEmpty) '【身份与外貌】${s.appearance.trim()}',
+      if (s.personality.trim().isNotEmpty) '【性格与习惯】${s.personality.trim()}',
+      if (s.relationToChar.trim().isNotEmpty)
+        '【与{{char}}的关系】${s.relationToChar.trim()}',
+      if (s.relationToUser.trim().isNotEmpty)
+        '【与{{user}}的关系】${s.relationToUser.trim()}',
+      if (s.motivation.trim().isNotEmpty) '【目标与动机】${s.motivation.trim()}',
+      if (s.secrets.trim().isNotEmpty) '【秘密与心结】${s.secrets.trim()}',
+      if (s.speechStyle.trim().isNotEmpty)
+        '【习惯的说话方式】${s.speechStyle.trim()}',
+      if (s.speechExamples.isNotEmpty)
+        '【说话示例】${s.speechExamples.take(5).map((q) => '「${q.trim()}」').join(' ')}',
+      if (evidence.trim().isNotEmpty) '【原文依据】${_clip(evidence.trim(), 800)}',
+    ];
+    if (parts.isEmpty) {
+      parts.add('【身份】${s.name}，小说中与{{char}}有交集的配角。');
+    }
+    return DraftLoreEntry(
+      name: s.name,
+      keys: _mergeAliases(s.aliases, [s.name]),
+      content: parts.join('\n'),
+      constant: false,
+      order: order,
+      position: 'before',
+    );
+  }
+
+  /// 对过短的条目做一次扩写（只在质量闸门触发时调用）。
+  Future<List<DraftLoreEntry>> _expandLoreEntries({
+    required List<DraftLoreEntry> entries,
+    required String context,
+    required int minChars,
+    required String target,
+    bool Function()? shouldStop,
+  }) async {
+    if (entries.isEmpty) return entries;
+    final listing = entries
+        .map((e) => '- ${e.name}\n${_clip(e.content, 1200)}')
+        .join('\n\n');
+    try {
+      final json = await _callJson([
+        {
+          'role': 'system',
+          'content': '你是 SillyTavern 世界书编辑。只输出 JSON。\n'
+              '下列条目的正文过短。请在不编造原文没有的事实的前提下扩写到 $target：'
+              '补足身份/外貌、性格与习惯、与{{char}}及{{user}}的关系、动机与秘密、'
+              '习惯的说话方式、3~5 句说话示例、剧情锚点。保留原条目名与原有事实，'
+              '用 {{char}} 指角色卡角色、{{user}} 指玩家，不要写死名字。\n'
+              '输出格式：{"entries":[{"name":"","content":""}]}',
+        },
+        {
+          'role': 'user',
+          'content': '【已有资料】\n${_clip(context, 4000)}\n\n'
+              '【待扩写条目】\n$listing',
+        },
+      ], shouldStop: shouldStop, attempts: 2);
+      final updated = <String, String>{};
+      for (final raw in (json['entries'] as List? ?? const [])) {
+        if (raw is! Map) continue;
+        final map = Map<String, dynamic>.from(raw);
+        final name = (map['name'] ?? '').toString().trim();
+        final content = (map['content'] ?? '').toString().trim();
+        if (name.isEmpty || content.length < minChars) continue;
+        updated[_norm(name)] = content;
+      }
+      if (updated.isEmpty) return entries;
+      return [
+        for (final e in entries)
+          if (updated[_norm(e.name)] != null)
+            e.copyWith(content: updated[_norm(e.name)]!)
+          else
+            e,
+      ];
+    } catch (_) {
+      return entries;
     }
   }
 
@@ -446,75 +1206,133 @@ class NovelGenerator {
   Future<List<DraftLoreEntry>> composeLore({
     required List<MergedLore> lore,
     required int maxEntries,
+    required String worldSummary,
+    NovelDetail detail = NovelDetail.detailed,
+    String plotSummary = '',
+    String charName = '',
+    String userName = '',
+    Map<String, String> evidence = const {},
     String extraInstruction = '',
     bool Function()? shouldStop,
   }) async {
     final picked = lore.take(maxEntries).toList();
     if (picked.isEmpty) return const [];
+    final detailed = detail == NovelDetail.detailed;
+    final target = detailed ? '250~500 字' : '120~250 字';
+    // 按批成稿：一次让模型写 40 条 × 400 字会超出输出上限，JSON 被截断
+    // 后整批都会退回短兜底，所以这里 4~6 条一批。
+    final batchSize = detailed ? 4 : 6;
+    final out = <DraftLoreEntry>[];
 
-    List<DraftLoreEntry> localFallback() => [
-          for (var i = 0; i < picked.length; i++)
-            DraftLoreEntry(
-              name: picked[i].topic,
-              keys: picked[i].keys.take(8).toList(),
-              content: picked[i].content,
-              constant: picked[i].constant,
-              order: picked[i].constant ? 10 : 100 + i,
-              position: 'before',
-            ),
-        ];
+    DraftLoreEntry fallbackFor(MergedLore l, int index) => DraftLoreEntry(
+          name: l.topic,
+          keys: _mergeAliases(
+            l.keys.take(8).toList(),
+            [l.topic],
+          ),
+          content: [
+            l.content,
+            if ((evidence[l.topic] ?? '').trim().isNotEmpty)
+              '【原文依据】${_clip(evidence[l.topic]!, 800)}',
+          ].where((s) => s.trim().isNotEmpty).join('\n'),
+          constant: l.constant,
+          order: l.constant ? 10 : 100 + index,
+          position: 'before',
+        );
 
-    final prompt = StringBuffer()
-      ..writeln('你是 SillyTavern 世界书编辑。只输出 JSON，不要解释。')
-      ..writeln('把给定设定整理成世界书条目：合并重复、补全触发关键词、'
-          '把世界观级设定标为常驻。')
-      ..writeln('字段：name, keys(触发关键词数组,含别名/简称), secondary_keys(数组,可空), '
-          'content(条目正文,写实陈述,120字内), constant(布尔), order(整数,常驻用10,其余100起)。')
-      ..writeln('输出格式：{"entries":[...]}')
-      ..writeln('最多 $maxEntries 条，按重要性排序。');
-    if (extraInstruction.trim().isNotEmpty) {
-      prompt.writeln('附加要求：${extraInstruction.trim()}');
-    }
+    for (var start = 0; start < picked.length; start += batchSize) {
+      if (out.length >= maxEntries) break;
+      final end =
+          (start + batchSize) > picked.length ? picked.length : start + batchSize;
+      final batch = picked.sublist(start, end);
+      final fallback = <DraftLoreEntry>[
+        for (var i = 0; i < batch.length; i++)
+          fallbackFor(batch[i], start + i),
+      ];
 
-    final source = picked
-        .map((l) => '- 主题：${l.topic}｜类别：${l.category}｜关键词：'
-            '${l.keys.take(6).join('、')}｜常驻：${l.constant}\n  内容：${l.content}')
-        .join('\n');
-
-    try {
-      final json = await _callJson([
-        {'role': 'system', 'content': prompt.toString()},
-        {'role': 'user', 'content': source},
-      ], shouldStop: shouldStop);
-      final entries = <DraftLoreEntry>[];
-      for (final raw in (json['entries'] as List? ?? const [])) {
-        if (raw is! Map) continue;
-        final m = Map<String, dynamic>.from(raw);
-        final content = (m['content'] ?? '').toString().trim();
-        final name = (m['name'] ?? '').toString().trim();
-        if (content.isEmpty || name.isEmpty) continue;
-        entries.add(DraftLoreEntry(
-          name: name,
-          keys: (m['keys'] as List? ?? const [])
-              .map((e) => e.toString().trim())
-              .where((e) => e.isNotEmpty)
-              .take(10)
-              .toList(),
-          secondaryKeys: (m['secondary_keys'] as List? ?? const [])
-              .map((e) => e.toString().trim())
-              .where((e) => e.isNotEmpty)
-              .take(6)
-              .toList(),
-          content: content,
-          constant: m['constant'] == true,
-          order: (m['order'] as num?)?.toInt() ?? 100,
-        ));
-        if (entries.length >= maxEntries) break;
+      final prompt = StringBuffer()
+        ..writeln('你是 SillyTavern 世界书编辑。只输出 JSON，不要解释。')
+        ..writeln('把给定设定写成可直接用于角色扮演的世界书条目：合并重复、'
+            '补全触发关键词、把世界观级设定标为常驻。')
+        ..writeln('正文必须具体、详细，禁止只写一两句概括：写清地点/组织的样貌、'
+            '规则、历史、与{{char}}/{{user}}的关系或影响。')
+        ..writeln('正文目标长度：$target（重要设定取长）。'
+            '可用 {{char}} 指角色卡角色、{{user}} 指玩家。')
+        ..writeln('字段：name, keys(触发关键词数组,含别名/简称), secondary_keys(数组,可空), '
+            'content, constant(布尔), order(整数,常驻用10,其余100起)。')
+        ..writeln('输出格式：{"entries":[{"name":"","keys":[],'
+            '"secondary_keys":[],"content":"","constant":false,"order":100}]}')
+        ..writeln('最多 ${batch.length} 条，按重要性排序。');
+      if (extraInstruction.trim().isNotEmpty) {
+        prompt.writeln('附加要求：${extraInstruction.trim()}');
       }
-      return entries.isEmpty ? localFallback() : entries;
-    } catch (_) {
-      return localFallback();
+
+      final source = batch
+          .map((l) => '- 主题：${l.topic}｜类别：${l.category}｜关键词：'
+              '${l.keys.take(8).join('、')}｜常驻：${l.constant}\n'
+              '  内容：${_clip(l.content, 1200)}'
+              '${(evidence[l.topic] ?? '').trim().isEmpty ? '' : '\n  原文依据：${_clip(evidence[l.topic]!, 800)}'}')
+          .join('\n');
+
+      try {
+        final json = await _callJson([
+          {'role': 'system', 'content': prompt.toString()},
+          {
+            'role': 'user',
+            'content': '角色卡：$charName｜玩家：$userName\n'
+                '${worldSummary.trim().isEmpty ? '' : '世界观：${_clip(worldSummary, 1000)}\n'}'
+                '${plotSummary.trim().isEmpty ? '' : '剧情梗概：${_clip(plotSummary, 1000)}\n'}'
+                '\n$source',
+          },
+        ], shouldStop: shouldStop);
+        final entries = <DraftLoreEntry>[];
+        for (final raw in (json['entries'] as List? ?? const [])) {
+          if (raw is! Map) continue;
+          final m = Map<String, dynamic>.from(raw);
+          final content = (m['content'] ?? '').toString().trim();
+          final name = (m['name'] ?? '').toString().trim();
+          if (content.isEmpty || name.isEmpty) continue;
+          entries.add(DraftLoreEntry(
+            name: name,
+            keys: _mergeAliases(
+              _stringList(m['keys']).take(12).toList(),
+              [name],
+            ),
+            secondaryKeys: _stringList(m['secondary_keys']).take(6).toList(),
+            content: content,
+            constant: m['constant'] == true,
+            order: (m['order'] as num?)?.toInt() ?? 100 + start + entries.length,
+            position: 'before',
+          ));
+          if (entries.length >= batch.length) break;
+        }
+        if (entries.isEmpty) {
+          out.addAll(fallback);
+          continue;
+        }
+        final short = entries
+            .where((e) => e.content.length < (detailed ? 200 : 100))
+            .toList();
+        if (short.isNotEmpty) {
+          final expanded = await _expandLoreEntries(
+            entries: short,
+            context: source,
+            minChars: detailed ? 200 : 100,
+            target: target,
+            shouldStop: shouldStop,
+          );
+          final byName = {for (final e in expanded) _norm(e.name): e};
+          for (var i = 0; i < entries.length; i++) {
+            final next = byName[_norm(entries[i].name)];
+            if (next != null) entries[i] = next;
+          }
+        }
+        out.addAll(entries);
+      } catch (_) {
+        out.addAll(fallback);
+      }
     }
+    return out.take(maxEntries).toList();
   }
 
   // ------------------------------------------------------------- 内部
@@ -587,6 +1405,130 @@ class NovelGenerator {
     }
     throw lastError ?? LLMException('生成失败');
   }
+}
+
+String _norm(String s) => s
+    .replaceAll(RegExp(r'''[「」『』“”"'\s·・]'''), '')
+    .trim()
+    .toLowerCase();
+
+T? _first<T>(Iterable<T> items) => items.isEmpty ? null : items.first;
+
+String _clip(String s, int max) {
+  final text = s.trim();
+  if (text.length <= max) return text;
+  return '${text.substring(0, max)}…';
+}
+
+List<String> _stringList(dynamic raw) => raw is List
+    ? raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList()
+    : const <String>[];
+
+List<String> _mergeAliases(List<String> a, List<String> b) {
+  final out = <String>[];
+  final seen = <String>{};
+  for (final raw in [...a, ...b]) {
+    final value = raw.trim();
+    final key = _norm(value);
+    if (value.isEmpty || key.isEmpty || seen.contains(key)) continue;
+    seen.add(key);
+    out.add(value);
+  }
+  return out;
+}
+
+CastCandidate? _matchCandidate(String raw, List<CastCandidate> list) {
+  final key = _norm(raw);
+  if (key.isEmpty) return null;
+  for (final c in list) {
+    if (_norm(c.name) == key) return c;
+    for (final alias in c.aliases) {
+      if (_norm(alias) == key) return c;
+    }
+  }
+  for (final c in list) {
+    final name = _norm(c.name);
+    if (key.length >= 2 &&
+        name.length >= 2 &&
+        (name.contains(key) || key.contains(name))) {
+      return c;
+    }
+    for (final alias in c.aliases) {
+      final a = _norm(alias);
+      if (key.length >= 2 &&
+          a.length >= 2 &&
+          (a.contains(key) || key.contains(a))) {
+        return c;
+      }
+    }
+  }
+  return null;
+}
+
+SupportingCast? _matchSupporting(String raw, List<SupportingCast> list) {
+  final key = _norm(raw);
+  if (key.isEmpty) return null;
+  for (final s in list) {
+    if (_norm(s.name) == key) return s;
+    for (final alias in s.aliases) {
+      if (_norm(alias) == key) return s;
+    }
+  }
+  for (final s in list) {
+    final name = _norm(s.name);
+    if (name.length >= 2 && (name.contains(key) || key.contains(name))) {
+      return s;
+    }
+  }
+  return null;
+}
+
+/// 判断开篇是否为第一人称叙述：去掉引号内对话后统计「我」与「他/她」。
+bool _looksFirstPerson(String text) {
+  final narration =
+      text.replaceAll(RegExp(r'[「『“][\s\S]*?[」』”]'), '');
+  int count(String ch) => ch.isEmpty ? 0 : narration.split(ch).length - 1;
+  final wo = count('我');
+  final other = count('他') + count('她');
+  return wo >= 5 && wo > other;
+}
+
+String _fallbackUserDescription({
+  required String userName,
+  CastCandidate? userMatch,
+  required String charName,
+  required bool firstPerson,
+}) {
+  final role = userMatch?.role.trim() ?? '';
+  final relation = userMatch?.relationship.trim() ?? '';
+  return [
+    if (firstPerson)
+      '你是故事的第一人称叙述者「我」${userName == '我' ? '' : '（$userName）'}，'
+          '以第一人称参与剧情。'
+    else
+      '你是故事中的「$userName」${role.isEmpty ? '' : '（$role）'}。',
+    '你与「$charName」存在核心剧情关系。',
+    if (relation.isNotEmpty) relation,
+    '以你的身份、立场和关系回应 $charName；不要替 $charName 说话。',
+  ].join('\n');
+}
+
+MergedCharacter? _mergedByName(
+  String name,
+  List<MergedCharacter> list,
+) {
+  final key = _norm(name);
+  if (key.isEmpty) return null;
+  for (final c in list) {
+    if (_norm(c.name) == key) return c;
+    for (final alias in c.aliases) {
+      if (_norm(alias) == key) return c;
+    }
+  }
+  return null;
 }
 
 /// 生成过程被取消/暂停时抛出，编排层据此干净退出。

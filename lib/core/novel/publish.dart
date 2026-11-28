@@ -54,6 +54,7 @@ Future<DemoCharacter> draftToCharacter(
     }
   }
   final name = draft.name.trim().isEmpty ? '未命名' : draft.name.trim();
+  final description = _descriptionWithSpeech(draft);
   return DemoCharacter(
     name: name,
     initial: String.fromCharCode(name.runes.first),
@@ -61,7 +62,7 @@ Future<DemoCharacter> draftToCharacter(
     tagline: draft.description.split('\n').first,
     creator: '小说生成',
     version: '1.0',
-    description: draft.description,
+    description: description,
     greeting: draft.firstMes,
     tags: draft.tags,
     lorebook: bookName.trim().isEmpty ? '未绑定' : bookName.trim(),
@@ -81,7 +82,26 @@ Future<DemoCharacter> draftToCharacter(
     alternateGreetings: draft.alternateGreetings,
     avatarBase64: avatarBase64,
     createdAt: DateTime.now().millisecondsSinceEpoch,
+    // 单卡改编的 {{user}}：角色级人格，只对这张卡生效，不污染全局人格。
+    personaNameOverride: draft.userName,
+    personaDescriptionOverride: draft.userDescription,
   );
+}
+
+/// 把「习惯的说话方式 + 示例」并入角色卡设定正文。
+///
+/// SillyTavern 的角色卡没有独立的 speech 字段，写在 description 里既能在
+/// 提示词里被模型读到，也能在导出 PNG/JSON 后保留。
+String _descriptionWithSpeech(DraftCard draft) {
+  final parts = <String>[
+    draft.description.trim(),
+    if (draft.speechStyle.trim().isNotEmpty)
+      '【习惯的说话方式】\n${draft.speechStyle.trim()}',
+    if (draft.speechExamples.isNotEmpty)
+      '【说话示例】\n'
+          '${draft.speechExamples.map((q) => '「${q.trim()}」').join('\n')}',
+  ].where((p) => p.isNotEmpty).toList();
+  return parts.join('\n\n');
 }
 
 /// 把生成结果里 **selected** 的世界书条目映射为 [Lorebook]。

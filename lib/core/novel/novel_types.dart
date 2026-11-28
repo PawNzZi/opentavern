@@ -159,6 +159,22 @@ class NovelStats {
   }
 }
 
+/// 世界书条目的详细程度。
+enum NovelDetail {
+  /// 简洁：世界设定 120~250 字，人物条目 200~350 字。
+  standard,
+
+  /// 详尽（默认）：世界设定 250~500 字，人物条目 400~800 字。
+  detailed,
+}
+
+extension NovelDetailLabel on NovelDetail {
+  String get label => switch (this) {
+        NovelDetail.standard => '标准',
+        NovelDetail.detailed => '详尽',
+      };
+}
+
 /// 扫描模式。几百 MB 全书精读要 20+ 小时，所以默认智能采样。
 enum ScanMode {
   /// 首尾加权 + 均匀覆盖 + 戏份密度优先，块数上限可控（默认）。
@@ -179,7 +195,6 @@ class NovelJobConfig {
     this.scanMode = ScanMode.smart,
     this.maxBlocks = 120,
     this.headChapters = 20,
-    this.maxCards = 3,
     this.maxLoreEntries = 40,
     this.concurrency = 2,
     this.blockChars = 6000,
@@ -189,6 +204,11 @@ class NovelJobConfig {
     this.extraInstruction = '',
     this.tokenBudget = 0,
     this.encodingOverride = '',
+    this.cardCharacter = '',
+    this.cardUser = '',
+    this.cardUserDescription = '',
+    this.detail = NovelDetail.detailed,
+    this.supportingLimit = 30,
   });
 
   final String filePath;
@@ -200,7 +220,6 @@ class NovelJobConfig {
 
   /// headOnly 模式读多少章。
   final int headChapters;
-  final int maxCards;
   final int maxLoreEntries;
 
   /// LLM 并发数（1~4）。
@@ -213,7 +232,7 @@ class NovelJobConfig {
   final String providerOverride;
   final String modelOverride;
 
-  /// 用户上传的立绘（本地路径），按顺序分配给生成的角色卡。
+  /// 用户上传的立绘（本地路径）。单卡模式只用第一张。
   final List<String> avatarPaths;
 
   /// 用户附加要求（例如「只生成女性角色」）。
@@ -226,11 +245,25 @@ class NovelJobConfig {
   /// 极短中文 GBK 文件的自动探测是启发式，给用户一个确定性的兜底。
   final String encodingOverride;
 
+  /// 手动指定角色卡角色（{{char}}）。空 = 由角色定位器自动判断。
+  final String cardCharacter;
+
+  /// 手动指定 {{user}} 名字。空 = 自动判断；第一人称兜底为「我」。
+  final String cardUser;
+
+  /// 手动指定 {{user}} 人格描述（空 = 由定位器/人物档案生成）。
+  final String cardUserDescription;
+
+  /// 世界书条目详细度。
+  final NovelDetail detail;
+
+  /// 写入世界书的配角上限。
+  final int supportingLimit;
+
   NovelJobConfig copyWith({
     ScanMode? scanMode,
     int? maxBlocks,
     int? headChapters,
-    int? maxCards,
     int? maxLoreEntries,
     int? concurrency,
     int? blockChars,
@@ -240,6 +273,11 @@ class NovelJobConfig {
     String? extraInstruction,
     int? tokenBudget,
     String? encodingOverride,
+    String? cardCharacter,
+    String? cardUser,
+    String? cardUserDescription,
+    NovelDetail? detail,
+    int? supportingLimit,
   }) =>
       NovelJobConfig(
         filePath: filePath,
@@ -247,7 +285,6 @@ class NovelJobConfig {
         scanMode: scanMode ?? this.scanMode,
         maxBlocks: maxBlocks ?? this.maxBlocks,
         headChapters: headChapters ?? this.headChapters,
-        maxCards: maxCards ?? this.maxCards,
         maxLoreEntries: maxLoreEntries ?? this.maxLoreEntries,
         concurrency: concurrency ?? this.concurrency,
         blockChars: blockChars ?? this.blockChars,
@@ -257,6 +294,12 @@ class NovelJobConfig {
         extraInstruction: extraInstruction ?? this.extraInstruction,
         tokenBudget: tokenBudget ?? this.tokenBudget,
         encodingOverride: encodingOverride ?? this.encodingOverride,
+        cardCharacter: cardCharacter ?? this.cardCharacter,
+        cardUser: cardUser ?? this.cardUser,
+        cardUserDescription:
+            cardUserDescription ?? this.cardUserDescription,
+        detail: detail ?? this.detail,
+        supportingLimit: supportingLimit ?? this.supportingLimit,
       );
 
   Map<String, dynamic> toJson() => {
@@ -265,7 +308,6 @@ class NovelJobConfig {
         'scanMode': scanMode.name,
         'maxBlocks': maxBlocks,
         'headChapters': headChapters,
-        'maxCards': maxCards,
         'maxLoreEntries': maxLoreEntries,
         'concurrency': concurrency,
         'blockChars': blockChars,
@@ -275,6 +317,11 @@ class NovelJobConfig {
         'extraInstruction': extraInstruction,
         'tokenBudget': tokenBudget,
         'encodingOverride': encodingOverride,
+        'cardCharacter': cardCharacter,
+        'cardUser': cardUser,
+        'cardUserDescription': cardUserDescription,
+        'detail': detail.name,
+        'supportingLimit': supportingLimit,
       };
 
   factory NovelJobConfig.fromJson(Map<String, dynamic> j) => NovelJobConfig(
@@ -286,7 +333,6 @@ class NovelJobConfig {
         ),
         maxBlocks: (j['maxBlocks'] as num?)?.toInt() ?? 120,
         headChapters: (j['headChapters'] as num?)?.toInt() ?? 20,
-        maxCards: (j['maxCards'] as num?)?.toInt() ?? 3,
         maxLoreEntries: (j['maxLoreEntries'] as num?)?.toInt() ?? 40,
         concurrency: (j['concurrency'] as num?)?.toInt() ?? 2,
         blockChars: (j['blockChars'] as num?)?.toInt() ?? 6000,
@@ -299,6 +345,14 @@ class NovelJobConfig {
         extraInstruction: (j['extraInstruction'] ?? '').toString(),
         tokenBudget: (j['tokenBudget'] as num?)?.toInt() ?? 0,
         encodingOverride: (j['encodingOverride'] ?? '').toString(),
+        cardCharacter: (j['cardCharacter'] ?? '').toString(),
+        cardUser: (j['cardUser'] ?? '').toString(),
+        cardUserDescription: (j['cardUserDescription'] ?? '').toString(),
+        detail: NovelDetail.values.firstWhere(
+          (e) => e.name == j['detail'],
+          orElse: () => NovelDetail.detailed,
+        ),
+        supportingLimit: (j['supportingLimit'] as num?)?.toInt() ?? 30,
       );
 }
 
@@ -312,6 +366,7 @@ class ExtractedCharacter {
     this.relationship = '',
     this.speechStyle = '',
     this.role = '',
+    this.quotes = const [],
   });
 
   final String name;
@@ -324,6 +379,9 @@ class ExtractedCharacter {
   /// 主角/配角/反派等。
   final String role;
 
+  /// 本片段中该人物的原话（直接摘录，用于学习/示例说话方式）。
+  final List<String> quotes;
+
   Map<String, dynamic> toJson() => {
         'name': name,
         'aliases': aliases,
@@ -332,6 +390,7 @@ class ExtractedCharacter {
         'relationship': relationship,
         'speechStyle': speechStyle,
         'role': role,
+        'quotes': quotes,
       };
 
   factory ExtractedCharacter.fromJson(Map<String, dynamic> j) =>
@@ -343,6 +402,7 @@ class ExtractedCharacter {
         relationship: (j['relationship'] ?? '').toString(),
         speechStyle: (j['speechStyle'] ?? '').toString(),
         role: (j['role'] ?? '').toString(),
+        quotes: _strList(j['quotes']),
       );
 }
 
@@ -434,6 +494,276 @@ class BlockExtraction {
       );
 }
 
+/// 角色定位的候选人物（来自本地归并档案，JSON 安全）。
+class CastCandidate {
+  const CastCandidate({
+    required this.name,
+    this.aliases = const [],
+    this.role = '',
+    this.mentions = 0,
+    this.relationship = '',
+  });
+
+  final String name;
+  final List<String> aliases;
+  final String role;
+  final int mentions;
+
+  /// 归并后的关系片段（用于定位器判断人物关系）。
+  final String relationship;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'aliases': aliases,
+        'role': role,
+        'mentions': mentions,
+        'relationship': relationship,
+      };
+
+  factory CastCandidate.fromJson(Map<String, dynamic> j) => CastCandidate(
+        name: (j['name'] ?? '').toString().trim(),
+        aliases: _strList(j['aliases']),
+        role: (j['role'] ?? '').toString(),
+        mentions: (j['mentions'] as num?)?.toInt() ?? 0,
+        relationship: (j['relationship'] ?? '').toString(),
+      );
+}
+
+/// 角色卡角色（{{char}}）。
+class CastCharacter {
+  const CastCharacter({
+    required this.name,
+    this.aliases = const [],
+    this.reason = '',
+  });
+
+  final String name;
+  final List<String> aliases;
+  final String reason;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'aliases': aliases,
+        'reason': reason,
+      };
+
+  factory CastCharacter.fromJson(Map<String, dynamic> j) => CastCharacter(
+        name: (j['name'] ?? '').toString().trim(),
+        aliases: _strList(j['aliases']),
+        reason: (j['reason'] ?? '').toString(),
+      );
+}
+
+/// 玩家角色（{{user}}）：名字 + 角色级人格描述。
+class CastUser {
+  const CastUser({
+    required this.name,
+    this.aliases = const [],
+    this.description = '',
+    this.reason = '',
+  });
+
+  /// 第一人称且未出现真名时默认「我」。
+  final String name;
+  final List<String> aliases;
+
+  /// 写入角色卡的 personaDescriptionOverride，只对这张卡生效。
+  final String description;
+  final String reason;
+
+  CastUser copyWith({
+    String? name,
+    List<String>? aliases,
+    String? description,
+    String? reason,
+  }) =>
+      CastUser(
+        name: name ?? this.name,
+        aliases: aliases ?? this.aliases,
+        description: description ?? this.description,
+        reason: reason ?? this.reason,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'aliases': aliases,
+        'description': description,
+        'reason': reason,
+      };
+
+  factory CastUser.fromJson(Map<String, dynamic> j) => CastUser(
+        name: (j['name'] ?? '').toString().trim(),
+        aliases: _strList(j['aliases']),
+        description: (j['description'] ?? '').toString(),
+        reason: (j['reason'] ?? '').toString(),
+      );
+}
+
+/// 配角：写进世界书的人物条目资料。
+class SupportingCast {
+  const SupportingCast({
+    required this.name,
+    this.aliases = const [],
+    this.importance = 3,
+    this.relationToChar = '',
+    this.relationToUser = '',
+    this.motivation = '',
+    this.secrets = '',
+    this.speechStyle = '',
+    this.appearance = '',
+    this.personality = '',
+    this.speechExamples = const [],
+  });
+
+  final String name;
+  final List<String> aliases;
+
+  /// 1~5，越大越重要（决定条目顺序与是否生成）。
+  final int importance;
+  final String relationToChar;
+  final String relationToUser;
+  final String motivation;
+  final String secrets;
+  final String speechStyle;
+  final String appearance;
+  final String personality;
+
+  /// 从原文摘录的说话示例（3~5 句），写进人物条目供模型模仿。
+  final List<String> speechExamples;
+
+  SupportingCast copyWith({
+    String? name,
+    List<String>? aliases,
+    int? importance,
+    String? relationToChar,
+    String? relationToUser,
+    String? motivation,
+    String? secrets,
+    String? speechStyle,
+    String? appearance,
+    String? personality,
+    List<String>? speechExamples,
+  }) =>
+      SupportingCast(
+        name: name ?? this.name,
+        aliases: aliases ?? this.aliases,
+        importance: importance ?? this.importance,
+        relationToChar: relationToChar ?? this.relationToChar,
+        relationToUser: relationToUser ?? this.relationToUser,
+        motivation: motivation ?? this.motivation,
+        secrets: secrets ?? this.secrets,
+        speechStyle: speechStyle ?? this.speechStyle,
+        appearance: appearance ?? this.appearance,
+        personality: personality ?? this.personality,
+        speechExamples: speechExamples ?? this.speechExamples,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'aliases': aliases,
+        'importance': importance,
+        'relationToChar': relationToChar,
+        'relationToUser': relationToUser,
+        'motivation': motivation,
+        'secrets': secrets,
+        'speechStyle': speechStyle,
+        'appearance': appearance,
+        'personality': personality,
+        'speechExamples': speechExamples,
+      };
+
+  factory SupportingCast.fromJson(Map<String, dynamic> j) => SupportingCast(
+        name: (j['name'] ?? '').toString().trim(),
+        aliases: _strList(j['aliases']),
+        importance: (j['importance'] as num?)?.toInt() ?? 3,
+        relationToChar: (j['relationToChar'] ?? '').toString(),
+        relationToUser: (j['relationToUser'] ?? '').toString(),
+        motivation: (j['motivation'] ?? '').toString(),
+        secrets: (j['secrets'] ?? '').toString(),
+        speechStyle: (j['speechStyle'] ?? '').toString(),
+        appearance: (j['appearance'] ?? '').toString(),
+        personality: (j['personality'] ?? '').toString(),
+        speechExamples: _strList(j['speechExamples']),
+      );
+}
+
+/// 一次生成唯一的角色定位结果。
+class CastResolution {
+  const CastResolution({
+    required this.character,
+    required this.user,
+    this.pov = '',
+    this.confidence = 0,
+    this.reason = '',
+    this.supporting = const [],
+    this.source = 'ai',
+  });
+
+  final CastCharacter character;
+  final CastUser user;
+
+  /// `first` / `third`，仅用于展示。
+  final String pov;
+  final double confidence;
+  final String reason;
+  final List<SupportingCast> supporting;
+
+  /// `ai` / `override` / `fallback`。
+  final String source;
+
+  CastResolution copyWith({
+    CastCharacter? character,
+    CastUser? user,
+    String? pov,
+    double? confidence,
+    String? reason,
+    List<SupportingCast>? supporting,
+    String? source,
+  }) =>
+      CastResolution(
+        character: character ?? this.character,
+        user: user ?? this.user,
+        pov: pov ?? this.pov,
+        confidence: confidence ?? this.confidence,
+        reason: reason ?? this.reason,
+        supporting: supporting ?? this.supporting,
+        source: source ?? this.source,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'character': character.toJson(),
+        'user': user.toJson(),
+        'pov': pov,
+        'confidence': confidence,
+        'reason': reason,
+        'supporting': supporting.map((e) => e.toJson()).toList(),
+        'source': source,
+      };
+
+  factory CastResolution.fromJson(Map<String, dynamic> j) => CastResolution(
+        character: CastCharacter.fromJson(
+          j['character'] is Map
+              ? Map<String, dynamic>.from(j['character'] as Map)
+              : const {},
+        ),
+        user: CastUser.fromJson(
+          j['user'] is Map
+              ? Map<String, dynamic>.from(j['user'] as Map)
+              : const {},
+        ),
+        pov: (j['pov'] ?? '').toString(),
+        confidence: (j['confidence'] as num?)?.toDouble() ?? 0,
+        reason: (j['reason'] ?? '').toString(),
+        supporting: (j['supporting'] as List?)
+                ?.whereType<Map>()
+                .map((e) =>
+                    SupportingCast.fromJson(Map<String, dynamic>.from(e)))
+                .toList() ??
+            const [],
+        source: (j['source'] ?? 'ai').toString(),
+      );
+}
+
 /// L3 成稿：一张待入库的角色卡草稿（字段与 DemoCharacter 对齐）。
 class DraftCard {
   const DraftCard({
@@ -449,6 +779,10 @@ class DraftCard {
     this.tags = const [],
     this.avatarPath = '',
     this.selected = true,
+    this.userName = '',
+    this.userDescription = '',
+    this.speechStyle = '',
+    this.speechExamples = const [],
   });
 
   final String name;
@@ -468,6 +802,18 @@ class DraftCard {
   /// 预览页勾选状态。
   final bool selected;
 
+  /// 角色级 {{user}} 名字（入库时写入 personaNameOverride）。
+  final String userName;
+
+  /// 角色级 {{user}} 人格描述（入库时写入 personaDescriptionOverride）。
+  final String userDescription;
+
+  /// 从原文总结的「习惯的说话方式」。
+  final String speechStyle;
+
+  /// 从原文摘录的说话示例（多条），入库时并入 description。
+  final List<String> speechExamples;
+
   DraftCard copyWith({
     String? name,
     String? description,
@@ -481,6 +827,10 @@ class DraftCard {
     List<String>? tags,
     String? avatarPath,
     bool? selected,
+    String? userName,
+    String? userDescription,
+    String? speechStyle,
+    List<String>? speechExamples,
   }) =>
       DraftCard(
         name: name ?? this.name,
@@ -495,6 +845,10 @@ class DraftCard {
         tags: tags ?? this.tags,
         avatarPath: avatarPath ?? this.avatarPath,
         selected: selected ?? this.selected,
+        userName: userName ?? this.userName,
+        userDescription: userDescription ?? this.userDescription,
+        speechStyle: speechStyle ?? this.speechStyle,
+        speechExamples: speechExamples ?? this.speechExamples,
       );
 
   Map<String, dynamic> toJson() => {
@@ -510,6 +864,10 @@ class DraftCard {
         'tags': tags,
         'avatarPath': avatarPath,
         'selected': selected,
+        'userName': userName,
+        'userDescription': userDescription,
+        'speechStyle': speechStyle,
+        'speechExamples': speechExamples,
       };
 
   factory DraftCard.fromJson(Map<String, dynamic> j) => DraftCard(
@@ -525,6 +883,10 @@ class DraftCard {
         tags: _strList(j['tags']),
         avatarPath: (j['avatarPath'] ?? '').toString(),
         selected: j['selected'] != false,
+        userName: (j['userName'] ?? '').toString(),
+        userDescription: (j['userDescription'] ?? '').toString(),
+        speechStyle: (j['speechStyle'] ?? '').toString(),
+        speechExamples: _strList(j['speechExamples']),
       );
 }
 
@@ -610,6 +972,7 @@ class GenResult {
     this.failedBlocks = const [],
     this.scannedBlocks = 0,
     this.totalBlocks = 0,
+    this.cast,
   });
 
   final String bookName;
@@ -620,6 +983,9 @@ class GenResult {
   final int scannedBlocks;
   final int totalBlocks;
 
+  /// 本次生成的单卡角色定位（角色卡对象 / {{user}} / 配角表）。
+  final CastResolution? cast;
+
   Map<String, dynamic> toJson() => {
         'bookName': bookName,
         'cards': cards.map((c) => c.toJson()).toList(),
@@ -628,6 +994,7 @@ class GenResult {
         'failedBlocks': failedBlocks,
         'scannedBlocks': scannedBlocks,
         'totalBlocks': totalBlocks,
+        if (cast != null) 'cast': cast!.toJson(),
       };
 
   factory GenResult.fromJson(Map<String, dynamic> j) => GenResult(
@@ -646,6 +1013,11 @@ class GenResult {
         failedBlocks: _strList(j['failedBlocks']),
         scannedBlocks: (j['scannedBlocks'] as num?)?.toInt() ?? 0,
         totalBlocks: (j['totalBlocks'] as num?)?.toInt() ?? 0,
+        cast: j['cast'] is Map
+            ? CastResolution.fromJson(
+                Map<String, dynamic>.from(j['cast'] as Map),
+              )
+            : null,
       );
 }
 

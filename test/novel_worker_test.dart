@@ -38,9 +38,9 @@ void main() {
       fileName: 'book.txt',
       scanMode: ScanMode.headOnly,
       headChapters: 2,
-      maxCards: 1,
       maxLoreEntries: 3,
       concurrency: 1,
+      supportingLimit: 3,
     );
 
     final jobId = 'test-job';

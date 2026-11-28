@@ -160,6 +160,42 @@ class NovelSampler {
     return Map<String, int>.fromEntries(entries.take(_maxCandidates));
   }
 
+  /// 从一段文本（通常是文件开头）快速抽人名候选及出现次数，供角色预检使用。
+  ///
+  /// 与全书扫描共用同一套启发式，但不落盘、不建索引，几十 KB 文本毫秒级完成。
+  static Map<String, int> nameCandidateCountsFromText(
+    String text, {
+    int limit = 30,
+  }) {
+    final counts = <String, int>{};
+    void add(String raw) {
+      if (_badName(raw)) return;
+      counts[raw] = (counts[raw] ?? 0) + 1;
+    }
+
+    for (final m in _nameBeforeVerb.allMatches(text)) {
+      add(m.group(2)!);
+    }
+    for (final m in _quotedName.allMatches(text)) {
+      add(m.group(1)!);
+    }
+    for (final m in _nameDe.allMatches(text)) {
+      add(m.group(2)!);
+    }
+    final entries = counts.entries.toList()
+      ..sort((a, b) {
+        final c = b.value.compareTo(a.value);
+        return c != 0 ? c : a.key.compareTo(b.key);
+      });
+    return Map<String, int>.fromEntries(entries.take(limit));
+  }
+
+  static List<String> nameCandidatesFromText(
+    String text, {
+    int limit = 30,
+  }) =>
+      nameCandidateCountsFromText(text, limit: limit).keys.toList();
+
   /// 按扫描模式挑选要送入 LLM 的章（返回 [ChapterRef.index]，升序、去重、
   /// 确定性）。smart：必选开头 min(3,n) 章 + 结尾 min(2,n) 章，再沿全书
   /// 均匀覆盖取点，剩余额度按戏份密度（chapterNameHits）从高到低补齐，

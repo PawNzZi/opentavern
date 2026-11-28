@@ -8,10 +8,12 @@ import 'package:flutter/material.dart';
 
 import '../core/lore_io.dart';
 import '../core/models.dart';
+import '../core/novel/generator.dart';
 import '../core/novel/job_store.dart';
 import '../core/novel/novel_controller.dart';
 import '../core/novel/novel_types.dart';
 import '../core/novel/publish.dart';
+import '../core/novel/stats.dart';
 import '../core/novel/text_stream.dart';
 import '../core/store.dart';
 import '../design/glass.dart';
@@ -54,11 +56,20 @@ class _NovelImportPageState extends State<NovelImportPage> {
 
   ScanMode _mode = ScanMode.smart;
   int _maxBlocks = 120;
-  int _maxCards = 3;
   int _maxLore = 40;
+  int _supportingLimit = 30;
+  NovelDetail _detail = NovelDetail.detailed;
   int _concurrency = 2;
   String _provider = '';
   String _model = '';
+
+  /// 角色定位（单卡）：可手动改选，留空 = 生成时自动判断。
+  String _castChar = '';
+  String _castUser = '';
+  String _castUserDescription = '';
+  CastResolution? _castPreview;
+  List<String> _castCandidates = const [];
+  bool _casting = false;
 
   List<NovelJobSummary> _jobs = const [];
   bool _saving = false;
@@ -130,6 +141,12 @@ class _NovelImportPageState extends State<NovelImportPage> {
       _fileSize = size;
       _fileEncoding = encoding;
       _estChars = estChars;
+      // 换文件后旧的预判结果失效。
+      _castPreview = null;
+      _castCandidates = const [];
+      _castChar = '';
+      _castUser = '';
+      _castUserDescription = '';
     });
   }
 
@@ -179,6 +196,217 @@ class _NovelImportPageState extends State<NovelImportPage> {
     setState(() => _model = picked);
   }
 
+  // ------------------------------------------------------------ 角色定位
+
+  String get _castCharLabel => _castChar.trim().isEmpty ? '自动判断' : _castChar;
+  String get _castUserLabel => _castUser.trim().isEmpty ? '自动判断' : _castUser;
+
+  /// 预检：只读文件开头 + 本地人名候选，调一次 AI 定位。
+  ///
+  /// 不预检也能直接开始——worker 会在抽取完成后自动定位；这里只是让用户在
+  /// 花钱抽全书之前就能确认「谁是角色卡、谁是 {{user}}」。
+  Future<void> _detectCast() async {
+    if (_filePath.isEmpty) {
+      showTavernToast(context, '请先选择小说或文档文件');
+      return;
+    }
+    if (_casting) return;
+    final api = AppStore.instance.apiForProvider(_provider, model: _model);
+    if (!api.configured) {
+      showTavernToast(context, '该服务商还没配置密钥，请先去「API 连接」填写');
+      return;
+    }
+    setState(() => _casting = true);
+    String textPath = _filePath;
+    var tempPath = false;
+    try {
+      textPath = await NovelTextStream.prepareTextFile(_filePath);
+      tempPath = textPath != _filePath;
+      final prefix = await NovelTextStream.readPrefix(textPath);
+      final counts = NovelSampler.nameCandidateCountsFromText(prefix);
+      final generator = NovelGenerator(
+        settings: AppStore.instance.settings.copyWith(api: api),
+      );
+      final cast = await generator.resolveCast(
+        title: _fileName,
+        openingExcerpt: prefix,
+        candidates: [
+          for (final entry in counts.entries)
+            CastCandidate(name: entry.key, mentions: entry.value),
+        ],
+        charOverride: _castChar,
+        userOverride: _castUser,
+        userDescriptionOverride: _castUserDescription,
+      );
+      if (!mounted) return;
+      setState(() {
+        _castPreview = cast;
+        _castCandidates = counts.keys.toList();
+        _castChar = cast.character.name;
+        _castUser = cast.user.name;
+        _castUserDescription = cast.user.description;
+      });
+      showTavernToast(
+        context,
+        '角色卡：${cast.character.name} · {{user}}：${cast.user.name}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showTavernToast(context, '角色识别失败：$e');
+    } finally {
+      if (tempPath) {
+        try {
+          await File(textPath).parent.delete(recursive: true);
+        } catch (_) {}
+      }
+      if (mounted) setState(() => _casting = false);
+    }
+  }
+
+  Future<void> _pickCastChar() async {
+    if (_castCandidates.isEmpty) {
+      showTavernToast(context, '先点「识别角色」得到候选，或直接开始自动判断');
+      return;
+    }
+    final picked = await _pickCastName(
+      title: '角色卡对象（{{char}}）',
+      subtitle: '只生成这一张卡，其余角色写进世界书',
+      current: _castChar,
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _castChar = picked);
+  }
+
+  Future<void> _pickCastUser() async {
+    if (_castCandidates.isEmpty) {
+      showTavernToast(context, '先点「识别角色」得到候选，或直接开始自动判断');
+      return;
+    }
+    final picked = await _pickCastName(
+      title: '{{user}} 是谁',
+      subtitle: '第一人称默认「我」，也可以选小说里的名字',
+      current: _castUser,
+      includeMe: true,
+    );
+    if (picked == null || !mounted) return;
+    if (picked == '__custom__') {
+      await _customCastUser();
+      return;
+    }
+    setState(() {
+      _castUser = picked;
+      _castUserDescription = _castPreview?.user.name == picked && picked.isNotEmpty
+          ? _castPreview!.user.description
+          : '';
+    });
+  }
+
+  Future<void> _customCastUser() async {
+    final controller = TextEditingController(text: _castUser);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('自定义 {{user}}'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '例如：我 / 小杰 / 儿子',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null || value.isEmpty || !mounted) return;
+    setState(() {
+      _castUser = value;
+      _castUserDescription = _castPreview?.user.name == value
+          ? _castPreview!.user.description
+          : '';
+    });
+  }
+
+  Future<String?> _pickCastName({
+    required String title,
+    required String subtitle,
+    required String current,
+    bool includeMe = false,
+  }) {
+    final options = <String>{
+      if (includeMe) '我',
+      ..._castCandidates,
+    }.where((e) => e.isNotEmpty).toList();
+    return showTavernSheet<String>(
+      context,
+      title: title,
+      subtitle: subtitle,
+      heightFactor: .78,
+      child: StatefulBuilder(
+        builder: (sheetContext, setSheet) {
+          final p = AppPalette.of(sheetContext);
+          return Glass(
+            radius: 22,
+            blur: 22,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                SettingRow(
+                  icon: Icons.auto_awesome_rounded,
+                  title: '自动判断',
+                  subtitle: '生成时按书名、第一人称与戏份决定',
+                  chevron: false,
+                  iconColor: current.isEmpty ? p.amber : p.textTertiary,
+                  trailing: current.isEmpty
+                      ? Icon(Icons.check_rounded, size: 17, color: p.amber)
+                      : null,
+                  onTap: () => Navigator.of(sheetContext).pop(''),
+                ),
+                for (final name in options.where((e) => e.isNotEmpty)) ...[
+                  const Hairline(indent: 56),
+                  SettingRow(
+                    icon: name == '我'
+                        ? Icons.person_outline_rounded
+                        : Icons.badge_outlined,
+                    title: name,
+                    chevron: false,
+                    iconColor:
+                        current == name ? p.amber : p.textTertiary,
+                    trailing: current == name
+                        ? Icon(Icons.check_rounded, size: 17, color: p.amber)
+                        : null,
+                    onTap: () => Navigator.of(sheetContext).pop(name),
+                  ),
+                ],
+                if (includeMe) ...[
+                  const Hairline(indent: 56),
+                  SettingRow(
+                    icon: Icons.edit_outlined,
+                    title: '自定义输入…',
+                    chevron: false,
+                    onTap: () =>
+                        Navigator.of(sheetContext).pop('__custom__'),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   // ------------------------------------------------------------ 启动
 
   NovelJobConfig get _config => NovelJobConfig(
@@ -186,7 +414,6 @@ class _NovelImportPageState extends State<NovelImportPage> {
         fileName: _fileName,
         scanMode: _mode,
         maxBlocks: _maxBlocks,
-        maxCards: _maxCards,
         maxLoreEntries: _maxLore,
         concurrency: _concurrency,
         providerOverride: _provider,
@@ -195,6 +422,11 @@ class _NovelImportPageState extends State<NovelImportPage> {
         extraInstruction: _extra.text.trim(),
         tokenBudget: _tokenBudget,
         encodingOverride: _encodingOverride,
+        cardCharacter: _castChar,
+        cardUser: _castUser,
+        cardUserDescription: _castUserDescription,
+        detail: _detail,
+        supportingLimit: _supportingLimit,
       );
 
   Future<void> _start() async {
@@ -511,7 +743,7 @@ class _NovelImportPageState extends State<NovelImportPage> {
           SettingRow(
             icon: Icons.image_outlined,
             title: '角色立绘',
-            subtitle: '按顺序分配给生成的角色，可留空',
+            subtitle: '单卡模式只用第一张立绘，可留空',
             value: _avatars.isEmpty ? '未选择' : '${_avatars.length} 张',
             iconColor: p.violet,
             onTap: _pickAvatars,
@@ -539,7 +771,56 @@ class _NovelImportPageState extends State<NovelImportPage> {
       ),
       const SizedBox(height: 14),
       SettingsGroup(
+        title: '角色定位（单卡）',
+        footnote: '只生成 1 张角色卡，其余人物自动写进世界书。'
+            '可以先「识别」再确认，也可以跳过、生成时自动判断。',
+        children: [
+          SettingRow(
+            icon: Icons.auto_awesome_rounded,
+            title: 'AI 预判角色卡与 {{user}}',
+            subtitle: _castPreview == null
+                ? '读取文件开头，调 1 次 AI 预判（不抽全书）'
+                : '已预判：${_castPreview!.source == 'ai' ? 'AI' : '本地规则'} · '
+                    '置信度 ${(_castPreview!.confidence * 100).round()}%',
+            value: _casting ? '识别中…' : '识别',
+            iconColor: _casting ? p.textTertiary : p.amber,
+            onTap: _casting ? null : _detectCast,
+          ),
+          const Hairline(indent: 56),
+          SettingRow(
+            icon: Icons.badge_outlined,
+            title: '角色卡对象（{{char}}）',
+            subtitle: '只生成这一张卡，其余角色入世界书',
+            value: _castCharLabel,
+            iconColor: p.violet,
+            onTap: _pickCastChar,
+          ),
+          const Hairline(indent: 56),
+          SettingRow(
+            icon: Icons.person_outline_rounded,
+            title: '{{user}} 身份',
+            subtitle: '默认「我」，可改成小说里的名字',
+            value: _castUserLabel,
+            iconColor: p.sage,
+            onTap: _pickCastUser,
+          ),
+        ],
+      ),
+      if (_castPreview != null) ...[
+        const SizedBox(height: 8),
+        HintCard(
+          text: '预判结果：{{char}} = ${_castPreview!.character.name}，'
+              '{{user}} = ${_castPreview!.user.name}。'
+              '${_castPreview!.reason.trim().isEmpty ? '' : _castPreview!.reason}',
+          icon: Icons.auto_awesome_rounded,
+          color: p.sage,
+        ),
+      ],
+      const SizedBox(height: 14),
+      SettingsGroup(
         title: '生成',
+        footnote: '「详尽」会让每条人物/世界设定写 250~700 字，token 消耗更高；'
+            '人物条目超出上限时按重要度截断。',
         children: [
           SegmentLine(
             title: '扫描模式',
@@ -560,18 +841,28 @@ class _NovelImportPageState extends State<NovelImportPage> {
             ),
           ],
           const Hairline(indent: 14),
-          StepperRow(
-            title: '角色卡数量',
-            subtitle: '按戏份取前 N 个人物',
-            value: '$_maxCards',
-            onMinus: () =>
-                setState(() => _maxCards = (_maxCards - 1).clamp(1, 10)),
-            onPlus: () =>
-                setState(() => _maxCards = (_maxCards + 1).clamp(1, 10)),
+          SegmentLine(
+            title: '世界书详细度',
+            options: const ['标准', '详尽'],
+            index: _detail.index,
+            onChanged: (i) => setState(
+              () => _detail = NovelDetail.values[i],
+            ),
           ),
           const Hairline(indent: 14),
           StepperRow(
-            title: '世界书条目上限',
+            title: '人物条目上限',
+            subtitle: '重要配角按戏份写入世界书',
+            value: '$_supportingLimit',
+            onMinus: () => setState(
+                () => _supportingLimit = (_supportingLimit - 5).clamp(5, 60)),
+            onPlus: () => setState(
+                () => _supportingLimit = (_supportingLimit + 5).clamp(5, 60)),
+          ),
+          const Hairline(indent: 14),
+          StepperRow(
+            title: '世界设定条目上限',
+            subtitle: '地点/组织/规则等，不含人物条目',
             value: '$_maxLore',
             onMinus: () =>
                 setState(() => _maxLore = (_maxLore - 10).clamp(5, 200)),
@@ -1010,6 +1301,17 @@ class _NovelImportPageState extends State<NovelImportPage> {
           ],
         ),
       ),
+      if (result.cast != null) ...[
+        const SizedBox(height: 10),
+        HintCard(
+          text: '单卡定位：{{char}} = ${result.cast!.character.name}，'
+              '{{user}} = ${result.cast!.user.name}（仅对本卡生效）。'
+              '其余 ${result.cast!.supporting.length} 人已写入世界书。'
+              '${result.cast!.source == 'fallback' ? '本次是本地规则兜底，建议核对。' : ''}',
+          icon: Icons.badge_outlined,
+          color: result.cast!.source == 'fallback' ? p.amber : p.sage,
+        ),
+      ],
       if (result.failedBlocks.isNotEmpty) ...[
         const SizedBox(height: 10),
         HintCard(
@@ -1021,7 +1323,7 @@ class _NovelImportPageState extends State<NovelImportPage> {
         ),
       ],
       const SizedBox(height: 14),
-      SectionLabel('角色卡'),
+      const SectionLabel('角色卡（单卡）'),
       const SizedBox(height: 8),
       for (var i = 0; i < result.cards.length; i++) ...[
         _cardTile(p, result, i),
@@ -1095,7 +1397,12 @@ class _NovelImportPageState extends State<NovelImportPage> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      card.avatarPath.isEmpty ? '未指定立绘' : '已指定立绘',
+                      card.userName.trim().isEmpty
+                          ? '{{user}}：跟随全局人格'
+                          : '{{user}}：${card.userName}'
+                              '${card.avatarPath.isEmpty ? '' : ' · 已指定立绘'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: appText(9.5, FontWeight.w400, p.textTertiary),
                     ),
                   ],
@@ -1116,6 +1423,17 @@ class _NovelImportPageState extends State<NovelImportPage> {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: appText(11.5, FontWeight.w400, p.textSecondary, height: 1.5),
+            ),
+          ],
+          if (card.speechStyle.trim().isNotEmpty ||
+              card.speechExamples.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              '说话方式：${card.speechStyle.trim().isEmpty ? '（见示例）' : card.speechStyle.trim()}'
+              '${card.speechExamples.isEmpty ? '' : '\n示例：${card.speechExamples.take(3).map((q) => '「$q」').join(' ')}'}',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: appText(10.5, FontWeight.w400, p.textTertiary, height: 1.5),
             ),
           ],
           if (card.tags.isNotEmpty) ...[
@@ -1168,6 +1486,7 @@ class _NovelImportPageState extends State<NovelImportPage> {
     List<DraftCard>? cards,
     List<DraftLoreEntry>? lore,
     String? bookName,
+    CastResolution? cast,
   }) =>
       GenResult(
         bookName: bookName ?? result.bookName,
@@ -1177,6 +1496,7 @@ class _NovelImportPageState extends State<NovelImportPage> {
         failedBlocks: result.failedBlocks,
         scannedBlocks: result.scannedBlocks,
         totalBlocks: result.totalBlocks,
+        cast: cast ?? result.cast,
       );
 
   Widget _loreTile(AppPalette p, GenResult result, int index) {
@@ -1283,6 +1603,13 @@ class _NovelImportPageState extends State<NovelImportPage> {
     );
     final system = TextEditingController(text: card.systemPrompt);
     final tags = TextEditingController(text: card.tags.join('、'));
+    final userName = TextEditingController(text: card.userName);
+    final userDesc =
+        TextEditingController(text: card.userDescription);
+    final speechStyle = TextEditingController(text: card.speechStyle);
+    final speechExamples = TextEditingController(
+      text: card.speechExamples.join('\n'),
+    );
     final saved = await showTavernSheet<bool>(
       context,
       title: '编辑角色卡',
@@ -1291,8 +1618,12 @@ class _NovelImportPageState extends State<NovelImportPage> {
       child: Column(
         children: [
           _editField('名字', name),
+          _editField('{{user}} 名字（角色级人格，仅本卡生效）', userName),
+          _editField('{{user}} 人格描述', userDesc, lines: 4),
           _editField('角色设定', desc, lines: 6),
           _editField('性格', personality, lines: 3),
+          _editField('习惯的说话方式', speechStyle, lines: 3),
+          _editField('说话示例（每行一条）', speechExamples, lines: 4),
           _editField('场景', scenario, lines: 2),
           _editField('开场白', greeting, lines: 6),
           _editField('对话示例（可用 <START> 分组）', example, lines: 6),
@@ -1328,8 +1659,23 @@ class _NovelImportPageState extends State<NovelImportPage> {
             .map((e) => e.trim())
             .where((e) => e.isNotEmpty)
             .toList(),
+        userName: userName.text.trim(),
+        userDescription: userDesc.text.trim(),
+        speechStyle: speechStyle.text.trim(),
+        speechExamples: speechExamples.text
+            .split('\n')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
       );
-      _gen.updateResult(_copyResult(result, cards: cards));
+      final currentCast = result.cast;
+      final cast = currentCast?.copyWith(
+        user: currentCast.user.copyWith(
+          name: userName.text.trim(),
+          description: userDesc.text.trim(),
+        ),
+      );
+      _gen.updateResult(_copyResult(result, cards: cards, cast: cast));
     }
     name.dispose();
     desc.dispose();
@@ -1340,6 +1686,10 @@ class _NovelImportPageState extends State<NovelImportPage> {
     alts.dispose();
     system.dispose();
     tags.dispose();
+    userName.dispose();
+    userDesc.dispose();
+    speechStyle.dispose();
+    speechExamples.dispose();
   }
 
   static const _altSeparator = '\n---\n';
